@@ -1,0 +1,50 @@
+name: TranStudy
+
+options:
+  bundleIdPrefix: com.cynicalight
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  TranStudy:
+    type: application
+    platform: macOS
+    sources:
+      - path: TranStudy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cynicalight.TranStudy
+        PRODUCT_NAME: TranStudy
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: TranStudy
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+
+  TranStudyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: TranStudyTests
+    dependencies:
+      - target: TranStudy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cynicalight.TranStudyTests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  TranStudy:
+    build:
+      targets:
+        TranStudy: all
+        TranStudyTests:
+          - test
+    test:
+      targets:
+        - TranStudyTests
