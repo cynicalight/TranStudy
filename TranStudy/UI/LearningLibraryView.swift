@@ -9,7 +9,7 @@ struct LearningLibraryView: View {
         ContentUnavailableView(
           "单词库",
           systemImage: "books.vertical",
-          description: Text("按 F4 翻译剪贴板中的单词，再点击“加入学习”。")
+          description: Text("按 F5 翻译剪贴板中的单词，再点击“加入学习”。")
         )
       } else {
         List(shell.learningItems) { item in

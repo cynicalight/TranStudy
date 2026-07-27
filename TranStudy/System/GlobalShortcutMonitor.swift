@@ -45,7 +45,7 @@ final class GlobalShortcutMonitor {
       id: 1
     )
     RegisterEventHotKey(
-      UInt32(kVK_F4),
+      UInt32(kVK_F5),
       0,
       identifier,
       GetApplicationEventTarget(),
