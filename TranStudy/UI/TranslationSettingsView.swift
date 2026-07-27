@@ -6,6 +6,26 @@ struct TranslationSettingsView: View {
 
   var body: some View {
     Form {
+      Section("悬浮窗") {
+        Picker(
+          "位置",
+          selection: Binding(
+            get: {
+              shell.translationPanelPosition
+            },
+            set: {
+              shell.setTranslationPanelPosition($0)
+            }
+          )
+        ) {
+          ForEach(TranslationPanelPosition.allCases) { position in
+            Text(position.title)
+              .tag(position)
+          }
+        }
+        .pickerStyle(.segmented)
+      }
+
       Section("DeepSeek") {
         LabeledContent("模型", value: DeepSeekModel.flash.title)
         SecureField("API Key", text: $apiKey)

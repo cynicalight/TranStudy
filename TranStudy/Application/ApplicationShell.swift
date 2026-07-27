@@ -28,10 +28,12 @@ final class ApplicationShell {
   private(set) var translationStatus: TranslationStatus = .idle
   private(set) var translationSourceText = ""
   private(set) var learningItems: [LearningItem] = []
+  private(set) var translationPanelPosition: TranslationPanelPosition
   private var activeTranslationID: UUID?
 
   init(environment: ApplicationEnvironment) {
     self.environment = environment
+    translationPanelPosition = environment.panelPositionStore.load()
   }
 
   func refreshTodayReview() async {
@@ -123,6 +125,11 @@ final class ApplicationShell {
   func prepareTranslationPresentation() {
     translationSourceText = ""
     translationStatus = .loading
+  }
+
+  func setTranslationPanelPosition(_ position: TranslationPanelPosition) {
+    translationPanelPosition = position
+    environment.panelPositionStore.save(position)
   }
 
   func testDeepSeekConnection(apiKey: String) async {

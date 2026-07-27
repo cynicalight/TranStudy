@@ -40,6 +40,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
 
   private func showPanel() {
     if let panel {
+      position(panel)
       panel.orderFrontRegardless()
       return
     }
@@ -68,9 +69,21 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
           self?.dismiss()
         }
       ))
-    panel.center()
+    position(panel)
 
     self.panel = panel
     panel.orderFrontRegardless()
+  }
+
+  private func position(_ panel: NSPanel) {
+    guard let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first else {
+      return
+    }
+
+    panel.setFrameOrigin(
+      shell.translationPanelPosition.origin(
+        panelSize: panel.frame.size,
+        visibleFrame: screen.visibleFrame
+      ))
   }
 }

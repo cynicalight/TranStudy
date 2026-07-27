@@ -231,6 +231,33 @@ struct ApplicationShellTests {
     controller.dismiss()
   }
 
+  @Test("translation panel uses the position selected in settings")
+  func translationPanelUsesSelectedPosition() throws {
+    let positionStore = TestTranslationPanelPositionStore(position: .topTrailing)
+    let shell = ApplicationShell(
+      environment: .test(panelPositionStore: positionStore)
+    )
+    let controller = TranslationPanelController(shell: shell)
+    let screen = try #require(NSScreen.main)
+
+    shell.setTranslationPanelPosition(.topLeading)
+    controller.presentClipboardTranslation()
+
+    let panel = try #require(
+      NSApp.windows
+        .compactMap { $0 as? NSPanel }
+        .first { $0.delegate === controller }
+    )
+    let expectedOrigin = TranslationPanelPosition.topLeading.origin(
+      panelSize: panel.frame.size,
+      visibleFrame: screen.visibleFrame
+    )
+
+    #expect(positionStore.savedPosition == .topLeading)
+    #expect(panel.frame.origin == expectedOrigin)
+    controller.dismiss()
+  }
+
   @Test("app launch refreshes today's review through replaceable boundaries")
   func appLaunchRefreshesTodayReview() async throws {
     let notifier = TestReviewNotifier()
@@ -266,7 +293,8 @@ extension ApplicationEnvironment {
     learningStore: TestLearningStore = TestLearningStore(),
     apiKeyStore: TestApplicationAPIKeyStore = TestApplicationAPIKeyStore(),
     connectionTester: TestTranslationConnectionTester = TestTranslationConnectionTester(),
-    notifier: TestReviewNotifier = TestReviewNotifier()
+    notifier: TestReviewNotifier = TestReviewNotifier(),
+    panelPositionStore: TestTranslationPanelPositionStore = TestTranslationPanelPositionStore()
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: TestSelectionProvider(),
@@ -277,7 +305,8 @@ extension ApplicationEnvironment {
       connectionTester: connectionTester,
       clock: TestClock(),
       notifications: notifier,
-      speech: TestSpeechPlayer()
+      speech: TestSpeechPlayer(),
+      panelPositionStore: panelPositionStore
     )
   }
 }
@@ -404,4 +433,20 @@ private final class TestReviewNotifier: ReviewNotifying {
 
 private struct TestSpeechPlayer: SpeechPlaying {
   func speak(_ text: String) {}
+}
+
+private final class TestTranslationPanelPositionStore: TranslationPanelPositionStoring {
+  private(set) var savedPosition: TranslationPanelPosition
+
+  init(position: TranslationPanelPosition = .topTrailing) {
+    savedPosition = position
+  }
+
+  func load() -> TranslationPanelPosition {
+    savedPosition
+  }
+
+  func save(_ position: TranslationPanelPosition) {
+    savedPosition = position
+  }
 }

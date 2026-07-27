@@ -11,6 +11,7 @@ struct ApplicationEnvironment {
   let clock: any DateProviding
   let notifications: any ReviewNotifying
   let speech: any SpeechPlaying
+  let panelPositionStore: any TranslationPanelPositionStoring
 }
 
 extension ApplicationEnvironment {
@@ -30,7 +31,8 @@ extension ApplicationEnvironment {
       connectionTester: connectionTester,
       clock: SystemDateProvider(),
       notifications: DisabledReviewNotifier(),
-      speech: DisabledSpeechPlayer()
+      speech: DisabledSpeechPlayer(),
+      panelPositionStore: UserDefaultsTranslationPanelPositionStore()
     )
   }
 }
