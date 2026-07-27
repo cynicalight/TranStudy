@@ -22,12 +22,16 @@ struct RootView: View {
   @ViewBuilder
   private var destinationView: some View {
     switch shell.selectedDestination {
-    case let destination?:
+    case .todayReview:
       PlaceholderView(
-        title: destination.title,
-        systemImage: destination.systemImage,
-        description: destination.placeholderDescription
+        title: AppDestination.todayReview.title,
+        systemImage: AppDestination.todayReview.systemImage,
+        description: AppDestination.todayReview.placeholderDescription
       )
+    case .library:
+      LearningLibraryView(shell: shell)
+    case .settings:
+      TranslationSettingsView(shell: shell)
     case nil:
       PlaceholderView(
         title: "TranStudy",

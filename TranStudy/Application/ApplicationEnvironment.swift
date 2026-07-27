@@ -6,6 +6,8 @@ struct ApplicationEnvironment {
   let clipboard: any ClipboardReading
   let translation: any TranslationProviding
   let learningStore: any LearningStoring
+  let apiKeyStore: any APIKeyStoring
+  let connectionTester: any TranslationConnectionTesting
   let clock: any DateProviding
   let notifications: any ReviewNotifying
   let speech: any SpeechPlaying
@@ -13,12 +15,19 @@ struct ApplicationEnvironment {
 
 extension ApplicationEnvironment {
   @MainActor
-  static func live(learningStore: any LearningStoring) -> ApplicationEnvironment {
+  static func live(
+    learningStore: any LearningStoring,
+    translation: any TranslationProviding,
+    apiKeyStore: any APIKeyStoring,
+    connectionTester: any TranslationConnectionTesting
+  ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: UnavailableSelectionProvider(),
       clipboard: SystemClipboardReader(),
-      translation: UnconfiguredTranslationProvider(),
+      translation: translation,
       learningStore: learningStore,
+      apiKeyStore: apiKeyStore,
+      connectionTester: connectionTester,
       clock: SystemDateProvider(),
       notifications: DisabledReviewNotifier(),
       speech: DisabledSpeechPlayer()
@@ -35,12 +44,6 @@ private struct UnavailableSelectionProvider: SelectionProviding {
 private struct SystemClipboardReader: ClipboardReading {
   func readText() -> String? {
     NSPasteboard.general.string(forType: .string)
-  }
-}
-
-private struct UnconfiguredTranslationProvider: TranslationProviding {
-  func translate(_ request: TranslationRequest) async throws -> TranslationResult {
-    throw TranslationError.notConfigured
   }
 }
 
