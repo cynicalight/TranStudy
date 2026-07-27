@@ -10,12 +10,6 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
   init(shell: ApplicationShell) {
     self.shell = shell
     super.init()
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(applicationDidResignActive),
-      name: NSApplication.didResignActiveNotification,
-      object: nil
-    )
   }
 
   func presentClipboardTranslation() {
@@ -37,11 +31,6 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     panel?.close()
   }
 
-  @objc
-  private func applicationDidResignActive(_ notification: Notification) {
-    dismiss()
-  }
-
   func windowWillClose(_ notification: Notification) {
     translationTask?.cancel()
     translationTask = nil
@@ -51,14 +40,13 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
 
   private func showPanel() {
     if let panel {
-      NSApp.activate(ignoringOtherApps: true)
-      panel.makeKeyAndOrderFront(nil)
+      panel.orderFrontRegardless()
       return
     }
 
     let panel = NSPanel(
       contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
-      styleMask: [.titled, .closable, .fullSizeContentView],
+      styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
       backing: .buffered,
       defer: false
     )
@@ -66,6 +54,8 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     panel.titlebarAppearsTransparent = true
     panel.isFloatingPanel = true
     panel.level = .floating
+    panel.hidesOnDeactivate = false
+    panel.becomesKeyOnlyIfNeeded = true
     panel.isReleasedWhenClosed = false
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
@@ -81,7 +71,6 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     panel.center()
 
     self.panel = panel
-    NSApp.activate(ignoringOtherApps: true)
-    panel.makeKeyAndOrderFront(nil)
+    panel.orderFrontRegardless()
   }
 }

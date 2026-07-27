@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -207,6 +208,27 @@ struct ApplicationShellTests {
 
     #expect(shell.translationDraft == nil)
     #expect(shell.translationStatus == .idle)
+  }
+
+  @Test("translation panel floats without activating TranStudy")
+  func translationPanelDoesNotActivateApplication() async {
+    let shell = ApplicationShell(environment: .test())
+    let controller = TranslationPanelController(shell: shell)
+    NSApp.deactivate()
+    try? await Task.sleep(for: .milliseconds(100))
+    #expect(NSApp.isActive == false)
+
+    controller.presentClipboardTranslation()
+    try? await Task.sleep(for: .milliseconds(100))
+
+    let panel = NSApp.windows
+      .compactMap { $0 as? NSPanel }
+      .first { $0.delegate === controller }
+
+    #expect(NSApp.isActive == false)
+    #expect(panel?.styleMask.contains(.nonactivatingPanel) == true)
+    #expect(panel?.hidesOnDeactivate == false)
+    controller.dismiss()
   }
 
   @Test("app launch refreshes today's review through replaceable boundaries")
