@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct TodayReviewView: View {
+  @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+  @State private var hasCompletedReviewFlip = false
+
   let shell: ApplicationShell
 
   var body: some View {
@@ -48,57 +51,76 @@ struct TodayReviewView: View {
 
   private func reviewSession(_ item: LearningItem) -> some View {
     VStack(spacing: 16) {
-      if shell.isReviewAnswerVisible {
+      ReviewFlipCard(
+        isFlipped: shell.isReviewAnswerVisible,
+        isBackFaceInteractive: hasCompletedReviewFlip,
+        onFlip: shell.revealCurrentReviewAnswer
+      ) {
+        Text(item.canonicalForm)
+          .font(.system(size: 48, weight: .semibold, design: .rounded))
+          .minimumScaleFactor(0.65)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } back: {
         reviewAnswer(item)
-          .padding(28)
-          .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
-          .contentSurface()
-      } else {
-        Button {
-          shell.revealCurrentReviewAnswer()
-        } label: {
-          Text(item.canonicalForm)
-            .font(.system(size: 48, weight: .semibold, design: .rounded))
-            .minimumScaleFactor(0.65)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(28)
-            .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
-            .contentSurface()
-            .contentShape(.rect)
+      }
+      .task(id: shell.isReviewAnswerVisible) {
+        hasCompletedReviewFlip = false
+        guard shell.isReviewAnswerVisible else {
+          return
         }
-        .buttonStyle(.plain)
-        .accessibilityHint("显示完整释义和例句")
+
+        let duration =
+          accessibilityReduceMotion
+          ? ReviewFlipMotion.reducedMotionCompletionDelay
+          : ReviewFlipMotion.completionDelay
+        try? await Task.sleep(for: duration)
+        guard !Task.isCancelled, shell.isReviewAnswerVisible else {
+          return
+        }
+        hasCompletedReviewFlip = true
       }
 
-      if shell.selectedReviewRating == nil {
-        HStack(spacing: 10) {
-          ForEach(ReviewRating.allCases, id: \.self) { rating in
-            Button {
-              Task {
-                await shell.rateCurrentReview(rating)
+      Group {
+        if !showsNextReviewButton {
+          HStack(spacing: 10) {
+            ForEach(ReviewRating.allCases, id: \.self) { rating in
+              Button {
+                Task {
+                  await shell.rateCurrentReview(rating)
+                }
+              } label: {
+                Text(rating.title)
+                  .frame(maxWidth: .infinity)
               }
-            } label: {
-              Text(rating.title)
-                .frame(maxWidth: .infinity)
+              .buttonStyle(.bordered)
+              .controlSize(.large)
+              .tint(rating.tint)
+              .disabled(shell.isReviewRating || shell.selectedReviewRating != nil)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .tint(rating.tint)
-            .disabled(shell.isReviewRating)
           }
+          .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        } else {
+          Button {
+            shell.advanceToNextReview()
+          } label: {
+            Label("下一个", systemImage: "arrow.right")
+              .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.large)
+          .transition(.opacity.combined(with: .scale(scale: 0.98)))
         }
-      } else {
-        Button {
-          shell.advanceToNextReview()
-        } label: {
-          Label("下一个", systemImage: "arrow.right")
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
       }
+      .animation(
+        .easeOut(duration: accessibilityReduceMotion ? 0.12 : 0.16),
+        value: showsNextReviewButton
+      )
     }
+  }
+
+  private var showsNextReviewButton: Bool {
+    shell.selectedReviewRating != nil && hasCompletedReviewFlip
   }
 
   private func reviewAnswer(_ item: LearningItem) -> some View {
@@ -217,6 +239,124 @@ struct TodayReviewView: View {
 
   private var reviewStatusTint: Color {
     shell.learningSummary.dueCount == 0 ? .green : .orange
+  }
+}
+
+private struct ReviewFlipCard<Front: View, Back: View>: View {
+  @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+  let isFlipped: Bool
+  let isBackFaceInteractive: Bool
+  let onFlip: () -> Void
+  let front: Front
+  let back: Back
+
+  init(
+    isFlipped: Bool,
+    isBackFaceInteractive: Bool,
+    onFlip: @escaping () -> Void,
+    @ViewBuilder front: () -> Front,
+    @ViewBuilder back: () -> Back
+  ) {
+    self.isFlipped = isFlipped
+    self.isBackFaceInteractive = isBackFaceInteractive
+    self.onFlip = onFlip
+    self.front = front()
+    self.back = back()
+  }
+
+  var body: some View {
+    ZStack(alignment: .topLeading) {
+      if accessibilityReduceMotion {
+        frontFace
+          .opacity(isFlipped ? 0 : 1)
+        backFace
+          .opacity(isFlipped ? 1 : 0)
+      } else {
+        frontFace
+          .modifier(
+            ReviewCardFaceEffect(
+              progress: isFlipped ? 1 : 0,
+              isBack: false
+            ))
+        backFace
+          .modifier(
+            ReviewCardFaceEffect(
+              progress: isFlipped ? 1 : 0,
+              isBack: true
+            ))
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
+    .animation(isFlipped ? flipAnimation : nil, value: isFlipped)
+  }
+
+  private var frontFace: some View {
+    Button(action: onFlip) {
+      front
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(28)
+        .frame(maxWidth: .infinity, minHeight: 300)
+        .contentSurface()
+        .contentShape(.rect)
+    }
+    .buttonStyle(.plain)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .allowsHitTesting(!isFlipped)
+    .accessibilityHidden(isFlipped)
+    .accessibilityHint("显示完整释义和例句")
+  }
+
+  private var backFace: some View {
+    back
+      .padding(28)
+      .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
+      .contentSurface()
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .allowsHitTesting(isBackFaceInteractive)
+      .accessibilityHidden(!isBackFaceInteractive)
+  }
+
+  private var flipAnimation: Animation {
+    ReviewFlipMotion.animation(reduceMotion: accessibilityReduceMotion)
+  }
+}
+
+private enum ReviewFlipMotion {
+  static let completionDelay = Duration.milliseconds(440)
+  static let reducedMotionCompletionDelay = Duration.milliseconds(120)
+
+  static func animation(reduceMotion: Bool) -> Animation {
+    if reduceMotion {
+      return .easeOut(duration: 0.12)
+    }
+    return .spring(duration: 0.44, bounce: 0.14)
+  }
+}
+
+private struct ReviewCardFaceEffect: @MainActor AnimatableModifier {
+  var progress: Double
+  let isBack: Bool
+
+  var animatableData: Double {
+    get { progress }
+    set { progress = newValue }
+  }
+
+  func body(content: Content) -> some View {
+    let rotation = progress * 180 + (isBack ? 180 : 0)
+    let isVisible = isBack ? progress >= 0.5 : progress < 0.5
+    let midpointScale = 1 - sin(progress * .pi) * 0.015
+
+    content
+      .opacity(isVisible ? 1 : 0)
+      .scaleEffect(midpointScale)
+      .rotation3DEffect(
+        .degrees(rotation),
+        axis: (x: 0, y: 1, z: 0),
+        anchor: .center,
+        perspective: 0.7
+      )
   }
 }
 
