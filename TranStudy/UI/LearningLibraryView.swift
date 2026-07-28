@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct LearningLibraryView: View {
-  let shell: ApplicationShell
+  @Bindable var shell: ApplicationShell
+  @State private var editingItem: LearningItem?
+  @State private var editedCanonicalForm = ""
 
   var body: some View {
     VStack(spacing: 0) {
@@ -29,6 +31,16 @@ struct LearningLibraryView: View {
                   .foregroundStyle(.secondary)
               }
               Spacer()
+              Button {
+                editedCanonicalForm = item.canonicalForm
+                editingItem = item
+              } label: {
+                Image(systemName: "pencil")
+              }
+              .buttonStyle(.borderless)
+              .help("修改词典原形")
+              .accessibilityLabel("修改 \(item.canonicalForm) 的词典原形")
+
               if !item.partOfSpeech.isEmpty {
                 Text(item.partOfSpeech)
                   .font(.caption.weight(.medium))
@@ -54,13 +66,27 @@ struct LearningLibraryView: View {
               Image(systemName: "doc.on.clipboard")
               Text(item.sourceApplicationName)
               Text("·")
-              Text(item.createdAt, format: .dateTime.year().month().day())
+              Text(
+                item.encounters.first?.encounteredAt ?? item.createdAt,
+                format: .dateTime.year().month().day()
+              )
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
+
+            if !item.encounters.isEmpty {
+              DisclosureGroup("\(item.encounters.count) 次真实语境") {
+                VStack(alignment: .leading, spacing: 12) {
+                  ForEach(item.encounters) { encounter in
+                    encounterView(encounter)
+                  }
+                }
+                .padding(.top, 8)
+              }
+              .font(.callout)
+            }
           }
           .padding(.vertical, 10)
-          .accessibilityElement(children: .combine)
         }
         .listStyle(.inset)
       }
@@ -69,13 +95,66 @@ struct LearningLibraryView: View {
     .task {
       await shell.refreshLibrary()
     }
+    .sheet(item: $editingItem) { item in
+      VStack(alignment: .leading, spacing: 18) {
+        Text("修改词典原形")
+          .font(.title2.weight(.semibold))
+
+        Text("修改后会用规范化词形检查重复；已有语境不会丢失。")
+          .foregroundStyle(.secondary)
+
+        TextField("词典原形", text: $editedCanonicalForm)
+          .textFieldStyle(.roundedBorder)
+
+        HStack {
+          Spacer()
+          Button("取消", role: .cancel) {
+            editingItem = nil
+          }
+          Button("保存") {
+            Task {
+              await shell.updateLearningItemCanonicalForm(
+                itemID: item.id,
+                canonicalForm: editedCanonicalForm
+              )
+              editingItem = nil
+            }
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(
+            editedCanonicalForm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          )
+        }
+      }
+      .padding(24)
+      .frame(width: 420)
+    }
+    .alert(
+      "合并到已有词条？",
+      isPresented: pendingLibraryMergeBinding,
+      presenting: shell.pendingLibraryMerge
+    ) { _ in
+      Button("取消", role: .cancel) {
+        shell.cancelPendingLibraryMerge()
+      }
+      Button("确认合并") {
+        Task {
+          await shell.confirmPendingLibraryMerge()
+        }
+      }
+    } message: { summary in
+      Text(
+        "“\(summary.incomingSourceText)”将合并到“\(summary.canonicalForm)”。"
+          + "合并后会保留双方的释义、例句和全部语境。"
+      )
+    }
   }
 
   private var librarySubtitle: String {
     if shell.learningItems.isEmpty {
       return "从真实语境中积累值得记住的单词和短语。"
     }
-    return "已收录 \(shell.learningItems.count) 条学习内容，按最近加入排序。"
+    return "已收录 \(shell.learningItems.count) 条学习内容，按最近遇见排序。"
   }
 
   private var emptyLibrary: some View {
@@ -106,6 +185,51 @@ struct LearningLibraryView: View {
     .contentSurface()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .padding(32)
+  }
+
+  private var pendingLibraryMergeBinding: Binding<Bool> {
+    Binding(
+      get: { shell.pendingLibraryMerge != nil },
+      set: { _ in }
+    )
+  }
+
+  private func encounterView(_ encounter: LearningEncounter) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack {
+        Text(encounter.sourceText)
+          .fontWeight(.semibold)
+        if !encounter.pronunciation.isEmpty {
+          Text(encounter.pronunciation)
+            .foregroundStyle(.secondary)
+        }
+        if !encounter.partOfSpeech.isEmpty {
+          Text(encounter.partOfSpeech)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Text(encounter.encounteredAt, format: .dateTime.year().month().day())
+          .font(.caption)
+          .foregroundStyle(.tertiary)
+      }
+
+      if !encounter.contextualMeaning.isEmpty {
+        Text(encounter.contextualMeaning)
+      }
+      if !encounter.exampleSentence.isEmpty {
+        Text(encounter.exampleSentence)
+          .italic()
+          .foregroundStyle(.secondary)
+      }
+      if !encounter.sentenceTranslation.isEmpty {
+        Text(encounter.sentenceTranslation)
+          .foregroundStyle(.secondary)
+      }
+      Label(encounter.sourceApplicationName, systemImage: "app")
+        .font(.caption)
+        .foregroundStyle(.tertiary)
+    }
   }
 }
 

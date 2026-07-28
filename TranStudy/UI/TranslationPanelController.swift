@@ -14,7 +14,9 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
 
   func presentClipboardTranslation() {
     translationTask?.cancel()
-    shell.prepareTranslationPresentation()
+    let sourceApplicationName =
+      NSWorkspace.shared.frontmostApplication?.localizedName ?? "剪贴板"
+    shell.prepareTranslationPresentation(sourceApplicationName: sourceApplicationName)
     showPanel()
     translationTask = Task { [weak self] in
       guard let self else {

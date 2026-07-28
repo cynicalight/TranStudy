@@ -64,6 +64,7 @@ struct ApplicationShellTests {
         learningStore: learningStore
       ))
 
+    shell.prepareTranslationPresentation(sourceApplicationName: "Safari")
     await shell.translateClipboard()
     shell.translationDraft?.contextualMeaning = "奔跑"
 
@@ -83,9 +84,57 @@ struct ApplicationShellTests {
             exampleSentence: "She ran home.",
             sentenceTranslation: "她跑回了家。"
           ),
-          sourceApplicationName: "剪贴板",
+          sourceApplicationName: "Safari",
           createdAt: Date(timeIntervalSince1970: 1_234)
         ))
+    #expect(shell.translationDraft == nil)
+  }
+
+  @Test("correcting a canonical form to an existing word requires merge confirmation")
+  func correctedCanonicalFormRequiresMergeConfirmation() async throws {
+    let existingID = UUID(uuidString: "A60B21B0-D9FC-4DBD-B818-A1819310E5E4")!
+    let learningStore = TestLearningStore(
+      mergeSummary: LearningMergeSummary(
+        existingItemID: existingID,
+        canonicalForm: "run",
+        existingEncounterCount: 2,
+        incomingSourceText: "ran"
+      ))
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "ran"),
+        translation: TestTranslationProvider(
+          result: TranslationResult(
+            sourceText: "ran",
+            canonicalForm: "ran",
+            pronunciation: "/ræn/",
+            partOfSpeech: "verb",
+            contextualMeaning: "跑",
+            exampleSentence: "She ran home.",
+            sentenceTranslation: "她跑回了家。"
+          )),
+        learningStore: learningStore
+      ))
+
+    await shell.translateClipboard()
+    shell.translationDraft?.canonicalForm = "run"
+    await shell.addCurrentDraftToLearning()
+
+    #expect(learningStore.lastAddition == nil)
+    #expect(
+      shell.pendingLearningMerge
+        == LearningMergeSummary(
+          existingItemID: existingID,
+          canonicalForm: "run",
+          existingEncounterCount: 2,
+          incomingSourceText: "ran"
+        ))
+    #expect(shell.translationDraft != nil)
+
+    await shell.confirmPendingLearningMerge()
+
+    #expect(learningStore.lastAddition?.draft.canonicalForm == "run")
+    #expect(shell.pendingLearningMerge == nil)
     #expect(shell.translationDraft == nil)
   }
 
@@ -160,6 +209,60 @@ struct ApplicationShellTests {
     await shell.refreshLibrary()
 
     #expect(shell.learningItems == [expectedItem])
+  }
+
+  @Test("renaming a library item to an existing word requires merge confirmation")
+  func libraryCanonicalCorrectionRequiresMergeConfirmation() async {
+    let itemID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
+    let existingID = UUID(uuidString: "A60B21B0-D9FC-4DBD-B818-A1819310E5E4")!
+    let mergeSummary = LearningMergeSummary(
+      existingItemID: existingID,
+      canonicalForm: "run",
+      existingEncounterCount: 2,
+      incomingSourceText: "sprinted"
+    )
+    let learningStore = TestLearningStore(
+      canonicalUpdateResults: [
+        .requiresConfirmation(mergeSummary),
+        .merged,
+      ])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    await shell.updateLearningItemCanonicalForm(
+      itemID: itemID,
+      canonicalForm: "run"
+    )
+
+    #expect(
+      learningStore.canonicalUpdateInvocations
+        == [
+          CanonicalUpdateInvocation(
+            itemID: itemID,
+            canonicalForm: "run",
+            confirmMerge: false
+          )
+        ])
+    #expect(shell.pendingLibraryMerge == mergeSummary)
+
+    await shell.confirmPendingLibraryMerge()
+
+    #expect(
+      learningStore.canonicalUpdateInvocations
+        == [
+          CanonicalUpdateInvocation(
+            itemID: itemID,
+            canonicalForm: "run",
+            confirmMerge: false
+          ),
+          CanonicalUpdateInvocation(
+            itemID: itemID,
+            canonicalForm: "run",
+            confirmMerge: true
+          ),
+        ])
+    #expect(shell.pendingLibraryMerge == nil)
   }
 
   @Test("a cancelled translation cannot publish a late result")
@@ -407,10 +510,19 @@ private final class ControlledTranslationProvider: TranslationProviding {
 @MainActor
 private final class TestLearningStore: LearningStoring {
   private(set) var lastAddition: LearningAddition?
+  private(set) var canonicalUpdateInvocations: [CanonicalUpdateInvocation] = []
   private var storedItems: [LearningItem]
+  private let storedMergeSummary: LearningMergeSummary?
+  private var canonicalUpdateResults: [LearningCanonicalUpdateResult]
 
-  init(items: [LearningItem] = []) {
+  init(
+    items: [LearningItem] = [],
+    mergeSummary: LearningMergeSummary? = nil,
+    canonicalUpdateResults: [LearningCanonicalUpdateResult] = []
+  ) {
     storedItems = items
+    storedMergeSummary = mergeSummary
+    self.canonicalUpdateResults = canonicalUpdateResults
   }
 
   func summary() async throws -> LearningSummary {
@@ -425,9 +537,33 @@ private final class TestLearningStore: LearningStoring {
     lastAddition = addition
   }
 
+  func mergeSummary(for addition: LearningAddition) async throws -> LearningMergeSummary? {
+    storedMergeSummary
+  }
+
+  func updateCanonicalForm(
+    itemID: UUID,
+    canonicalForm: String,
+    confirmMerge: Bool
+  ) async throws -> LearningCanonicalUpdateResult {
+    canonicalUpdateInvocations.append(
+      CanonicalUpdateInvocation(
+        itemID: itemID,
+        canonicalForm: canonicalForm,
+        confirmMerge: confirmMerge
+      ))
+    return canonicalUpdateResults.isEmpty ? .updated : canonicalUpdateResults.removeFirst()
+  }
+
   func items() async throws -> [LearningItem] {
     storedItems
   }
+}
+
+private struct CanonicalUpdateInvocation: Equatable {
+  let itemID: UUID
+  let canonicalForm: String
+  let confirmMerge: Bool
 }
 
 @MainActor

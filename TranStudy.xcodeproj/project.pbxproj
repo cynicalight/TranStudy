@@ -48,6 +48,7 @@
 		9FB05A1CC653926C04F60176 /* TranslationPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B2332215B11112DCD342C24 /* TranslationPanelView.swift */; };
 		A1EE03E0CFFCA2BFDD311541 /* LearningStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF1A6468F5A38FB8643441B /* LearningStoring.swift */; };
 		A76D820347D2D2AFEC2890B9 /* LearningRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E8389C189D488477B36DB5 /* LearningRecord.swift */; };
+		AE362D87A755D987E198302D /* LearningEncounterRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0107B42BEC4FF8B96FE60E43 /* LearningEncounterRecord.swift */; };
 		B285870C915EA43E0DF6CFD6 /* TranStudyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571B54B2E6D38AF604F0A9CF /* TranStudyApp.swift */; };
 		B9248E258528A907B24A2AB0 /* DeepSeekTranslationProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0024E9DFCF4F67D5F18251B6 /* DeepSeekTranslationProviderTests.swift */; };
 		C6EE2787EB58DB6C18860EB6 /* TranslationDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD0603928223B27E98B195D /* TranslationDraft.swift */; };
@@ -60,6 +61,7 @@
 		EB10F6E6BCA7DC87A3867ED2 /* TranslationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD117BC866E3B3B13D75132E /* TranslationSettingsView.swift */; };
 		F22FCBD2BF7DFC217383662A /* TranslationCacheKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 333A2FBB41FC174957BE90AC /* TranslationCacheKey.swift */; };
 		F607761A5405D0F202D4B017 /* AppDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3F7DF048B1E5E6338A2E33 /* AppDestination.swift */; };
+		F6816CE3A1183F2ECA75504F /* NormalizedCanonicalForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B35707F44F4914981DD282 /* NormalizedCanonicalForm.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +76,7 @@
 
 /* Begin PBXFileReference section */
 		0024E9DFCF4F67D5F18251B6 /* DeepSeekTranslationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekTranslationProviderTests.swift; sourceTree = "<group>"; };
+		0107B42BEC4FF8B96FE60E43 /* LearningEncounterRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningEncounterRecord.swift; sourceTree = "<group>"; };
 		01410761EE739EA302307FDB /* TranslationCacheStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationCacheStoreTests.swift; sourceTree = "<group>"; };
 		01DEC940DB22AFA858DA3B0F /* ApplicationEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationEnvironment.swift; sourceTree = "<group>"; };
 		0EDFA17B8138F7B3A2FC49ED /* TranslationProviderConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviderConfiguration.swift; sourceTree = "<group>"; };
@@ -127,6 +130,7 @@
 		EFDDAB013A94CD551A257935 /* TranslationProviderConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviderConfigurationTests.swift; sourceTree = "<group>"; };
 		F045DE99B91697C02E17E20B /* HTTPDataLoading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPDataLoading.swift; sourceTree = "<group>"; };
 		F3AF1E9DF32FA8F069DFE556 /* OpenAIChatTranslationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIChatTranslationClient.swift; sourceTree = "<group>"; };
+		F9B35707F44F4914981DD282 /* NormalizedCanonicalForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NormalizedCanonicalForm.swift; sourceTree = "<group>"; };
 		FDF1A6468F5A38FB8643441B /* LearningStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningStoring.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -137,6 +141,7 @@
 				4D63D38A43EBE4E98305C497 /* ApplicationCoordinator.swift */,
 				01DEC940DB22AFA858DA3B0F /* ApplicationEnvironment.swift */,
 				BC58A44C46D02F739F637EEF /* ApplicationShell.swift */,
+				F9B35707F44F4914981DD282 /* NormalizedCanonicalForm.swift */,
 				333A2FBB41FC174957BE90AC /* TranslationCacheKey.swift */,
 				EAD0603928223B27E98B195D /* TranslationDraft.swift */,
 				0EDFA17B8138F7B3A2FC49ED /* TranslationProviderConfiguration.swift */,
@@ -247,6 +252,7 @@
 				B0BDB21DE5F588FBC1EFD744 /* DebugEnvironmentAPIKeyStore.swift */,
 				17BE30085B3E542EBAA70D66 /* FileTranslationCacheStore.swift */,
 				93491B3DF2455B2CED6EB38E /* KeychainAPIKeyStore.swift */,
+				0107B42BEC4FF8B96FE60E43 /* LearningEncounterRecord.swift */,
 				84E8389C189D488477B36DB5 /* LearningRecord.swift */,
 				3B9AD4FA6759148ACAC9F430 /* SwiftDataLearningStore.swift */,
 				54220E6249BBBCCD2010ADBB /* UserDefaultsTranslationPanelPositionStore.swift */,
@@ -373,9 +379,11 @@
 				3FEE9E04446231BEADB9A0D1 /* HTTPDataLoading.swift in Sources */,
 				1D068A08DC004EAF0346E8D0 /* InMemoryTranslationCacheStore.swift in Sources */,
 				584A63660E7D0058D8011979 /* KeychainAPIKeyStore.swift in Sources */,
+				AE362D87A755D987E198302D /* LearningEncounterRecord.swift in Sources */,
 				CFCB5C16A568BA97C7B592F5 /* LearningLibraryView.swift in Sources */,
 				A76D820347D2D2AFEC2890B9 /* LearningRecord.swift in Sources */,
 				A1EE03E0CFFCA2BFDD311541 /* LearningStoring.swift in Sources */,
+				F6816CE3A1183F2ECA75504F /* NormalizedCanonicalForm.swift in Sources */,
 				64084A34512E4EA7D5D73FD0 /* OpenAIChatTranslationClient.swift in Sources */,
 				9A7E88D16CE523212E1603A1 /* OpenAICompatibleTranslationProvider.swift in Sources */,
 				93C0518F888C7F59DC03D74B /* PreviewSupport.swift in Sources */,

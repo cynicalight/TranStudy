@@ -28,9 +28,15 @@ final class ApplicationShell {
   private(set) var translationStatus: TranslationStatus = .idle
   private(set) var translationSourceText = ""
   private(set) var learningItems: [LearningItem] = []
+  private(set) var pendingLearningMerge: LearningMergeSummary?
+  private(set) var pendingLibraryMerge: LearningMergeSummary?
   private(set) var translationPanelPosition: TranslationPanelPosition
   private(set) var translationProviderConfiguration: TranslationProviderConfiguration
   private var activeTranslationID: UUID?
+  private var translationSuggestedCanonicalForm = ""
+  private var translationSourceApplicationName = "剪贴板"
+  private var pendingLearningAddition: LearningAddition?
+  private var pendingLibraryCanonicalUpdate: (itemID: UUID, canonicalForm: String)?
 
   init(environment: ApplicationEnvironment) {
     self.environment = environment
@@ -74,6 +80,9 @@ final class ApplicationShell {
 
       activeTranslationID = nil
       translationDraft = TranslationDraft(result: result)
+      translationSuggestedCanonicalForm = result.canonicalForm
+      pendingLearningMerge = nil
+      pendingLearningAddition = nil
       translationStatus = .ready
     } catch is CancellationError {
       if activeTranslationID == translationID {
@@ -93,20 +102,45 @@ final class ApplicationShell {
       return
     }
 
+    let addition = LearningAddition(
+      draft: translationDraft,
+      sourceApplicationName: translationSourceApplicationName,
+      createdAt: environment.clock.now
+    )
+
     do {
-      try await environment.learningStore.add(
-        LearningAddition(
-          draft: translationDraft,
-          sourceApplicationName: "剪贴板",
-          createdAt: environment.clock.now
-        ))
-      self.translationDraft = nil
-      translationStatus = .idle
-      await refreshTodayReview()
-      await refreshLibrary()
+      let correctedCanonicalForm =
+        NormalizedCanonicalForm(translationDraft.canonicalForm)
+        != NormalizedCanonicalForm(translationSuggestedCanonicalForm)
+      if correctedCanonicalForm,
+        let mergeSummary = try await environment.learningStore.mergeSummary(for: addition)
+      {
+        pendingLearningMerge = mergeSummary
+        pendingLearningAddition = addition
+        return
+      }
+
+      try await persistLearningAddition(addition)
     } catch {
       // The translation panel keeps the draft available when persistence fails.
     }
+  }
+
+  func confirmPendingLearningMerge() async {
+    guard let pendingLearningAddition else {
+      return
+    }
+
+    do {
+      try await persistLearningAddition(pendingLearningAddition)
+    } catch {
+      // The translation panel keeps the draft and merge summary available on failure.
+    }
+  }
+
+  func cancelPendingLearningMerge() {
+    pendingLearningMerge = nil
+    pendingLearningAddition = nil
   }
 
   func refreshLibrary() async {
@@ -117,6 +151,52 @@ final class ApplicationShell {
     }
   }
 
+  func updateLearningItemCanonicalForm(itemID: UUID, canonicalForm: String) async {
+    do {
+      let result = try await environment.learningStore.updateCanonicalForm(
+        itemID: itemID,
+        canonicalForm: canonicalForm,
+        confirmMerge: false
+      )
+      switch result {
+      case .updated, .merged:
+        pendingLibraryMerge = nil
+        pendingLibraryCanonicalUpdate = nil
+        await refreshLibrary()
+      case .requiresConfirmation(let summary):
+        pendingLibraryMerge = summary
+        pendingLibraryCanonicalUpdate = (itemID, canonicalForm)
+      }
+    } catch {
+      // Keep the current library contents available when the correction fails.
+    }
+  }
+
+  func confirmPendingLibraryMerge() async {
+    guard let pendingLibraryCanonicalUpdate else {
+      return
+    }
+
+    do {
+      _ = try await environment.learningStore.updateCanonicalForm(
+        itemID: pendingLibraryCanonicalUpdate.itemID,
+        canonicalForm: pendingLibraryCanonicalUpdate.canonicalForm,
+        confirmMerge: true
+      )
+      pendingLibraryMerge = nil
+      self.pendingLibraryCanonicalUpdate = nil
+      await refreshTodayReview()
+      await refreshLibrary()
+    } catch {
+      // Keep the merge summary available so the user can retry.
+    }
+  }
+
+  func cancelPendingLibraryMerge() {
+    pendingLibraryMerge = nil
+    pendingLibraryCanonicalUpdate = nil
+  }
+
   func cancelTranslation() {
     activeTranslationID = nil
     if translationStatus == .loading {
@@ -124,8 +204,12 @@ final class ApplicationShell {
     }
   }
 
-  func prepareTranslationPresentation() {
+  func prepareTranslationPresentation(sourceApplicationName: String = "剪贴板") {
     translationSourceText = ""
+    translationSuggestedCanonicalForm = ""
+    translationSourceApplicationName = sourceApplicationName
+    pendingLearningMerge = nil
+    pendingLearningAddition = nil
     translationStatus = .loading
   }
 
@@ -199,5 +283,17 @@ final class ApplicationShell {
     }
 
     return true
+  }
+
+  private func persistLearningAddition(_ addition: LearningAddition) async throws {
+    try await environment.learningStore.add(addition)
+    translationDraft = nil
+    translationSuggestedCanonicalForm = ""
+    translationSourceApplicationName = "剪贴板"
+    pendingLearningMerge = nil
+    pendingLearningAddition = nil
+    translationStatus = .idle
+    await refreshTodayReview()
+    await refreshLibrary()
   }
 }

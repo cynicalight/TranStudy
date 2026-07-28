@@ -9,7 +9,10 @@ struct TranStudyApp: App {
 
   init() {
     do {
-      let container = try ModelContainer(for: LearningRecord.self)
+      let container = try ModelContainer(
+        for: LearningRecord.self,
+        LearningEncounterRecord.self
+      )
       let learningStore = SwiftDataLearningStore(container: container)
       let keychainAPIKeyStore = KeychainAPIKeyStore()
       #if DEBUG

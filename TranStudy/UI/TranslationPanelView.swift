@@ -13,6 +13,28 @@ struct TranslationPanelView: View {
     .padding(14)
     .frame(width: 500)
     .onExitCommand(perform: onDismiss)
+    .alert(
+      "合并到已有词条？",
+      isPresented: pendingMergeBinding,
+      presenting: shell.pendingLearningMerge
+    ) { _ in
+      Button("取消", role: .cancel) {
+        shell.cancelPendingLearningMerge()
+      }
+      Button("确认合并") {
+        Task {
+          await shell.confirmPendingLearningMerge()
+          if shell.translationDraft == nil {
+            onDismiss()
+          }
+        }
+      }
+    } message: { summary in
+      Text(
+        "“\(summary.incomingSourceText)”将合并到“\(summary.canonicalForm)”。"
+          + "已有 \(summary.existingEncounterCount) 条语境会全部保留，并新增当前语境。"
+      )
+    }
   }
 
   private var panelHeader: some View {
@@ -153,6 +175,10 @@ struct TranslationPanelView: View {
           Label("加入学习", systemImage: "plus")
         }
         .buttonStyle(.borderedProminent)
+        .disabled(
+          shell.translationDraft?.canonicalForm
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        )
       }
     }
     .padding(4)
@@ -170,6 +196,13 @@ struct TranslationPanelView: View {
         draft[keyPath: keyPath] = value
         shell.translationDraft = draft
       }
+    )
+  }
+
+  private var pendingMergeBinding: Binding<Bool> {
+    Binding(
+      get: { shell.pendingLearningMerge != nil },
+      set: { _ in }
     )
   }
 }
