@@ -93,7 +93,13 @@ final class OpenAIChatTranslationClient {
       payload.pronunciation.isEmpty || Self.looksLikeIPA(payload.pronunciation),
       Self.containsHanCharacter(payload.contextualMeaning),
       Self.containsLatinLetter(exampleAndTranslation.exampleSentence),
-      Self.containsHanCharacter(exampleAndTranslation.sentenceTranslation)
+      Self.containsHanCharacter(exampleAndTranslation.sentenceTranslation),
+      request.kind != .contextualSelection
+        || request.targetSentence == nil
+        || request.targetSentence?.trimmingCharacters(in: .whitespacesAndNewlines)
+          == exampleAndTranslation.exampleSentence.trimmingCharacters(
+            in: .whitespacesAndNewlines
+          )
     else {
       throw TranslationError.invalidResponse
     }

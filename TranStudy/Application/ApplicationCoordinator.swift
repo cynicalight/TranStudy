@@ -2,10 +2,30 @@
 final class ApplicationCoordinator {
   private let shortcutMonitor = GlobalShortcutMonitor()
   private let translationPanel: TranslationPanelController
+  private let selectionEvents: SystemSelectionEventMonitor
+  private let selectionIndicator: SelectionIndicatorController
+  private let selectionInteraction: SelectionInteractionController
   private var hasStarted = false
 
   init(shell: ApplicationShell) {
-    translationPanel = TranslationPanelController(shell: shell)
+    let translationPanel = TranslationPanelController(shell: shell)
+    let selectionEvents = SystemSelectionEventMonitor()
+    let selectionIndicator = SelectionIndicatorController()
+
+    self.translationPanel = translationPanel
+    self.selectionEvents = selectionEvents
+    self.selectionIndicator = selectionIndicator
+    selectionInteraction = SelectionInteractionController(
+      selection: shell.environment.selection,
+      events: selectionEvents,
+      indicator: selectionIndicator,
+      onExternalInteraction: { [weak translationPanel] in
+        translationPanel?.dismissForExternalInteraction()
+      },
+      onSelection: { [weak translationPanel] snapshot in
+        translationPanel?.presentSelectionTranslation(snapshot)
+      }
+    )
   }
 
   func start() {
@@ -17,6 +37,7 @@ final class ApplicationCoordinator {
     shortcutMonitor.start { [weak self] in
       self?.presentClipboardTranslation()
     }
+    selectionInteraction.start()
   }
 
   func presentClipboardTranslation() {

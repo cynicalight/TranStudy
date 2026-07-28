@@ -8,15 +8,18 @@ struct TranslationRequest: Codable, Equatable, Hashable, Sendable {
   let sourceText: String
   let context: String?
   let kind: TranslationRequestKind
+  let targetSentence: String?
 
   init(
     sourceText: String,
     context: String? = nil,
-    kind: TranslationRequestKind = .wordOrPhrase
+    kind: TranslationRequestKind = .wordOrPhrase,
+    targetSentence: String? = nil
   ) {
     self.sourceText = sourceText
     self.context = context
     self.kind = kind
+    self.targetSentence = targetSentence
   }
 
   var promptContent: String {
@@ -24,13 +27,24 @@ struct TranslationRequest: Codable, Equatable, Hashable, Sendable {
       return sourceText
     }
 
-    return """
+    var content = """
       Target text:
       \(sourceText)
 
       Context:
       \(context)
       """
+    if kind == .contextualSelection, let targetSentence {
+      content += """
+
+
+        Return this exact target sentence unchanged as example_sentence:
+        \(targetSentence)
+        Translate that exact sentence as sentence_translation. Use adjacent sentences only to
+        disambiguate the target text; do not return either adjacent sentence as learning content.
+        """
+    }
+    return content
   }
 }
 

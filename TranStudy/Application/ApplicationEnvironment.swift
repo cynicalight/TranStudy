@@ -25,7 +25,7 @@ extension ApplicationEnvironment {
     providerConfigurationStore: any TranslationProviderConfigurationStoring
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
-      selection: UnavailableSelectionProvider(),
+      selection: AccessibilitySelectionProvider(),
       clipboard: SystemClipboardReader(),
       translation: translation,
       learningStore: learningStore,
@@ -37,12 +37,6 @@ extension ApplicationEnvironment {
       panelPositionStore: UserDefaultsTranslationPanelPositionStore(),
       providerConfigurationStore: providerConfigurationStore
     )
-  }
-}
-
-private struct UnavailableSelectionProvider: SelectionProviding {
-  func currentSelection() async -> SelectionSnapshot? {
-    nil
   }
 }
 

@@ -50,7 +50,8 @@ struct OpenAICompatibleTranslationProviderTests {
       TranslationRequest(
         sourceText: "ran",
         context: "She ran home.",
-        kind: .contextualSelection
+        kind: .contextualSelection,
+        targetSentence: "She ran home."
       )
     )
 
@@ -66,7 +67,18 @@ struct OpenAICompatibleTranslationProviderTests {
     let userMessage = try #require(messages.last?["content"])
     #expect(userMessage.contains("ran"))
     #expect(userMessage.contains("She ran home."))
+    #expect(userMessage.contains("Return this exact target sentence unchanged"))
     #expect(result.canonicalForm == "run")
+
+    await #expect(throws: TranslationError.invalidResponse) {
+      try await provider.translate(
+        TranslationRequest(
+          sourceText: "ran",
+          context: "They ran away.",
+          kind: .contextualSelection,
+          targetSentence: "They ran away."
+        ))
+    }
   }
 
   @Test("structured response must preserve the requested source text")

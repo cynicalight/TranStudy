@@ -27,6 +27,7 @@ final class ApplicationShell {
   private(set) var connectionStatus: TranslationConnectionStatus = .idle
   private(set) var translationStatus: TranslationStatus = .idle
   private(set) var translationSourceText = ""
+  private(set) var translationPresentationTitle = "翻译剪贴板"
   private(set) var learningItems: [LearningItem] = []
   private(set) var reviewQueue: [LearningItem] = []
   private(set) var isReviewAnswerVisible = false
@@ -122,15 +123,36 @@ final class ApplicationShell {
       return
     }
 
+    await translate(
+      TranslationRequest(sourceText: sourceText)
+    )
+  }
+
+  func translateSelection(_ snapshot: SelectionSnapshot) async {
+    let sourceText = snapshot.selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard Self.isWordOrShortPhrase(sourceText) else {
+      translationStatus = .failed
+      return
+    }
+
+    translationSourceApplicationName = snapshot.sourceApplicationName
+    await translate(
+      TranslationRequest(
+        sourceText: sourceText,
+        context: snapshot.translationContext,
+        kind: .contextualSelection,
+        targetSentence: snapshot.targetSentence
+      ))
+  }
+
+  private func translate(_ request: TranslationRequest) async {
     let translationID = UUID()
     activeTranslationID = translationID
-    translationSourceText = sourceText
+    translationSourceText = request.sourceText
     translationStatus = .loading
 
     do {
-      let result = try await environment.translation.translate(
-        TranslationRequest(sourceText: sourceText)
-      )
+      let result = try await environment.translation.translate(request)
       try Task.checkCancellation()
       guard activeTranslationID == translationID else {
         return
@@ -263,7 +285,25 @@ final class ApplicationShell {
   }
 
   func prepareTranslationPresentation(sourceApplicationName: String = "剪贴板") {
+    prepareTranslationPresentation(
+      title: "翻译剪贴板",
+      sourceApplicationName: sourceApplicationName
+    )
+  }
+
+  func prepareSelectionTranslationPresentation(sourceApplicationName: String) {
+    prepareTranslationPresentation(
+      title: "翻译划词",
+      sourceApplicationName: sourceApplicationName
+    )
+  }
+
+  private func prepareTranslationPresentation(
+    title: String,
+    sourceApplicationName: String
+  ) {
     translationSourceText = ""
+    translationPresentationTitle = title
     translationSuggestedCanonicalForm = ""
     translationSourceApplicationName = sourceApplicationName
     pendingLearningMerge = nil

@@ -45,6 +45,53 @@ struct ApplicationShellTests {
     #expect(shell.translationDraft?.contextualMeaning == "奔跑")
   }
 
+  @Test("a captured mouse selection translates with its surrounding context")
+  func capturedMouseSelectionTranslatesWithContext() async throws {
+    let translator = TestTranslationProvider(
+      result: TranslationResult(
+        sourceText: "ran",
+        canonicalForm: "run",
+        pronunciation: "/ræn/",
+        partOfSpeech: "verb",
+        contextualMeaning: "跑",
+        exampleSentence: "She ran home.",
+        sentenceTranslation: "她跑回了家。"
+      ))
+    let shell = ApplicationShell(
+      environment: .test(translation: translator)
+    )
+    let snapshot = SelectionSnapshot(
+      selectedText: "ran",
+      targetSentence: "She ran home.",
+      previousSentence: "It was getting late.",
+      nextSentence: "Her mother smiled.",
+      screenPosition: CGPoint(x: 640, y: 420),
+      sourceApplicationName: "Safari"
+    )
+
+    await shell.translateSelection(snapshot)
+
+    #expect(
+      translator.lastRequest
+        == TranslationRequest(
+          sourceText: "ran",
+          context: """
+            Previous sentence:
+            It was getting late.
+
+            Target sentence:
+            She ran home.
+
+            Next sentence:
+            Her mother smiled.
+            """,
+          kind: .contextualSelection,
+          targetSentence: "She ran home."
+        ))
+    #expect(shell.translationSourceText == "ran")
+    #expect(shell.translationDraft?.exampleSentence == "She ran home.")
+  }
+
   @Test("only joining learning persists the edited session draft")
   func onlyJoiningLearningPersistsEditedSessionDraft() async throws {
     let learningStore = TestLearningStore()

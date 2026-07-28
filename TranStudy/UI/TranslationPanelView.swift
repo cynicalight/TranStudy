@@ -46,7 +46,7 @@ struct TranslationPanelView: View {
         .background(.tint.opacity(0.1), in: .rect(cornerRadius: 9))
 
       VStack(alignment: .leading, spacing: 1) {
-        Text("翻译剪贴板")
+        Text(shell.translationPresentationTitle)
           .font(.headline)
         Text("按 Esc 关闭")
           .font(.caption)

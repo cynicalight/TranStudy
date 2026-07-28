@@ -6,6 +6,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
   private let shell: ApplicationShell
   private var panel: NSPanel?
   private var translationTask: Task<Void, Never>?
+  private var panelHasBeenKey = false
 
   init(shell: ApplicationShell) {
     self.shell = shell
@@ -26,6 +27,27 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     }
   }
 
+  func presentSelectionTranslation(_ snapshot: SelectionSnapshot) {
+    translationTask?.cancel()
+    shell.prepareSelectionTranslationPresentation(
+      sourceApplicationName: snapshot.sourceApplicationName
+    )
+    showPanel()
+    translationTask = Task { [weak self] in
+      guard let self else {
+        return
+      }
+      await shell.translateSelection(snapshot)
+    }
+  }
+
+  func dismissForExternalInteraction() {
+    guard panel != nil || translationTask != nil else {
+      return
+    }
+    dismiss()
+  }
+
   func dismiss() {
     translationTask?.cancel()
     translationTask = nil
@@ -38,6 +60,18 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     translationTask = nil
     shell.cancelTranslation()
     panel = nil
+    panelHasBeenKey = false
+  }
+
+  func windowDidBecomeKey(_ notification: Notification) {
+    panelHasBeenKey = true
+  }
+
+  func windowDidResignKey(_ notification: Notification) {
+    guard panelHasBeenKey else {
+      return
+    }
+    dismiss()
   }
 
   private func showPanel() {
@@ -47,7 +81,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
       return
     }
 
-    let panel = NSPanel(
+    let panel = DismissibleTranslationPanel(
       contentRect: NSRect(x: 0, y: 0, width: 500, height: 470),
       styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
       backing: .buffered,
@@ -64,6 +98,9 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
     panel.standardWindowButton(.zoomButton)?.isHidden = true
     panel.delegate = self
+    panel.onCancel = { [weak self] in
+      self?.dismiss()
+    }
     panel.contentView = NSHostingView(
       rootView: TranslationPanelView(
         shell: shell,
@@ -87,5 +124,13 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         panelSize: panel.frame.size,
         visibleFrame: screen.visibleFrame
       ))
+  }
+}
+
+private final class DismissibleTranslationPanel: NSPanel {
+  var onCancel: (() -> Void)?
+
+  override func cancelOperation(_ sender: Any?) {
+    onCancel?()
   }
 }
