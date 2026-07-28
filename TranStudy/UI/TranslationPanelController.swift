@@ -46,7 +46,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     }
 
     let panel = NSPanel(
-      contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
+      contentRect: NSRect(x: 0, y: 0, width: 500, height: 470),
       styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
       backing: .buffered,
       defer: false

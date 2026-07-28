@@ -28,15 +28,4 @@ enum AppDestination: String, CaseIterable, Equatable, Identifiable {
       "gearshape"
     }
   }
-
-  var placeholderDescription: String {
-    switch self {
-    case .todayReview:
-      "到期的学习内容会显示在这里。"
-    case .library:
-      "加入学习的单词和句子会显示在这里。"
-    case .settings:
-      "划词、翻译服务和提醒设置会显示在这里。"
-    }
-  }
 }

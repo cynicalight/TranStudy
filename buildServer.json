@@ -1,0 +1,19 @@
+{
+	"name": "xcode build server",
+	"version": "1.3.0",
+	"bspVersion": "2.2.0",
+	"languages": [
+		"c",
+		"cpp",
+		"objective-c",
+		"objective-cpp",
+		"swift"
+	],
+	"argv": [
+		"/Users/apple/.local/share/nvim/mason/bin/xcode-build-server"
+	],
+	"workspace": "/Users/apple/Developer/TranStudy/TranStudy.xcodeproj/project.xcworkspace",
+	"build_root": "/Users/apple/Library/Developer/Xcode/DerivedData/TranStudy-dofojekapuedzzfbfkysvzfpevxa",
+	"scheme": "TranStudy",
+	"kind": "xcode"
+}

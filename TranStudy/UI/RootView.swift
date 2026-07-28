@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
   @Bindable var shell: ApplicationShell
+  let onTranslateClipboard: () -> Void
 
   var body: some View {
     NavigationSplitView {
@@ -17,41 +18,37 @@ struct RootView: View {
     } detail: {
       destinationView
     }
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button(action: onTranslateClipboard) {
+          Label("翻译剪贴板", systemImage: "character.bubble")
+        }
+        .help("翻译剪贴板（F5）")
+      }
+    }
   }
 
   @ViewBuilder
   private var destinationView: some View {
     switch shell.selectedDestination {
     case .todayReview:
-      PlaceholderView(
-        title: AppDestination.todayReview.title,
-        systemImage: AppDestination.todayReview.systemImage,
-        description: AppDestination.todayReview.placeholderDescription
-      )
+      TodayReviewView(shell: shell)
     case .library:
       LearningLibraryView(shell: shell)
     case .settings:
       TranslationSettingsView(shell: shell)
     case nil:
-      PlaceholderView(
-        title: "TranStudy",
+      ContentUnavailableView(
+        "TranStudy",
         systemImage: "character.book.closed",
-        description: "从侧边栏选择一个区域。"
+        description: Text("从侧边栏选择一个区域。")
       )
     }
   }
 }
 
-private struct PlaceholderView: View {
-  let title: String
-  let systemImage: String
-  let description: String
-
-  var body: some View {
-    ContentUnavailableView(
-      title,
-      systemImage: systemImage,
-      description: Text(description)
-    )
+#if DEBUG
+  #Preview("主窗口") {
+    PreviewFactory.rootView()
   }
-}
+#endif

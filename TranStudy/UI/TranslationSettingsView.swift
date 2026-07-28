@@ -5,73 +5,103 @@ struct TranslationSettingsView: View {
   @State private var apiKey = ""
 
   var body: some View {
-    Form {
-      Section("悬浮窗") {
-        Picker(
-          "位置",
-          selection: Binding(
-            get: {
-              shell.translationPanelPosition
-            },
-            set: {
-              shell.setTranslationPanelPosition($0)
+    VStack(spacing: 0) {
+      PageHeader(
+        title: "设置",
+        subtitle: "调整翻译入口与服务连接，密钥始终保存在这台 Mac。",
+        systemImage: "gearshape.fill"
+      )
+      .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
+      .padding(.horizontal, 32)
+      .padding(.vertical, 24)
+
+      Divider()
+
+      Form {
+        Section {
+          CenteredLabeledContent("位置") {
+            TranStudySegmentedControl(
+              options: TranslationPanelPosition.allCases,
+              selection: Binding(
+                get: {
+                  shell.translationPanelPosition
+                },
+                set: {
+                  shell.setTranslationPanelPosition($0)
+                }
+              ),
+              label: \.title
+            )
+            .frame(maxWidth: 420)
+          }
+        } header: {
+          Label("悬浮窗", systemImage: "macwindow.on.rectangle")
+        } footer: {
+          Text("翻译浮窗会出现在当前屏幕的所选位置，并保持在其他应用上方。")
+        }
+
+        Section {
+          CenteredLabeledContent("供应商") {
+            TranStudySegmentedControl(
+              options: TranslationProviderKind.allCases,
+              selection: Binding(
+                get: {
+                  shell.translationProviderConfiguration.provider
+                },
+                set: {
+                  shell.selectTranslationProvider($0)
+                  apiKey = ""
+                }
+              ),
+              label: \.title
+            )
+            .frame(maxWidth: 420)
+          }
+
+          providerFields
+
+          CenteredLabeledContent("API Key") {
+            HStack(spacing: 12) {
+              SecureField(
+                text: $apiKey,
+                prompt: Text("输入后测试连接")
+                  .foregroundStyle(.secondary)
+              ) {
+                Text("API Key")
+              }
+              .labelsHidden()
+              .textFieldStyle(.roundedBorder)
+              .multilineTextAlignment(.leading)
+              .textContentType(.password)
+              .frame(maxWidth: 360)
+
+              Button {
+                Task {
+                  await shell.testTranslationConnection(apiKey: apiKey)
+                }
+              } label: {
+                Label("测试", systemImage: "bolt.horizontal.circle")
+              }
+              .buttonStyle(.borderedProminent)
+              .disabled(!canTestConnection)
+
+              connectionStatus
             }
+          }
+        } header: {
+          Label("翻译服务", systemImage: "network")
+        } footer: {
+          Label(
+            "连接成功后，API Key 才会写入 macOS Keychain；不会进入学习数据库、缓存或日志。",
+            systemImage: "lock.shield"
           )
-        ) {
-          ForEach(TranslationPanelPosition.allCases) { position in
-            Text(position.title)
-              .tag(position)
-          }
-        }
-        .pickerStyle(.segmented)
-      }
-
-      Section("翻译服务") {
-        Picker(
-          "供应商",
-          selection: Binding(
-            get: {
-              shell.translationProviderConfiguration.provider
-            },
-            set: {
-              shell.selectTranslationProvider($0)
-              apiKey = ""
-            }
-          )
-        ) {
-          ForEach(TranslationProviderKind.allCases) { provider in
-            Text(provider.title)
-              .tag(provider)
-          }
-        }
-        .pickerStyle(.segmented)
-
-        providerFields
-
-        SecureField("API Key", text: $apiKey)
-          .textContentType(.password)
-
-        HStack {
-          Button("测试连接") {
-            Task {
-              await shell.testTranslationConnection(apiKey: apiKey)
-            }
-          }
-          .disabled(!canTestConnection)
-
-          connectionStatus
         }
       }
-
-      Section {
-        Text("每个供应商的 API Key 只在连接成功后写入 macOS Keychain，不进入学习数据库。")
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
+      .formStyle(.grouped)
+      .frame(maxWidth: TranStudyDesign.pageWidth)
+      .padding(.horizontal, 16)
     }
-    .formStyle(.grouped)
     .navigationTitle("设置")
-    .padding()
   }
 
   @ViewBuilder
@@ -95,34 +125,41 @@ struct TranslationSettingsView: View {
         }
       }
     case .openAICompatible:
-      TextField(
-        "Base URL",
-        text: Binding(
-          get: {
-            shell.translationProviderConfiguration.customBaseURL
-          },
-          set: {
-            shell.updateCustomProvider(
-              baseURL: $0,
-              model: shell.translationProviderConfiguration.customModel
-            )
-          }
+      CenteredLabeledContent("Base URL") {
+        TextField(
+          "https://example.com/v1",
+          text: Binding(
+            get: {
+              shell.translationProviderConfiguration.customBaseURL
+            },
+            set: {
+              shell.updateCustomProvider(
+                baseURL: $0,
+                model: shell.translationProviderConfiguration.customModel
+              )
+            }
+          )
         )
-      )
-      TextField(
-        "模型名称",
-        text: Binding(
-          get: {
-            shell.translationProviderConfiguration.customModel
-          },
-          set: {
-            shell.updateCustomProvider(
-              baseURL: shell.translationProviderConfiguration.customBaseURL,
-              model: $0
-            )
-          }
+        .frame(maxWidth: 360)
+      }
+
+      CenteredLabeledContent("模型名称") {
+        TextField(
+          "例如 gpt-4.1-mini",
+          text: Binding(
+            get: {
+              shell.translationProviderConfiguration.customModel
+            },
+            set: {
+              shell.updateCustomProvider(
+                baseURL: shell.translationProviderConfiguration.customBaseURL,
+                model: $0
+              )
+            }
+          )
         )
-      )
+        .frame(maxWidth: 360)
+      }
     }
   }
 
@@ -157,9 +194,52 @@ struct TranslationSettingsView: View {
     case .connected:
       Label("连接成功", systemImage: "checkmark.circle.fill")
         .foregroundStyle(.green)
+        .font(.callout.weight(.medium))
     case .failed:
-      Label("连接失败，请检查 API Key 和网络", systemImage: "exclamationmark.triangle.fill")
+      Label("连接失败，请检查设置和网络", systemImage: "exclamationmark.triangle.fill")
         .foregroundStyle(.red)
+        .font(.callout.weight(.medium))
     }
   }
 }
+
+private struct CenteredLabeledContent<Content: View>: View {
+  let title: String
+  let content: Content
+
+  init(
+    _ title: String,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.title = title
+    self.content = content()
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 12) {
+      Text(title)
+        .lineLimit(1)
+        .frame(width: 96, alignment: .leading)
+
+      content
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+  }
+}
+
+#if DEBUG
+  #Preview("DeepSeek 设置") {
+    PreviewFactory.translationSettingsView()
+  }
+
+  #Preview("OpenAI 兼容设置") {
+    PreviewFactory.translationSettingsView(
+      providerConfiguration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://api.example.com/v1",
+        customModel: "gpt-4.1-mini"
+      )
+    )
+  }
+#endif

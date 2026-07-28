@@ -37,16 +37,22 @@ struct TranStudyApp: App {
 
   var body: some Scene {
     WindowGroup {
-      RootView(shell: shell)
-        .frame(minWidth: 720, minHeight: 480)
-        .onAppear {
-          coordinator.start()
+      RootView(
+        shell: shell,
+        onTranslateClipboard: {
+          coordinator.presentClipboardTranslation()
         }
-        .task {
-          await shell.refreshTodayReview()
-          await shell.refreshLibrary()
-        }
+      )
+      .frame(minWidth: 760, minHeight: 520)
+      .onAppear {
+        coordinator.start()
+      }
+      .task {
+        await shell.refreshTodayReview()
+        await shell.refreshLibrary()
+      }
     }
+    .defaultSize(width: 940, height: 640)
     .commands {
       CommandMenu("翻译") {
         Button("翻译剪贴板") {
