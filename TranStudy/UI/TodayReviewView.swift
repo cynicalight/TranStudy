@@ -353,7 +353,7 @@ private struct ReviewCardFaceEffect: @MainActor AnimatableModifier {
       .scaleEffect(midpointScale)
       .rotation3DEffect(
         .degrees(rotation),
-        axis: (x: 0, y: 1, z: 0),
+        axis: (x: 1, y: 0, z: 0),
         anchor: .center,
         perspective: 0.7
       )
