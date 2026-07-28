@@ -28,6 +28,10 @@ final class ApplicationShell {
   private(set) var translationStatus: TranslationStatus = .idle
   private(set) var translationSourceText = ""
   private(set) var learningItems: [LearningItem] = []
+  private(set) var reviewQueue: [LearningItem] = []
+  private(set) var isReviewAnswerVisible = false
+  private(set) var isReviewRating = false
+  private(set) var selectedReviewRating: ReviewRating?
   private(set) var pendingLearningMerge: LearningMergeSummary?
   private(set) var pendingLibraryMerge: LearningMergeSummary?
   private(set) var translationPanelPosition: TranslationPanelPosition
@@ -38,6 +42,10 @@ final class ApplicationShell {
   private var pendingLearningAddition: LearningAddition?
   private var pendingLibraryCanonicalUpdate: (itemID: UUID, canonicalForm: String)?
 
+  var currentReviewItem: LearningItem? {
+    reviewQueue.first
+  }
+
   init(environment: ApplicationEnvironment) {
     self.environment = environment
     translationPanelPosition = environment.panelPositionStore.load()
@@ -46,12 +54,62 @@ final class ApplicationShell {
 
   func refreshTodayReview() async {
     do {
-      let summary = try await environment.learningStore.summary()
+      let now = environment.clock.now
+      let summary = try await environment.learningStore.summary(at: now)
+      let dueItems = try await environment.learningStore.dueItems(at: now)
       learningSummary = summary
-      lastReviewRefreshDate = environment.clock.now
+      reviewQueue = dueItems
+      isReviewAnswerVisible = false
+      selectedReviewRating = nil
+      lastReviewRefreshDate = now
     } catch {
       // A later ticket will expose recoverable loading errors in the review UI.
     }
+  }
+
+  func revealCurrentReviewAnswer() {
+    guard currentReviewItem != nil else {
+      return
+    }
+    isReviewAnswerVisible = true
+  }
+
+  func rateCurrentReview(_ rating: ReviewRating) async {
+    guard
+      let currentReviewItem,
+      selectedReviewRating == nil,
+      !isReviewRating
+    else {
+      return
+    }
+
+    isReviewRating = true
+    defer {
+      isReviewRating = false
+    }
+    let now = environment.clock.now
+    do {
+      _ = try await environment.learningStore.recordReview(
+        itemID: currentReviewItem.id,
+        rating: rating,
+        reviewedAt: now
+      )
+      selectedReviewRating = rating
+      isReviewAnswerVisible = true
+      learningSummary = try await environment.learningStore.summary(at: now)
+      lastReviewRefreshDate = now
+    } catch {
+      // Keep the current card rateable when persistence fails.
+    }
+  }
+
+  func advanceToNextReview() {
+    guard selectedReviewRating != nil, !reviewQueue.isEmpty else {
+      return
+    }
+    reviewQueue.removeFirst()
+    isReviewAnswerVisible = false
+    selectedReviewRating = nil
   }
 
   func translateClipboard() async {

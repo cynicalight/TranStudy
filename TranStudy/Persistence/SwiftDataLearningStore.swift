@@ -3,6 +3,7 @@ import SwiftData
 
 enum LearningStoreError: Error {
   case emptyCanonicalForm
+  case missingLearningItem
 }
 
 @MainActor
@@ -13,14 +14,101 @@ final class SwiftDataLearningStore: LearningStoring {
     context = ModelContext(container)
   }
 
-  func summary() async throws -> LearningSummary {
-    let recordCount = try consolidatedRecords().count
+  func summary(at date: Date) async throws -> LearningSummary {
+    let records = try consolidatedRecords()
+    let dueCount = records.count(where: {
+      !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= date
+    })
 
     return LearningSummary(
-      dueCount: 0,
-      wordCount: recordCount,
+      dueCount: dueCount,
+      wordCount: records.count,
       sentenceCount: 0
     )
+  }
+
+  func dueItems(at date: Date) async throws -> [LearningItem] {
+    try await items()
+      .filter {
+        !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= date
+      }
+      .sorted { first, second in
+        let firstReviewDate = first.nextReviewAt ?? .distantFuture
+        let secondReviewDate = second.nextReviewAt ?? .distantFuture
+        if firstReviewDate != secondReviewDate {
+          return firstReviewDate < secondReviewDate
+        }
+        return first.id.uuidString < second.id.uuidString
+      }
+  }
+
+  func recordReview(
+    itemID: UUID,
+    rating: ReviewRating,
+    reviewedAt: Date
+  ) async throws -> LearningReviewResult {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+
+    let previousReviewAt = record.reviewEvents.map(\.reviewedAt).max()
+    let schedule = nextSchedule(
+      rating: rating,
+      currentIntervalDays: max(1, record.reviewIntervalDays),
+      currentEase: record.reviewEase
+    )
+    let nextReviewAt = date(
+      byAddingDays: Int(schedule.intervalDays),
+      to: reviewedAt
+    )
+    record.nextReviewAt = nextReviewAt
+    record.reviewIntervalDays = schedule.intervalDays
+    record.reviewEase = schedule.ease
+    record.reviewCount += 1
+    if rating == .forgot {
+      record.lapseCount += 1
+    }
+    record.reviewEvents.append(
+      ReviewEventRecord(
+        rating: rating,
+        reviewedAt: reviewedAt,
+        previousReviewAt: previousReviewAt,
+        nextReviewAt: nextReviewAt,
+        intervalDays: schedule.intervalDays
+      ))
+    try context.save()
+
+    return LearningReviewResult(
+      itemID: itemID,
+      rating: rating,
+      reviewedAt: reviewedAt,
+      nextReviewAt: nextReviewAt,
+      intervalDays: schedule.intervalDays
+    )
+  }
+
+  func reviewHistory(itemID: UUID) async throws -> [LearningReviewEvent] {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+
+    return record.reviewEvents
+      .compactMap { event in
+        guard let rating = ReviewRating(rawValue: event.ratingRawValue) else {
+          return nil
+        }
+        return LearningReviewEvent(
+          id: event.id,
+          rating: rating,
+          reviewedAt: event.reviewedAt,
+          previousReviewAt: event.previousReviewAt,
+          nextReviewAt: event.nextReviewAt,
+          intervalDays: event.intervalDays
+        )
+      }
+      .sorted { $0.reviewedAt < $1.reviewedAt }
   }
 
   func add(_ addition: LearningAddition) async throws {
@@ -61,7 +149,7 @@ final class SwiftDataLearningStore: LearningStoring {
       exampleSentence: draft.exampleSentence,
       sentenceTranslation: draft.sentenceTranslation,
       sourceApplicationName: addition.sourceApplicationName,
-      nextReviewAt: addition.nextReviewAt,
+      nextReviewAt: addition.nextReviewAt ?? firstReviewDate(after: addition.createdAt),
       isPaused: addition.isPaused
     )
     record.encounters.append(makeEncounter(from: addition))
@@ -169,7 +257,12 @@ final class SwiftDataLearningStore: LearningStoring {
     let groupedRecords = Dictionary(grouping: records) {
       normalizedCanonicalForm(for: $0)
     }
-    var didMerge = false
+    var didChange = false
+
+    for record in records where record.nextReviewAt == nil {
+      record.nextReviewAt = firstReviewDate(after: record.createdAt)
+      didChange = true
+    }
 
     for (normalizedForm, duplicates) in groupedRecords
     where !normalizedForm.isEmpty && duplicates.count > 1 {
@@ -180,11 +273,11 @@ final class SwiftDataLearningStore: LearningStoring {
 
       for sourceRecord in orderedDuplicates.dropFirst() {
         merge(sourceRecord, into: targetRecord)
-        didMerge = true
+        didChange = true
       }
     }
 
-    if didMerge {
+    if didChange {
       try context.save()
       return try context.fetch(descriptor)
     }
@@ -193,6 +286,33 @@ final class SwiftDataLearningStore: LearningStoring {
 
   private func effectiveLastEncounteredAt(for record: LearningRecord) -> Date {
     record.encounters.map(\.encounteredAt).max() ?? record.createdAt
+  }
+
+  private func firstReviewDate(after joinedAt: Date) -> Date {
+    date(byAddingDays: 1, to: joinedAt)
+  }
+
+  private func date(byAddingDays days: Int, to date: Date) -> Date {
+    Calendar.autoupdatingCurrent.date(byAdding: .day, value: days, to: date)
+      ?? date.addingTimeInterval(Double(days) * 86_400)
+  }
+
+  private func nextSchedule(
+    rating: ReviewRating,
+    currentIntervalDays: Double,
+    currentEase: Double
+  ) -> (intervalDays: Double, ease: Double) {
+    switch rating {
+    case .forgot:
+      return (1, max(1.3, currentEase - 0.2))
+    case .hard:
+      return (max(2, ceil(currentIntervalDays * 1.2)), max(1.3, currentEase - 0.15))
+    case .remembered:
+      return (max(3, ceil(currentIntervalDays * currentEase)), currentEase)
+    case .easy:
+      let nextEase = currentEase + 0.15
+      return (max(5, ceil(currentIntervalDays * (nextEase + 1))), nextEase)
+    }
   }
 
   private func normalizedCanonicalForm(for record: LearningRecord) -> String {
@@ -298,6 +418,18 @@ final class SwiftDataLearningStore: LearningStoring {
 
     let sourceEncounters = Array(sourceRecord.encounters)
     targetRecord.encounters.append(contentsOf: sourceEncounters)
+    let useSourceSchedule = isEarlier(
+      sourceRecord.nextReviewAt,
+      than: targetRecord.nextReviewAt
+    )
+    if useSourceSchedule {
+      targetRecord.reviewIntervalDays = sourceRecord.reviewIntervalDays
+      targetRecord.reviewEase = sourceRecord.reviewEase
+    }
+    targetRecord.reviewCount += sourceRecord.reviewCount
+    targetRecord.lapseCount += sourceRecord.lapseCount
+    let sourceReviewEvents = Array(sourceRecord.reviewEvents)
+    targetRecord.reviewEvents.append(contentsOf: sourceReviewEvents)
     targetRecord.createdAt = min(targetRecord.createdAt, sourceRecord.createdAt)
     targetRecord.lastEncounteredAt = max(
       targetRecord.lastEncounteredAt,
@@ -332,6 +464,17 @@ final class SwiftDataLearningStore: LearningStoring {
       date
     case (.some(let firstDate), .some(let secondDate)):
       min(firstDate, secondDate)
+    }
+  }
+
+  private func isEarlier(_ candidate: Date?, than current: Date?) -> Bool {
+    switch (candidate, current) {
+    case (.some(let candidateDate), .some(let currentDate)):
+      candidateDate < currentDate
+    case (.some, .none):
+      true
+    case (.none, _):
+      false
     }
   }
 }

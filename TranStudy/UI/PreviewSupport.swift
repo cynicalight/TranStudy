@@ -154,11 +154,29 @@
       storedItems = items
     }
 
-    func summary() async throws -> LearningSummary {
+    func summary(at date: Date) async throws -> LearningSummary {
       storedSummary
     }
 
     func add(_ addition: LearningAddition) async throws {}
+
+    func dueItems(at date: Date) async throws -> [LearningItem] {
+      storedItems
+    }
+
+    func recordReview(
+      itemID: UUID,
+      rating: ReviewRating,
+      reviewedAt: Date
+    ) async throws -> LearningReviewResult {
+      LearningReviewResult(
+        itemID: itemID,
+        rating: rating,
+        reviewedAt: reviewedAt,
+        nextReviewAt: reviewedAt.addingTimeInterval(3 * 86_400),
+        intervalDays: 3
+      )
+    }
 
     func items() async throws -> [LearningItem] {
       storedItems

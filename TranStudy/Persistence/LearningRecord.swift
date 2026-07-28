@@ -17,8 +17,14 @@ final class LearningRecord {
   var lastEncounteredAt: Date = Date()
   var nextReviewAt: Date?
   var isPaused: Bool = false
+  var reviewIntervalDays: Double = 1
+  var reviewEase: Double = 2.5
+  var reviewCount: Int = 0
+  var lapseCount: Int = 0
   @Relationship(deleteRule: .cascade, inverse: \LearningEncounterRecord.learningRecord)
   var encounters: [LearningEncounterRecord] = []
+  @Relationship(deleteRule: .cascade, inverse: \ReviewEventRecord.learningRecord)
+  var reviewEvents: [ReviewEventRecord] = []
 
   init(
     id: UUID = UUID(),

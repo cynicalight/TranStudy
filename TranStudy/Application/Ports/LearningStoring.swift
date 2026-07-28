@@ -59,6 +59,30 @@ enum LearningCanonicalUpdateResult: Equatable, Sendable {
   case merged
 }
 
+enum ReviewRating: String, CaseIterable, Equatable, Hashable, Sendable {
+  case forgot
+  case hard
+  case remembered
+  case easy
+}
+
+struct LearningReviewResult: Equatable, Sendable {
+  let itemID: UUID
+  let rating: ReviewRating
+  let reviewedAt: Date
+  let nextReviewAt: Date
+  let intervalDays: Double
+}
+
+struct LearningReviewEvent: Equatable, Identifiable, Sendable {
+  let id: UUID
+  let rating: ReviewRating
+  let reviewedAt: Date
+  let previousReviewAt: Date?
+  let nextReviewAt: Date
+  let intervalDays: Double
+}
+
 struct LearningItem: Equatable, Identifiable, Sendable {
   let id: UUID
   let sourceText: String
@@ -107,7 +131,14 @@ struct LearningItem: Equatable, Identifiable, Sendable {
 
 @MainActor
 protocol LearningStoring {
-  func summary() async throws -> LearningSummary
+  func summary(at date: Date) async throws -> LearningSummary
+  func dueItems(at date: Date) async throws -> [LearningItem]
+  func recordReview(
+    itemID: UUID,
+    rating: ReviewRating,
+    reviewedAt: Date
+  ) async throws -> LearningReviewResult
+  func reviewHistory(itemID: UUID) async throws -> [LearningReviewEvent]
   func add(_ addition: LearningAddition) async throws
   func mergeSummary(for addition: LearningAddition) async throws -> LearningMergeSummary?
   func updateCanonicalForm(
@@ -119,6 +150,10 @@ protocol LearningStoring {
 }
 
 extension LearningStoring {
+  func reviewHistory(itemID: UUID) async throws -> [LearningReviewEvent] {
+    []
+  }
+
   func mergeSummary(for addition: LearningAddition) async throws -> LearningMergeSummary? {
     nil
   }

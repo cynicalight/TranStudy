@@ -57,6 +57,7 @@
 		CFCB5C16A568BA97C7B592F5 /* LearningLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813136C4D5EE2C9238A3B45C /* LearningLibraryView.swift */; };
 		D55EAEF2B2036470C899AB9B /* UserDefaultsTranslationProviderConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E421369785FC34DFCFA96402 /* UserDefaultsTranslationProviderConfigurationStore.swift */; };
 		D7EB2E47DE12E4DA4AFF28E3 /* TranslationProviderConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EDFA17B8138F7B3A2FC49ED /* TranslationProviderConfiguration.swift */; };
+		D9203CDCF3BE600884219E67 /* ReviewEventRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D89020FC50C5D7B244ADBA /* ReviewEventRecord.swift */; };
 		E0195B15A368189D610EE566 /* TranslationPanelPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D258F951539CAA01183633 /* TranslationPanelPositionTests.swift */; };
 		EB10F6E6BCA7DC87A3867ED2 /* TranslationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD117BC866E3B3B13D75132E /* TranslationSettingsView.swift */; };
 		F22FCBD2BF7DFC217383662A /* TranslationCacheKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 333A2FBB41FC174957BE90AC /* TranslationCacheKey.swift */; };
@@ -85,6 +86,7 @@
 		1D681D142094206B09400C9F /* OpenAICompatibleTranslationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleTranslationProviderTests.swift; sourceTree = "<group>"; };
 		2301BC5DCDA1295502BC91BC /* SwiftDataLearningStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLearningStoreTests.swift; sourceTree = "<group>"; };
 		27A499FF37BA0EBF7FA1FCB1 /* TranslationPanelPositionStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationPanelPositionStoring.swift; sourceTree = "<group>"; };
+		29D89020FC50C5D7B244ADBA /* ReviewEventRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewEventRecord.swift; sourceTree = "<group>"; };
 		333A2FBB41FC174957BE90AC /* TranslationCacheKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationCacheKey.swift; sourceTree = "<group>"; };
 		37A14EFDAED5A88AD69E8876 /* DebugEnvironmentAPIKeyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugEnvironmentAPIKeyStoreTests.swift; sourceTree = "<group>"; };
 		3B9AD4FA6759148ACAC9F430 /* SwiftDataLearningStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLearningStore.swift; sourceTree = "<group>"; };
@@ -254,6 +256,7 @@
 				93491B3DF2455B2CED6EB38E /* KeychainAPIKeyStore.swift */,
 				0107B42BEC4FF8B96FE60E43 /* LearningEncounterRecord.swift */,
 				84E8389C189D488477B36DB5 /* LearningRecord.swift */,
+				29D89020FC50C5D7B244ADBA /* ReviewEventRecord.swift */,
 				3B9AD4FA6759148ACAC9F430 /* SwiftDataLearningStore.swift */,
 				54220E6249BBBCCD2010ADBB /* UserDefaultsTranslationPanelPositionStore.swift */,
 				E421369785FC34DFCFA96402 /* UserDefaultsTranslationProviderConfigurationStore.swift */,
@@ -387,6 +390,7 @@
 				64084A34512E4EA7D5D73FD0 /* OpenAIChatTranslationClient.swift in Sources */,
 				9A7E88D16CE523212E1603A1 /* OpenAICompatibleTranslationProvider.swift in Sources */,
 				93C0518F888C7F59DC03D74B /* PreviewSupport.swift in Sources */,
+				D9203CDCF3BE600884219E67 /* ReviewEventRecord.swift in Sources */,
 				8156F0FBB03325CB554344A3 /* ReviewNotifying.swift in Sources */,
 				9F330A62B857FB643842E05C /* RootView.swift in Sources */,
 				677D4E83E1506EBD0C39E17C /* SelectionProviding.swift in Sources */,

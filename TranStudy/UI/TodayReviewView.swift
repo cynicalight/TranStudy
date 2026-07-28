@@ -33,13 +33,133 @@ struct TodayReviewView: View {
           )
         }
 
-        reviewStatus
+        if let item = shell.currentReviewItem {
+          reviewSession(item)
+        } else {
+          reviewStatus
+        }
       }
       .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
       .padding(32)
       .frame(maxWidth: .infinity, alignment: .top)
     }
     .navigationTitle("今日复习")
+  }
+
+  private func reviewSession(_ item: LearningItem) -> some View {
+    VStack(spacing: 16) {
+      if shell.isReviewAnswerVisible {
+        reviewAnswer(item)
+          .padding(28)
+          .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
+          .contentSurface()
+      } else {
+        Button {
+          shell.revealCurrentReviewAnswer()
+        } label: {
+          Text(item.canonicalForm)
+            .font(.system(size: 48, weight: .semibold, design: .rounded))
+            .minimumScaleFactor(0.65)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(28)
+            .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
+            .contentSurface()
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("显示完整释义和例句")
+      }
+
+      if shell.selectedReviewRating == nil {
+        HStack(spacing: 10) {
+          ForEach(ReviewRating.allCases, id: \.self) { rating in
+            Button {
+              Task {
+                await shell.rateCurrentReview(rating)
+              }
+            } label: {
+              Text(rating.title)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .tint(rating.tint)
+            .disabled(shell.isReviewRating)
+          }
+        }
+      } else {
+        Button {
+          shell.advanceToNextReview()
+        } label: {
+          Label("下一个", systemImage: "arrow.right")
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+      }
+    }
+  }
+
+  private func reviewAnswer(_ item: LearningItem) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack(alignment: .firstTextBaseline, spacing: 10) {
+        Text(item.canonicalForm)
+          .font(.largeTitle.weight(.semibold))
+        if !item.pronunciation.isEmpty {
+          Text(item.pronunciation)
+            .font(.title3)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        if !item.partOfSpeech.isEmpty {
+          Text(item.partOfSpeech)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.quaternary, in: .capsule)
+        }
+      }
+
+      Text(item.contextualMeaning)
+        .font(.title3.weight(.medium))
+
+      VStack(alignment: .leading, spacing: 7) {
+        Text(item.exampleSentence)
+          .font(.body)
+          .italic()
+        Text(item.sentenceTranslation)
+          .foregroundStyle(.secondary)
+      }
+
+      let otherEncounters = Array(item.encounters.dropFirst())
+      if !otherEncounters.isEmpty {
+        DisclosureGroup("其他义项与例句（\(otherEncounters.count)）") {
+          VStack(alignment: .leading, spacing: 12) {
+            ForEach(otherEncounters) { encounter in
+              VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                  Text(encounter.contextualMeaning)
+                    .fontWeight(.medium)
+                  if !encounter.partOfSpeech.isEmpty {
+                    Text(encounter.partOfSpeech)
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                }
+                Text(encounter.exampleSentence)
+                  .italic()
+                Text(encounter.sentenceTranslation)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+          .padding(.top, 8)
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var reviewStatus: some View {
@@ -97,6 +217,34 @@ struct TodayReviewView: View {
 
   private var reviewStatusTint: Color {
     shell.learningSummary.dueCount == 0 ? .green : .orange
+  }
+}
+
+extension ReviewRating {
+  fileprivate var title: String {
+    switch self {
+    case .forgot:
+      "忘记"
+    case .hard:
+      "困难"
+    case .remembered:
+      "记得"
+    case .easy:
+      "简单"
+    }
+  }
+
+  fileprivate var tint: Color {
+    switch self {
+    case .forgot:
+      .red
+    case .hard:
+      .orange
+    case .remembered:
+      .blue
+    case .easy:
+      .green
+    }
   }
 }
 

@@ -265,6 +265,49 @@ struct ApplicationShellTests {
     #expect(shell.pendingLibraryMerge == nil)
   }
 
+  @Test("rating a due card records the controlled time, reveals the answer, then advances")
+  func ratingDueCardRevealsAnswerThenAdvances() async throws {
+    let firstItem = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let secondItem = makeLearningItem(
+      id: UUID(uuidString: "A60B21B0-D9FC-4DBD-B818-A1819310E5E4")!,
+      canonicalForm: "pause"
+    )
+    let learningStore = TestLearningStore(dueItems: [firstItem, secondItem])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    await shell.refreshTodayReview()
+
+    #expect(shell.currentReviewItem == firstItem)
+    #expect(shell.isReviewAnswerVisible == false)
+    #expect(shell.selectedReviewRating == nil)
+
+    await shell.rateCurrentReview(.remembered)
+
+    #expect(
+      learningStore.reviewInvocations
+        == [
+          ReviewInvocation(
+            itemID: firstItem.id,
+            rating: .remembered,
+            reviewedAt: Date(timeIntervalSince1970: 1_234)
+          )
+        ])
+    #expect(shell.currentReviewItem == firstItem)
+    #expect(shell.isReviewAnswerVisible)
+    #expect(shell.selectedReviewRating == .remembered)
+
+    shell.advanceToNextReview()
+
+    #expect(shell.currentReviewItem == secondItem)
+    #expect(shell.isReviewAnswerVisible == false)
+    #expect(shell.selectedReviewRating == nil)
+  }
+
   @Test("a cancelled translation cannot publish a late result")
   func cancelledTranslationCannotPublishLateResult() async {
     let translator = ControlledTranslationProvider()
@@ -294,6 +337,22 @@ struct ApplicationShellTests {
 
     #expect(shell.translationDraft == nil)
     #expect(shell.translationStatus == .idle)
+  }
+
+  private func makeLearningItem(id: UUID, canonicalForm: String) -> LearningItem {
+    LearningItem(
+      id: id,
+      sourceText: canonicalForm,
+      canonicalForm: canonicalForm,
+      pronunciation: "",
+      partOfSpeech: "verb",
+      contextualMeaning: canonicalForm,
+      exampleSentence: "\(canonicalForm) example",
+      sentenceTranslation: "\(canonicalForm) 翻译",
+      sourceApplicationName: "Safari",
+      createdAt: Date(timeIntervalSince1970: 1_000),
+      nextReviewAt: Date(timeIntervalSince1970: 1_200)
+    )
   }
 
   @Test("sentence clipboard content waits for the long-text issue")
@@ -511,21 +570,25 @@ private final class ControlledTranslationProvider: TranslationProviding {
 private final class TestLearningStore: LearningStoring {
   private(set) var lastAddition: LearningAddition?
   private(set) var canonicalUpdateInvocations: [CanonicalUpdateInvocation] = []
+  private(set) var reviewInvocations: [ReviewInvocation] = []
   private var storedItems: [LearningItem]
+  private var storedDueItems: [LearningItem]
   private let storedMergeSummary: LearningMergeSummary?
   private var canonicalUpdateResults: [LearningCanonicalUpdateResult]
 
   init(
     items: [LearningItem] = [],
+    dueItems: [LearningItem] = [],
     mergeSummary: LearningMergeSummary? = nil,
     canonicalUpdateResults: [LearningCanonicalUpdateResult] = []
   ) {
     storedItems = items
+    storedDueItems = dueItems
     storedMergeSummary = mergeSummary
     self.canonicalUpdateResults = canonicalUpdateResults
   }
 
-  func summary() async throws -> LearningSummary {
+  func summary(at date: Date) async throws -> LearningSummary {
     LearningSummary(
       dueCount: 3,
       wordCount: 12,
@@ -535,6 +598,30 @@ private final class TestLearningStore: LearningStoring {
 
   func add(_ addition: LearningAddition) async throws {
     lastAddition = addition
+  }
+
+  func dueItems(at date: Date) async throws -> [LearningItem] {
+    storedDueItems
+  }
+
+  func recordReview(
+    itemID: UUID,
+    rating: ReviewRating,
+    reviewedAt: Date
+  ) async throws -> LearningReviewResult {
+    reviewInvocations.append(
+      ReviewInvocation(
+        itemID: itemID,
+        rating: rating,
+        reviewedAt: reviewedAt
+      ))
+    return LearningReviewResult(
+      itemID: itemID,
+      rating: rating,
+      reviewedAt: reviewedAt,
+      nextReviewAt: reviewedAt.addingTimeInterval(3 * 86_400),
+      intervalDays: 3
+    )
   }
 
   func mergeSummary(for addition: LearningAddition) async throws -> LearningMergeSummary? {
@@ -564,6 +651,12 @@ private struct CanonicalUpdateInvocation: Equatable {
   let itemID: UUID
   let canonicalForm: String
   let confirmMerge: Bool
+}
+
+private struct ReviewInvocation: Equatable {
+  let itemID: UUID
+  let rating: ReviewRating
+  let reviewedAt: Date
 }
 
 @MainActor

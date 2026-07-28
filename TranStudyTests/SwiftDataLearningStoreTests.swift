@@ -238,6 +238,7 @@ struct SwiftDataLearningStoreTests {
     let container = try ModelContainer(
       for: LearningRecord.self,
       LearningEncounterRecord.self,
+      ReviewEventRecord.self,
       configurations: configuration
     )
     let context = ModelContext(container)
@@ -287,6 +288,7 @@ struct SwiftDataLearningStoreTests {
     let container = try ModelContainer(
       for: LearningRecord.self,
       LearningEncounterRecord.self,
+      ReviewEventRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -334,6 +336,7 @@ struct SwiftDataLearningStoreTests {
     let container = try ModelContainer(
       for: LearningRecord.self,
       LearningEncounterRecord.self,
+      ReviewEventRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -357,11 +360,284 @@ struct SwiftDataLearningStoreTests {
     #expect(try await store.items().isEmpty)
   }
 
+  @Test("new words first become due the next day while paused words stay out of review")
+  func newWordsBecomeDueNextDayUnlessPaused() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    let joinedAt = Date(timeIntervalSince1970: 10_000)
+
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "ran",
+          canonicalForm: "run",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: joinedAt
+      ))
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "paused",
+          canonicalForm: "pause",
+          pronunciation: "/pɔːzd/",
+          partOfSpeech: "verb",
+          contextualMeaning: "暂停",
+          exampleSentence: "The music paused.",
+          sentenceTranslation: "音乐暂停了。"
+        ),
+        sourceApplicationName: "Preview",
+        createdAt: joinedAt,
+        nextReviewAt: joinedAt,
+        isPaused: true
+      ))
+
+    #expect(try await store.summary(at: joinedAt).dueCount == 0)
+    #expect(try await store.dueItems(at: joinedAt).isEmpty)
+
+    let nextDay = joinedAt.addingTimeInterval(86_400)
+    let dueItems = try await store.dueItems(at: nextDay)
+
+    #expect(try await store.summary(at: nextDay).dueCount == 1)
+    #expect(dueItems.map(\.canonicalForm) == ["run"])
+    #expect(dueItems.first?.nextReviewAt == nextDay)
+  }
+
+  @Test("four review ratings persist adaptive intervals and remove cards from today's queue")
+  func reviewRatingsPersistAdaptiveIntervals() async throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let databaseURL = directory.appending(path: "TranStudy.store")
+    try FileManager.default.createDirectory(
+      at: directory,
+      withIntermediateDirectories: true
+    )
+    defer {
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let reviewDate = Date(timeIntervalSince1970: 100_000)
+    let expectations: [(String, ReviewRating, Double)] = [
+      ("forget", .forgot, 1),
+      ("hard", .hard, 2),
+      ("remember", .remembered, 3),
+      ("easy", .easy, 5),
+    ]
+
+    do {
+      let container = try makeContainer(at: databaseURL)
+      let store = SwiftDataLearningStore(container: container)
+      for (canonicalForm, rating, expectedInterval) in expectations {
+        try await store.add(
+          LearningAddition(
+            draft: TranslationDraft(
+              sourceText: canonicalForm,
+              canonicalForm: canonicalForm,
+              pronunciation: "",
+              partOfSpeech: "verb",
+              contextualMeaning: canonicalForm,
+              exampleSentence: "\(canonicalForm) example",
+              sentenceTranslation: "\(canonicalForm) 翻译"
+            ),
+            sourceApplicationName: "Safari",
+            createdAt: reviewDate.addingTimeInterval(-86_400),
+            nextReviewAt: reviewDate
+          ))
+        let item = try #require(
+          try await store.items().first(where: { $0.canonicalForm == canonicalForm })
+        )
+
+        let result = try await store.recordReview(
+          itemID: item.id,
+          rating: rating,
+          reviewedAt: reviewDate
+        )
+
+        #expect(result.intervalDays == expectedInterval)
+        #expect(
+          result.nextReviewAt
+            == reviewDate.addingTimeInterval(expectedInterval * 86_400)
+        )
+      }
+
+      #expect(try await store.summary(at: reviewDate).dueCount == 0)
+      #expect(try await store.dueItems(at: reviewDate).isEmpty)
+    }
+
+    let reopenedContainer = try makeContainer(at: databaseURL)
+    let reopenedStore = SwiftDataLearningStore(container: reopenedContainer)
+    let items = try await reopenedStore.items()
+
+    for (canonicalForm, rating, _) in expectations {
+      let item = try #require(items.first(where: { $0.canonicalForm == canonicalForm }))
+      let history = try await reopenedStore.reviewHistory(itemID: item.id)
+
+      #expect(history.map(\.rating) == [rating])
+      #expect(history.map(\.reviewedAt) == [reviewDate])
+    }
+  }
+
+  @Test("review history records the previous actual review time")
+  func reviewHistoryRecordsPreviousActualReviewTime() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    let firstReviewDate = Date(timeIntervalSince1970: 100_000)
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "ran",
+          canonicalForm: "run",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: firstReviewDate.addingTimeInterval(-86_400),
+        nextReviewAt: firstReviewDate
+      ))
+    let item = try #require(try await store.items().first)
+    let firstResult = try await store.recordReview(
+      itemID: item.id,
+      rating: .forgot,
+      reviewedAt: firstReviewDate
+    )
+    let secondReviewDate = firstResult.nextReviewAt.addingTimeInterval(300)
+    _ = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: secondReviewDate
+    )
+
+    let history = try await store.reviewHistory(itemID: item.id)
+
+    #expect(history.map(\.previousReviewAt) == [nil, firstReviewDate])
+    #expect(history.map(\.reviewedAt) == [firstReviewDate, secondReviewDate])
+  }
+
+  @Test("cards with the same due date keep a deterministic order")
+  func sameDueDateUsesDeterministicOrder() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    let dueDate = Date(timeIntervalSince1970: 100_000)
+    for canonicalForm in ["zebra", "apple", "middle"] {
+      try await store.add(
+        LearningAddition(
+          draft: TranslationDraft(
+            sourceText: canonicalForm,
+            canonicalForm: canonicalForm,
+            pronunciation: "",
+            partOfSpeech: "noun",
+            contextualMeaning: canonicalForm,
+            exampleSentence: "\(canonicalForm) example",
+            sentenceTranslation: "\(canonicalForm) 翻译"
+          ),
+          sourceApplicationName: "Safari",
+          createdAt: dueDate.addingTimeInterval(-86_400),
+          nextReviewAt: dueDate
+        ))
+    }
+    let firstOrder = try await store.dueItems(at: dueDate).map(\.id)
+    let secondOrder = try await store.dueItems(at: dueDate).map(\.id)
+
+    #expect(firstOrder == secondOrder)
+    #expect(firstOrder == firstOrder.sorted { $0.uuidString < $1.uuidString })
+  }
+
+  @Test("merging reviewed words preserves both histories and the more urgent schedule state")
+  func mergingReviewedWordsPreservesHistoryAndUrgentSchedule() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    let reviewDate = Date(timeIntervalSince1970: 100_000)
+
+    for canonicalForm in ["run", "sprint"] {
+      try await store.add(
+        LearningAddition(
+          draft: TranslationDraft(
+            sourceText: canonicalForm,
+            canonicalForm: canonicalForm,
+            pronunciation: "",
+            partOfSpeech: "verb",
+            contextualMeaning: canonicalForm,
+            exampleSentence: "\(canonicalForm) example",
+            sentenceTranslation: "\(canonicalForm) 翻译"
+          ),
+          sourceApplicationName: "Safari",
+          createdAt: reviewDate.addingTimeInterval(-86_400),
+          nextReviewAt: reviewDate
+        ))
+    }
+    let runItem = try #require(
+      try await store.items().first(where: { $0.canonicalForm == "run" })
+    )
+    let sprintItem = try #require(
+      try await store.items().first(where: { $0.canonicalForm == "sprint" })
+    )
+    _ = try await store.recordReview(
+      itemID: runItem.id,
+      rating: .easy,
+      reviewedAt: reviewDate
+    )
+    let urgentResult = try await store.recordReview(
+      itemID: sprintItem.id,
+      rating: .hard,
+      reviewedAt: reviewDate.addingTimeInterval(1)
+    )
+
+    _ = try await store.updateCanonicalForm(
+      itemID: sprintItem.id,
+      canonicalForm: "run",
+      confirmMerge: true
+    )
+
+    let mergedItem = try #require(try await store.items().first)
+    let history = try await store.reviewHistory(itemID: mergedItem.id)
+    let nextResult = try await store.recordReview(
+      itemID: mergedItem.id,
+      rating: .remembered,
+      reviewedAt: urgentResult.nextReviewAt
+    )
+
+    #expect(mergedItem.nextReviewAt == urgentResult.nextReviewAt)
+    #expect(history.map(\.rating) == [.easy, .hard])
+    #expect(nextResult.intervalDays == 5)
+  }
+
   private func makeContainer(at url: URL) throws -> ModelContainer {
     let configuration = ModelConfiguration(url: url)
     return try ModelContainer(
       for: LearningRecord.self,
       LearningEncounterRecord.self,
+      ReviewEventRecord.self,
       configurations: configuration
     )
   }
