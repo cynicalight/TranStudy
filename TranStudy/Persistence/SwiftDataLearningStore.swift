@@ -149,7 +149,7 @@ final class SwiftDataLearningStore: LearningStoring {
       exampleSentence: draft.exampleSentence,
       sentenceTranslation: draft.sentenceTranslation,
       sourceApplicationName: addition.sourceApplicationName,
-      nextReviewAt: addition.nextReviewAt ?? firstReviewDate(after: addition.createdAt),
+      nextReviewAt: addition.nextReviewAt ?? addition.createdAt,
       isPaused: addition.isPaused
     )
     record.encounters.append(makeEncounter(from: addition))
@@ -260,7 +260,7 @@ final class SwiftDataLearningStore: LearningStoring {
     var didChange = false
 
     for record in records where record.nextReviewAt == nil {
-      record.nextReviewAt = firstReviewDate(after: record.createdAt)
+      record.nextReviewAt = record.createdAt
       didChange = true
     }
 
@@ -286,10 +286,6 @@ final class SwiftDataLearningStore: LearningStoring {
 
   private func effectiveLastEncounteredAt(for record: LearningRecord) -> Date {
     record.encounters.map(\.encounteredAt).max() ?? record.createdAt
-  }
-
-  private func firstReviewDate(after joinedAt: Date) -> Date {
-    date(byAddingDays: 1, to: joinedAt)
   }
 
   private func date(byAddingDays days: Int, to date: Date) -> Date {

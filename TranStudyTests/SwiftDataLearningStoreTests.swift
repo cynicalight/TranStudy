@@ -360,8 +360,8 @@ struct SwiftDataLearningStoreTests {
     #expect(try await store.items().isEmpty)
   }
 
-  @Test("new words first become due the next day while paused words stay out of review")
-  func newWordsBecomeDueNextDayUnlessPaused() async throws {
+  @Test("new words first become due when joined while paused words stay out of review")
+  func newWordsBecomeDueWhenJoinedUnlessPaused() async throws {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try ModelContainer(
       for: LearningRecord.self,
@@ -403,15 +403,46 @@ struct SwiftDataLearningStoreTests {
         isPaused: true
       ))
 
-    #expect(try await store.summary(at: joinedAt).dueCount == 0)
-    #expect(try await store.dueItems(at: joinedAt).isEmpty)
+    let dueItems = try await store.dueItems(at: joinedAt)
 
-    let nextDay = joinedAt.addingTimeInterval(86_400)
-    let dueItems = try await store.dueItems(at: nextDay)
-
-    #expect(try await store.summary(at: nextDay).dueCount == 1)
+    #expect(try await store.summary(at: joinedAt).dueCount == 1)
     #expect(dueItems.map(\.canonicalForm) == ["run"])
-    #expect(dueItems.first?.nextReviewAt == nextDay)
+    #expect(dueItems.first?.nextReviewAt == joinedAt)
+  }
+
+  @Test("legacy words without a schedule become due from their joined time")
+  func legacyWordsWithoutScheduleBecomeDueFromJoinedTime() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      configurations: configuration
+    )
+    let joinedAt = Date(timeIntervalSince1970: 10_000)
+    let context = ModelContext(container)
+    context.insert(
+      LearningRecord(
+        createdAt: joinedAt,
+        sourceText: "ran",
+        canonicalForm: "run",
+        pronunciation: "/ræn/",
+        partOfSpeech: "verb",
+        contextualMeaning: "跑",
+        exampleSentence: "She ran home.",
+        sentenceTranslation: "她跑回了家。",
+        sourceApplicationName: "Safari",
+        nextReviewAt: nil
+      ))
+    try context.save()
+    let store = SwiftDataLearningStore(container: container)
+
+    let dueItems = try await store.dueItems(at: joinedAt)
+    let reloadedItems = try await SwiftDataLearningStore(container: container).items()
+
+    #expect(try await store.summary(at: joinedAt).dueCount == 1)
+    #expect(dueItems.map(\.canonicalForm) == ["run"])
+    #expect(reloadedItems.first?.nextReviewAt == joinedAt)
   }
 
   @Test("four review ratings persist adaptive intervals and remove cards from today's queue")
