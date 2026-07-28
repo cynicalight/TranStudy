@@ -41,7 +41,9 @@
 		8F59F4365F9465CD580EB45E /* ApplicationShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3DF5A919583DACB3C3F2C6 /* ApplicationShellTests.swift */; };
 		93C0518F888C7F59DC03D74B /* PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D9430F5290004481CBD408 /* PreviewSupport.swift */; };
 		94CE3905FC4A00F9545A9621 /* DateProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = E73251EDC99994FB0D3DA3EA /* DateProviding.swift */; };
+		9822A5C329E61A7B552B74D3 /* DebugEnvironmentAPIKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BDB21DE5F588FBC1EFD744 /* DebugEnvironmentAPIKeyStore.swift */; };
 		9A7E88D16CE523212E1603A1 /* OpenAICompatibleTranslationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2D9FF9E7D759F233ACB5DA /* OpenAICompatibleTranslationProvider.swift */; };
+		9DF9AC464E6A65F90276F135 /* DebugEnvironmentAPIKeyStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A14EFDAED5A88AD69E8876 /* DebugEnvironmentAPIKeyStoreTests.swift */; };
 		9F330A62B857FB643842E05C /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BBEFAB9A84D61EA7850826A /* RootView.swift */; };
 		9FB05A1CC653926C04F60176 /* TranslationPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B2332215B11112DCD342C24 /* TranslationPanelView.swift */; };
 		A1EE03E0CFFCA2BFDD311541 /* LearningStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF1A6468F5A38FB8643441B /* LearningStoring.swift */; };
@@ -81,6 +83,7 @@
 		2301BC5DCDA1295502BC91BC /* SwiftDataLearningStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLearningStoreTests.swift; sourceTree = "<group>"; };
 		27A499FF37BA0EBF7FA1FCB1 /* TranslationPanelPositionStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationPanelPositionStoring.swift; sourceTree = "<group>"; };
 		333A2FBB41FC174957BE90AC /* TranslationCacheKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationCacheKey.swift; sourceTree = "<group>"; };
+		37A14EFDAED5A88AD69E8876 /* DebugEnvironmentAPIKeyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugEnvironmentAPIKeyStoreTests.swift; sourceTree = "<group>"; };
 		3B9AD4FA6759148ACAC9F430 /* SwiftDataLearningStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLearningStore.swift; sourceTree = "<group>"; };
 		41B966A1D5F567119371D2A6 /* TranslationPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationPanelController.swift; sourceTree = "<group>"; };
 		47B05F425B1609D79265A448 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
@@ -105,6 +108,7 @@
 		9E4265F13B01628E06FE8DF1 /* TranslationCacheStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationCacheStoring.swift; sourceTree = "<group>"; };
 		A1D258F951539CAA01183633 /* TranslationPanelPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationPanelPositionTests.swift; sourceTree = "<group>"; };
 		A6935DF92E5E4BAF4D1C5285 /* TranslationConnectionTesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationConnectionTesting.swift; sourceTree = "<group>"; };
+		B0BDB21DE5F588FBC1EFD744 /* DebugEnvironmentAPIKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugEnvironmentAPIKeyStore.swift; sourceTree = "<group>"; };
 		B2D7D4A04CAA11570C8CADBA /* InMemoryTranslationCacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryTranslationCacheStore.swift; sourceTree = "<group>"; };
 		BC58A44C46D02F739F637EEF /* ApplicationShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationShell.swift; sourceTree = "<group>"; };
 		BD3F7DF048B1E5E6338A2E33 /* AppDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestination.swift; sourceTree = "<group>"; };
@@ -179,6 +183,7 @@
 			children = (
 				4D3DF5A919583DACB3C3F2C6 /* ApplicationShellTests.swift */,
 				840AC99294DED14888CA4322 /* ConfiguredTranslationServiceTests.swift */,
+				37A14EFDAED5A88AD69E8876 /* DebugEnvironmentAPIKeyStoreTests.swift */,
 				0024E9DFCF4F67D5F18251B6 /* DeepSeekTranslationProviderTests.swift */,
 				1D681D142094206B09400C9F /* OpenAICompatibleTranslationProviderTests.swift */,
 				2301BC5DCDA1295502BC91BC /* SwiftDataLearningStoreTests.swift */,
@@ -239,6 +244,7 @@
 		E5EBE485BC9A818288E94473 /* Persistence */ = {
 			isa = PBXGroup;
 			children = (
+				B0BDB21DE5F588FBC1EFD744 /* DebugEnvironmentAPIKeyStore.swift */,
 				17BE30085B3E542EBAA70D66 /* FileTranslationCacheStore.swift */,
 				93491B3DF2455B2CED6EB38E /* KeychainAPIKeyStore.swift */,
 				84E8389C189D488477B36DB5 /* LearningRecord.swift */,
@@ -337,6 +343,7 @@
 			files = (
 				8F59F4365F9465CD580EB45E /* ApplicationShellTests.swift in Sources */,
 				47FECDCE68B419E03245C4A0 /* ConfiguredTranslationServiceTests.swift in Sources */,
+				9DF9AC464E6A65F90276F135 /* DebugEnvironmentAPIKeyStoreTests.swift in Sources */,
 				B9248E258528A907B24A2AB0 /* DeepSeekTranslationProviderTests.swift in Sources */,
 				6D9AC012DA735C61A1420CF4 /* OpenAICompatibleTranslationProviderTests.swift in Sources */,
 				61C128AAD67D5F92F3436D73 /* SwiftDataLearningStoreTests.swift in Sources */,
@@ -358,6 +365,7 @@
 				62FC5A87AE99346C96701020 /* ClipboardReading.swift in Sources */,
 				4F0360E5D629952A4BF60F8A /* ConfiguredTranslationService.swift in Sources */,
 				94CE3905FC4A00F9545A9621 /* DateProviding.swift in Sources */,
+				9822A5C329E61A7B552B74D3 /* DebugEnvironmentAPIKeyStore.swift in Sources */,
 				8B6979F4F5A3A20BA36794BA /* DeepSeekTranslationProvider.swift in Sources */,
 				2F0C850E5EF0B4C0C5258038 /* DesignSystem.swift in Sources */,
 				7839DEBA2C757499FEB529E6 /* FileTranslationCacheStore.swift in Sources */,

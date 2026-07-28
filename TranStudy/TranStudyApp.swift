@@ -11,7 +11,14 @@ struct TranStudyApp: App {
     do {
       let container = try ModelContainer(for: LearningRecord.self)
       let learningStore = SwiftDataLearningStore(container: container)
-      let apiKeyStore = KeychainAPIKeyStore()
+      let keychainAPIKeyStore = KeychainAPIKeyStore()
+      #if DEBUG
+        let apiKeyStore: any APIKeyStoring = DebugEnvironmentAPIKeyStore(
+          fallback: keychainAPIKeyStore
+        )
+      #else
+        let apiKeyStore: any APIKeyStoring = keychainAPIKeyStore
+      #endif
       let httpClient = URLSessionHTTPClient()
       let providerConfigurationStore = UserDefaultsTranslationProviderConfigurationStore()
       let translationService = ConfiguredTranslationService(
