@@ -71,15 +71,70 @@ final class OpenAIChatTranslationClient {
       throw TranslationError.invalidResponse
     }
 
+    let exampleAndTranslation =
+      if Self.containsHanCharacter(payload.exampleSentence),
+        Self.containsLatinLetter(payload.sentenceTranslation)
+      {
+        (
+          exampleSentence: payload.sentenceTranslation,
+          sentenceTranslation: payload.exampleSentence
+        )
+      } else {
+        (
+          exampleSentence: payload.exampleSentence,
+          sentenceTranslation: payload.sentenceTranslation
+        )
+      }
+
+    guard
+      Self.containsLatinLetter(payload.canonicalForm),
+      !Self.containsHanCharacter(payload.canonicalForm),
+      !Self.containsHanCharacter(payload.pronunciation),
+      payload.pronunciation.isEmpty || Self.looksLikeIPA(payload.pronunciation),
+      Self.containsHanCharacter(payload.contextualMeaning),
+      Self.containsLatinLetter(exampleAndTranslation.exampleSentence),
+      Self.containsHanCharacter(exampleAndTranslation.sentenceTranslation)
+    else {
+      throw TranslationError.invalidResponse
+    }
+
     return TranslationResult(
       sourceText: request.sourceText,
       canonicalForm: payload.canonicalForm,
       pronunciation: payload.pronunciation,
       partOfSpeech: payload.partOfSpeech,
       contextualMeaning: payload.contextualMeaning,
-      exampleSentence: payload.exampleSentence,
-      sentenceTranslation: payload.sentenceTranslation
+      exampleSentence: exampleAndTranslation.exampleSentence,
+      sentenceTranslation: exampleAndTranslation.sentenceTranslation
     )
+  }
+
+  private static func containsHanCharacter(_ text: String) -> Bool {
+    text.unicodeScalars.contains { scalar in
+      (0x3400...0x4DBF).contains(scalar.value)
+        || (0x4E00...0x9FFF).contains(scalar.value)
+        || (0xF900...0xFAFF).contains(scalar.value)
+    }
+  }
+
+  private static func containsLatinLetter(_ text: String) -> Bool {
+    text.unicodeScalars.contains { scalar in
+      (0x0041...0x005A).contains(scalar.value)
+        || (0x0061...0x007A).contains(scalar.value)
+    }
+  }
+
+  private static func looksLikeIPA(_ text: String) -> Bool {
+    let pronunciation = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let isDelimited =
+      (pronunciation.hasPrefix("/") && pronunciation.hasSuffix("/"))
+      || (pronunciation.hasPrefix("[") && pronunciation.hasSuffix("]"))
+    let pinyinToneMarks = CharacterSet(charactersIn: "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü")
+
+    return
+      isDelimited
+      && pronunciation.rangeOfCharacter(from: .decimalDigits) == nil
+      && pronunciation.rangeOfCharacter(from: pinyinToneMarks) == nil
   }
 
   private static let systemPrompt = """
@@ -89,8 +144,18 @@ final class OpenAIChatTranslationClient {
     contextual_meaning, example_sentence, sentence_translation.
     Set input_kind to "word_or_phrase" only for a word or short phrase. Set it to
     "long_text" for a sentence or paragraph.
-    Preserve the supplied text in source_text. Use an empty pronunciation only when it is
-    genuinely unavailable. Do not include markdown or explanations outside the JSON object.
+    Follow these language and meaning requirements exactly:
+    - source_text: the exact supplied English text, unchanged.
+    - canonical_form: its English dictionary lemma, never a Chinese translation.
+    - pronunciation: slash-delimited IPA for the exact English source_text form, never
+      Mandarin pinyin.
+    - part_of_speech: the English part-of-speech name.
+    - contextual_meaning: the Chinese meaning of source_text in context.
+    - example_sentence: a natural English sentence containing the source word or phrase.
+    - sentence_translation: the Chinese translation of example_sentence.
+    Use an empty pronunciation only when it is genuinely unavailable. Never reverse English
+    source fields and Chinese translation fields. Do not include markdown or explanations
+    outside the JSON object.
     """
 }
 

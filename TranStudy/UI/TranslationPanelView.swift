@@ -86,38 +86,44 @@ struct TranslationPanelView: View {
   private var draftForm: some View {
     VStack(alignment: .leading, spacing: 14) {
       if !shell.translationSourceText.isEmpty {
-        Text(shell.translationSourceText)
-          .font(.title3.weight(.semibold))
-          .lineLimit(2)
-          .textSelection(.enabled)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(alignment: .bottom, spacing: 14) {
+          VStack(alignment: .leading, spacing: 5) {
+            Text("原文")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Text(shell.translationSourceText)
+              .font(.title3.weight(.semibold))
+              .lineLimit(2)
+              .textSelection(.enabled)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+
+          DraftField(
+            title: "原文音标",
+            text: binding(\.pronunciation)
+          )
+          .frame(width: 150)
+        }
       }
 
       Divider()
 
       HStack {
         DraftField(
-          title: "规范词形",
+          title: "词典原形",
           text: binding(\.canonicalForm)
         )
-        DraftField(
-          title: "音标",
-          text: binding(\.pronunciation)
-        )
-        .frame(width: 150)
-      }
-
-      HStack {
         DraftField(
           title: "词性",
           text: binding(\.partOfSpeech)
         )
         .frame(width: 110)
-        DraftField(
-          title: "语境释义",
-          text: binding(\.contextualMeaning)
-        )
       }
+
+      DraftField(
+        title: "语境释义",
+        text: binding(\.contextualMeaning)
+      )
 
       DraftField(
         title: "英文例句",
@@ -126,7 +132,7 @@ struct TranslationPanelView: View {
       )
 
       DraftField(
-        title: "整句翻译",
+        title: "例句中文翻译",
         text: binding(\.sentenceTranslation),
         axis: .vertical
       )

@@ -127,7 +127,6 @@ struct TranslationSettingsView: View {
     case .openAICompatible:
       CenteredLabeledContent("Base URL") {
         TextField(
-          "https://example.com/v1",
           text: Binding(
             get: {
               shell.translationProviderConfiguration.customBaseURL
@@ -138,14 +137,18 @@ struct TranslationSettingsView: View {
                 model: shell.translationProviderConfiguration.customModel
               )
             }
-          )
-        )
+          ),
+          prompt: Text("https://example.com/v1")
+            .foregroundStyle(.secondary)
+        ) {
+          Text("Base URL")
+        }
+        .labelsHidden()
         .frame(maxWidth: 360)
       }
 
       CenteredLabeledContent("模型名称") {
         TextField(
-          "例如 gpt-4.1-mini",
           text: Binding(
             get: {
               shell.translationProviderConfiguration.customModel
@@ -156,8 +159,13 @@ struct TranslationSettingsView: View {
                 model: $0
               )
             }
-          )
-        )
+          ),
+          prompt: Text("例如 gpt-4.1-mini")
+            .foregroundStyle(.secondary)
+        ) {
+          Text("模型名称")
+        }
+        .labelsHidden()
         .frame(maxWidth: 360)
       }
     }

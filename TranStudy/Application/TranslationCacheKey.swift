@@ -16,14 +16,15 @@ struct TranslationCacheKey: Codable, Hashable, Sendable {
     switch configuration.provider {
     case .deepSeek:
       endpoint = "https://api.deepseek.com"
-      model = configuration.deepSeekModel.rawValue
+      model = "\(configuration.deepSeekModel.rawValue)#response-v2"
     case .openAICompatible:
       endpoint = configuration.customBaseURL.trimmingCharacters(
         in: .whitespacesAndNewlines
       )
-      model = configuration.customModel.trimmingCharacters(
-        in: .whitespacesAndNewlines
-      )
+      model =
+        configuration.customModel.trimmingCharacters(
+          in: .whitespacesAndNewlines
+        ) + "#response-v2"
     }
   }
 }

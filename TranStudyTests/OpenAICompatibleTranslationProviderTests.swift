@@ -111,6 +111,89 @@ struct OpenAICompatibleTranslationProviderTests {
     }
   }
 
+  @Test("reversed English example and Chinese translation are corrected")
+  func reversedExampleAndTranslationAreCorrected() async throws {
+    let responseContent = try JSONSerialization.data(
+      withJSONObject: [
+        "input_kind": "word_or_phrase",
+        "source_text": "ran",
+        "canonical_form": "run",
+        "pronunciation": "/ræn/",
+        "part_of_speech": "verb",
+        "contextual_meaning": "奔跑",
+        "example_sentence": "她跑回了家。",
+        "sentence_translation": "She ran home.",
+      ]
+    )
+    let responseBody = try JSONSerialization.data(
+      withJSONObject: [
+        "choices": [
+          [
+            "message": [
+              "content": try #require(String(data: responseContent, encoding: .utf8))
+            ]
+          ]
+        ]
+      ]
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
+    )
+
+    let result = try await provider.translate(TranslationRequest(sourceText: "ran"))
+
+    #expect(result.exampleSentence == "She ran home.")
+    #expect(result.sentenceTranslation == "她跑回了家。")
+  }
+
+  @Test("Mandarin pinyin is rejected as an invalid English pronunciation")
+  func mandarinPinyinIsRejected() async throws {
+    let responseContent = try JSONSerialization.data(
+      withJSONObject: [
+        "input_kind": "word_or_phrase",
+        "source_text": "word",
+        "canonical_form": "word",
+        "pronunciation": "dān cí",
+        "part_of_speech": "noun",
+        "contextual_meaning": "单词",
+        "example_sentence": "This is a word.",
+        "sentence_translation": "这是一个单词。",
+      ]
+    )
+    let responseBody = try JSONSerialization.data(
+      withJSONObject: [
+        "choices": [
+          [
+            "message": [
+              "content": try #require(String(data: responseContent, encoding: .utf8))
+            ]
+          ]
+        ]
+      ]
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
+    )
+
+    await #expect(throws: TranslationError.invalidResponse) {
+      try await provider.translate(TranslationRequest(sourceText: "word"))
+    }
+  }
+
   @Test("remote HTTP base URL is rejected before sending the API key")
   func remoteHTTPBaseURLIsRejected() async {
     let httpClient = CustomProviderTestHTTPClient(data: Data(), statusCode: 200)
