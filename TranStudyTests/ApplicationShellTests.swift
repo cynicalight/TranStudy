@@ -89,8 +89,8 @@ struct ApplicationShellTests {
     #expect(shell.translationDraft == nil)
   }
 
-  @Test("a successful DeepSeek connection saves the API key")
-  func successfulDeepSeekConnectionSavesAPIKey() async {
+  @Test("a successful selected-provider connection saves the API key")
+  func successfulSelectedProviderConnectionSavesAPIKey() async {
     let apiKeyStore = TestApplicationAPIKeyStore()
     let connectionTester = TestTranslationConnectionTester()
     let shell = ApplicationShell(
@@ -99,11 +99,43 @@ struct ApplicationShellTests {
         connectionTester: connectionTester
       ))
 
-    await shell.testDeepSeekConnection(apiKey: "  test-api-key  ")
+    await shell.testTranslationConnection(apiKey: "  test-api-key  ")
 
     #expect(connectionTester.lastAPIKey == "test-api-key")
-    #expect(apiKeyStore.savedAPIKey == "test-api-key")
+    #expect(apiKeyStore.savedAPIKeys[.deepSeek] == "test-api-key")
     #expect(shell.connectionStatus == .connected)
+  }
+
+  @Test("custom provider settings and API key are saved for the selected provider")
+  func customProviderSettingsAndAPIKeyAreSaved() async {
+    let configurationStore = TestTranslationProviderConfigurationStore()
+    let apiKeyStore = TestApplicationAPIKeyStore()
+    let connectionTester = TestTranslationConnectionTester()
+    let shell = ApplicationShell(
+      environment: .test(
+        apiKeyStore: apiKeyStore,
+        connectionTester: connectionTester,
+        providerConfigurationStore: configurationStore
+      ))
+
+    shell.selectTranslationProvider(.openAICompatible)
+    shell.updateCustomProvider(
+      baseURL: "https://example.com/v1",
+      model: "example-model"
+    )
+    await shell.testTranslationConnection(apiKey: "  custom-api-key  ")
+
+    let expectedConfiguration = TranslationProviderConfiguration(
+      provider: .openAICompatible,
+      deepSeekModel: .flash,
+      customBaseURL: "https://example.com/v1",
+      customModel: "example-model"
+    )
+    #expect(shell.translationProviderConfiguration == expectedConfiguration)
+    #expect(configurationStore.savedConfiguration == expectedConfiguration)
+    #expect(connectionTester.lastConfiguration == expectedConfiguration)
+    #expect(apiKeyStore.savedAPIKeys[.openAICompatible] == "custom-api-key")
+    #expect(apiKeyStore.savedAPIKeys[.deepSeek] == nil)
   }
 
   @Test("refreshing the library publishes persisted learning items")
@@ -294,7 +326,9 @@ extension ApplicationEnvironment {
     apiKeyStore: TestApplicationAPIKeyStore = TestApplicationAPIKeyStore(),
     connectionTester: TestTranslationConnectionTester = TestTranslationConnectionTester(),
     notifier: TestReviewNotifier = TestReviewNotifier(),
-    panelPositionStore: TestTranslationPanelPositionStore = TestTranslationPanelPositionStore()
+    panelPositionStore: TestTranslationPanelPositionStore = TestTranslationPanelPositionStore(),
+    providerConfigurationStore: TestTranslationProviderConfigurationStore =
+      TestTranslationProviderConfigurationStore()
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: TestSelectionProvider(),
@@ -306,7 +340,8 @@ extension ApplicationEnvironment {
       clock: TestClock(),
       notifications: notifier,
       speech: TestSpeechPlayer(),
-      panelPositionStore: panelPositionStore
+      panelPositionStore: panelPositionStore,
+      providerConfigurationStore: providerConfigurationStore
     )
   }
 }
@@ -397,22 +432,27 @@ private final class TestLearningStore: LearningStoring {
 
 @MainActor
 private final class TestApplicationAPIKeyStore: APIKeyStoring {
-  private(set) var savedAPIKey: String?
+  private(set) var savedAPIKeys: [TranslationProviderKind: String] = [:]
 
-  func loadAPIKey() throws -> String? {
-    savedAPIKey
+  func loadAPIKey(for provider: TranslationProviderKind) throws -> String? {
+    savedAPIKeys[provider]
   }
 
-  func saveAPIKey(_ apiKey: String) throws {
-    savedAPIKey = apiKey
+  func saveAPIKey(_ apiKey: String, for provider: TranslationProviderKind) throws {
+    savedAPIKeys[provider] = apiKey
   }
 }
 
 @MainActor
 private final class TestTranslationConnectionTester: TranslationConnectionTesting {
   private(set) var lastAPIKey: String?
+  private(set) var lastConfiguration: TranslationProviderConfiguration?
 
-  func testConnection(apiKey: String) async throws {
+  func testConnection(
+    configuration: TranslationProviderConfiguration,
+    apiKey: String
+  ) async throws {
+    lastConfiguration = configuration
     lastAPIKey = apiKey
   }
 }
@@ -448,5 +488,23 @@ private final class TestTranslationPanelPositionStore: TranslationPanelPositionS
 
   func save(_ position: TranslationPanelPosition) {
     savedPosition = position
+  }
+}
+
+private final class TestTranslationProviderConfigurationStore:
+  TranslationProviderConfigurationStoring
+{
+  private(set) var savedConfiguration: TranslationProviderConfiguration
+
+  init(configuration: TranslationProviderConfiguration = .default) {
+    savedConfiguration = configuration
+  }
+
+  func load() -> TranslationProviderConfiguration {
+    savedConfiguration
+  }
+
+  func save(_ configuration: TranslationProviderConfiguration) {
+    savedConfiguration = configuration
   }
 }

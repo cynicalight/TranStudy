@@ -12,6 +12,7 @@ struct ApplicationEnvironment {
   let notifications: any ReviewNotifying
   let speech: any SpeechPlaying
   let panelPositionStore: any TranslationPanelPositionStoring
+  let providerConfigurationStore: any TranslationProviderConfigurationStoring
 }
 
 extension ApplicationEnvironment {
@@ -20,7 +21,8 @@ extension ApplicationEnvironment {
     learningStore: any LearningStoring,
     translation: any TranslationProviding,
     apiKeyStore: any APIKeyStoring,
-    connectionTester: any TranslationConnectionTesting
+    connectionTester: any TranslationConnectionTesting,
+    providerConfigurationStore: any TranslationProviderConfigurationStoring
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: UnavailableSelectionProvider(),
@@ -32,7 +34,8 @@ extension ApplicationEnvironment {
       clock: SystemDateProvider(),
       notifications: DisabledReviewNotifier(),
       speech: DisabledSpeechPlayer(),
-      panelPositionStore: UserDefaultsTranslationPanelPositionStore()
+      panelPositionStore: UserDefaultsTranslationPanelPositionStore(),
+      providerConfigurationStore: providerConfigurationStore
     )
   }
 }

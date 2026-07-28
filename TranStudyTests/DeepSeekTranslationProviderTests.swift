@@ -20,7 +20,10 @@ struct DeepSeekTranslationProviderTests {
     )
 
     await #expect(throws: TranslationError.self) {
-      try await provider.testConnection(apiKey: "test-api-key")
+      try await provider.testConnection(
+        configuration: .default,
+        apiKey: "test-api-key"
+      )
     }
   }
 
@@ -42,7 +45,10 @@ struct DeepSeekTranslationProviderTests {
       model: .flash
     )
 
-    try await provider.testConnection(apiKey: "test-api-key")
+    try await provider.testConnection(
+      configuration: .default,
+      apiKey: "test-api-key"
+    )
 
     let request = try #require(httpClient.lastRequest)
     #expect(request.url?.absoluteString == "https://api.deepseek.com/models")
@@ -182,9 +188,9 @@ private final class TestHTTPClient: HTTPDataLoading {
 private struct TestAPIKeyStore: APIKeyStoring {
   let apiKey: String?
 
-  func loadAPIKey() throws -> String? {
+  func loadAPIKey(for provider: TranslationProviderKind) throws -> String? {
     apiKey
   }
 
-  func saveAPIKey(_ apiKey: String) throws {}
+  func saveAPIKey(_ apiKey: String, for provider: TranslationProviderKind) throws {}
 }

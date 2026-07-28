@@ -7,11 +7,10 @@ enum KeychainError: Error {
 
 @MainActor
 final class KeychainAPIKeyStore: APIKeyStoring {
-  private let service = "com.cynicalight.TranStudy.deepseek"
   private let account = "api-key"
 
-  func loadAPIKey() throws -> String? {
-    var query = baseQuery
+  func loadAPIKey(for provider: TranslationProviderKind) throws -> String? {
+    var query = baseQuery(for: provider)
     query[kSecReturnData as String] = true
     query[kSecMatchLimit as String] = kSecMatchLimitOne
 
@@ -36,10 +35,10 @@ final class KeychainAPIKeyStore: APIKeyStoring {
     return apiKey
   }
 
-  func saveAPIKey(_ apiKey: String) throws {
+  func saveAPIKey(_ apiKey: String, for provider: TranslationProviderKind) throws {
     let data = Data(apiKey.utf8)
     let updateStatus = SecItemUpdate(
-      baseQuery as CFDictionary,
+      baseQuery(for: provider) as CFDictionary,
       [kSecValueData as String: data] as CFDictionary
     )
 
@@ -51,7 +50,7 @@ final class KeychainAPIKeyStore: APIKeyStoring {
       throw KeychainError.unexpectedStatus(updateStatus)
     }
 
-    var addition = baseQuery
+    var addition = baseQuery(for: provider)
     addition[kSecValueData as String] = data
     addition[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
     let addStatus = SecItemAdd(addition as CFDictionary, nil)
@@ -61,11 +60,20 @@ final class KeychainAPIKeyStore: APIKeyStoring {
     }
   }
 
-  private var baseQuery: [String: Any] {
+  private func baseQuery(for provider: TranslationProviderKind) -> [String: Any] {
     [
       kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: service,
+      kSecAttrService as String: service(for: provider),
       kSecAttrAccount as String: account,
     ]
+  }
+
+  private func service(for provider: TranslationProviderKind) -> String {
+    switch provider {
+    case .deepSeek:
+      "com.cynicalight.TranStudy.deepseek"
+    case .openAICompatible:
+      "com.cynicalight.TranStudy.openai-compatible"
+    }
   }
 }

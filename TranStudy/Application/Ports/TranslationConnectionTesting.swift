@@ -1,4 +1,7 @@
 @MainActor
 protocol TranslationConnectionTesting {
-  func testConnection(apiKey: String) async throws
+  func testConnection(
+    configuration: TranslationProviderConfiguration,
+    apiKey: String
+  ) async throws
 }

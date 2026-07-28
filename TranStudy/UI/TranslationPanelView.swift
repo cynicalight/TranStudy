@@ -41,7 +41,7 @@ struct TranslationPanelView: View {
       ContentUnavailableView(
         "翻译失败",
         systemImage: "exclamationmark.triangle",
-        description: Text("请检查 DeepSeek 设置和网络，然后重试。")
+        description: Text("请检查翻译服务设置和网络，然后重试。")
       )
     case .ready:
       if shell.translationDraft != nil {

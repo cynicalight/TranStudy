@@ -29,11 +29,13 @@ final class ApplicationShell {
   private(set) var translationSourceText = ""
   private(set) var learningItems: [LearningItem] = []
   private(set) var translationPanelPosition: TranslationPanelPosition
+  private(set) var translationProviderConfiguration: TranslationProviderConfiguration
   private var activeTranslationID: UUID?
 
   init(environment: ApplicationEnvironment) {
     self.environment = environment
     translationPanelPosition = environment.panelPositionStore.load()
+    translationProviderConfiguration = environment.providerConfigurationStore.load()
   }
 
   func refreshTodayReview() async {
@@ -132,7 +134,26 @@ final class ApplicationShell {
     environment.panelPositionStore.save(position)
   }
 
-  func testDeepSeekConnection(apiKey: String) async {
+  func selectTranslationProvider(_ provider: TranslationProviderKind) {
+    translationProviderConfiguration.provider = provider
+    environment.providerConfigurationStore.save(translationProviderConfiguration)
+    connectionStatus = .idle
+  }
+
+  func updateCustomProvider(baseURL: String, model: String) {
+    translationProviderConfiguration.customBaseURL = baseURL
+    translationProviderConfiguration.customModel = model
+    environment.providerConfigurationStore.save(translationProviderConfiguration)
+    connectionStatus = .idle
+  }
+
+  func updateDeepSeekModel(_ model: DeepSeekModel) {
+    translationProviderConfiguration.deepSeekModel = model
+    environment.providerConfigurationStore.save(translationProviderConfiguration)
+    connectionStatus = .idle
+  }
+
+  func testTranslationConnection(apiKey: String) async {
     let normalizedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !normalizedAPIKey.isEmpty else {
       connectionStatus = .failed
@@ -142,8 +163,14 @@ final class ApplicationShell {
     connectionStatus = .testing
 
     do {
-      try await environment.connectionTester.testConnection(apiKey: normalizedAPIKey)
-      try environment.apiKeyStore.saveAPIKey(normalizedAPIKey)
+      try await environment.connectionTester.testConnection(
+        configuration: translationProviderConfiguration,
+        apiKey: normalizedAPIKey
+      )
+      try environment.apiKeyStore.saveAPIKey(
+        normalizedAPIKey,
+        for: translationProviderConfiguration.provider
+      )
       connectionStatus = .connected
     } catch {
       connectionStatus = .failed

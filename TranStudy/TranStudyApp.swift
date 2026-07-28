@@ -13,17 +13,20 @@ struct TranStudyApp: App {
       let learningStore = SwiftDataLearningStore(container: container)
       let apiKeyStore = KeychainAPIKeyStore()
       let httpClient = URLSessionHTTPClient()
-      let translationProvider = DeepSeekTranslationProvider(
+      let providerConfigurationStore = UserDefaultsTranslationProviderConfigurationStore()
+      let translationService = ConfiguredTranslationService(
+        configurationStore: providerConfigurationStore,
         apiKeyStore: apiKeyStore,
         httpClient: httpClient,
-        model: .flash
+        cacheStore: FileTranslationCacheStore()
       )
       let shell = ApplicationShell(
         environment: .live(
           learningStore: learningStore,
-          translation: translationProvider,
+          translation: translationService,
           apiKeyStore: apiKeyStore,
-          connectionTester: translationProvider
+          connectionTester: translationService,
+          providerConfigurationStore: providerConfigurationStore
         ))
       _shell = State(initialValue: shell)
       coordinator = ApplicationCoordinator(shell: shell)
