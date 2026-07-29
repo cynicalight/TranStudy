@@ -183,6 +183,21 @@ struct ApplicationShellTests {
     #expect(configurationStore.savedConfiguration.excludedApplications.isEmpty)
   }
 
+  @Test("sentence card capability is opt-in and persists immediately")
+  func sentenceCardCapabilityIsOptIn() {
+    let configurationStore = TestSentenceCardConfigurationStore()
+    let shell = ApplicationShell(
+      environment: .test(sentenceCardConfigurationStore: configurationStore)
+    )
+
+    #expect(!shell.isSentenceCardsEnabled)
+
+    shell.setSentenceCardsEnabled(true)
+
+    #expect(shell.isSentenceCardsEnabled)
+    #expect(configurationStore.savedValue)
+  }
+
   @Test("only joining learning persists the edited session draft")
   func onlyJoiningLearningPersistsEditedSessionDraft() async throws {
     let learningStore = TestLearningStore()
@@ -540,6 +555,99 @@ struct ApplicationShellTests {
     #expect(translator.lastRequest?.targetSentence == expectedSentence)
   }
 
+  @Test("enabled sentence cards are added only after the explicit sentence action")
+  func sentenceCardsRequireExplicitLongTextAction() async {
+    let source = "She ran home. They stayed outside."
+    let sentence = "She ran home."
+    let selectedRange = (source as NSString).range(of: "ran")
+    let translator = SentenceCardTranslationProvider(
+      translations: [
+        source: "她跑回了家。他们待在外面。",
+        sentence: "她跑回了家。",
+      ])
+    let learningStore = TestLearningStore()
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: source),
+        translation: translator,
+        learningStore: learningStore,
+        sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(
+          isEnabled: true
+        )
+      ))
+
+    await shell.translateClipboard()
+
+    #expect(learningStore.lastAddition == nil)
+    #expect(shell.canAddLongTextSentence(selectedRange))
+
+    await shell.addLongTextSentence(selectedRange)
+
+    #expect(translator.translatedSources == [source, sentence])
+    #expect(
+      learningStore.lastAddition
+        == LearningAddition(
+          kind: .sentence,
+          draft: TranslationDraft(
+            sourceText: sentence,
+            canonicalForm: sentence,
+            pronunciation: "",
+            partOfSpeech: "",
+            contextualMeaning: "",
+            exampleSentence: sentence,
+            sentenceTranslation: "她跑回了家。"
+          ),
+          sourceApplicationName: "剪贴板",
+          createdAt: Date(timeIntervalSince1970: 1_234)
+        ))
+    #expect(shell.sentenceCardAdditionStatus == .added)
+
+    shell.clearSentenceCardAdditionStatus()
+
+    #expect(shell.sentenceCardAdditionStatus == nil)
+  }
+
+  @Test("sentence cards reject a selection that crosses sentence boundaries")
+  func sentenceCardsRejectCrossSentenceSelection() async {
+    let source = "She ran home. They stayed outside."
+    let selectedRange = (source as NSString).range(of: "home. They")
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: source),
+        translation: SentenceCardTranslationProvider(
+          translations: [source: "她跑回了家。他们待在外面。"]
+        ),
+        sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(
+          isEnabled: true
+        )
+      ))
+
+    await shell.translateClipboard()
+
+    #expect(!shell.canAddLongTextSentence(selectedRange))
+  }
+
+  @Test("sentence card addition exposes translation failure")
+  func sentenceCardAdditionExposesTranslationFailure() async {
+    let source = "She ran home. They stayed outside."
+    let selectedRange = (source as NSString).range(of: "ran")
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: source),
+        translation: SentenceCardTranslationProvider(
+          translations: [source: "她跑回了家。他们待在外面。"]
+        ),
+        sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(
+          isEnabled: true
+        )
+      ))
+
+    await shell.translateClipboard()
+    await shell.addLongTextSentence(selectedRange)
+
+    #expect(shell.sentenceCardAdditionStatus == .failed)
+  }
+
   @Test("closing the translation panel cancels its in-flight request")
   func closingTranslationPanelCancelsInFlightRequest() async {
     let translator = ControlledTranslationProvider()
@@ -662,7 +770,9 @@ extension ApplicationEnvironment {
       TestTranslationProviderConfigurationStore(),
     selectionConfigurationStore: TestSelectionConfigurationStore =
       TestSelectionConfigurationStore(),
-    shortcutStore: TestTranslationShortcutStore = TestTranslationShortcutStore()
+    shortcutStore: TestTranslationShortcutStore = TestTranslationShortcutStore(),
+    sentenceCardConfigurationStore: TestSentenceCardConfigurationStore =
+      TestSentenceCardConfigurationStore()
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: TestSelectionProvider(),
@@ -677,7 +787,51 @@ extension ApplicationEnvironment {
       panelPositionStore: panelPositionStore,
       providerConfigurationStore: providerConfigurationStore,
       selectionConfigurationStore: selectionConfigurationStore,
-      shortcutStore: shortcutStore
+      shortcutStore: shortcutStore,
+      sentenceCardConfigurationStore: sentenceCardConfigurationStore
+    )
+  }
+}
+
+private final class TestSentenceCardConfigurationStore:
+  SentenceCardConfigurationStoring
+{
+  private(set) var savedValue: Bool
+
+  init(isEnabled: Bool = false) {
+    savedValue = isEnabled
+  }
+
+  func load() -> Bool {
+    savedValue
+  }
+
+  func save(_ isEnabled: Bool) {
+    savedValue = isEnabled
+  }
+}
+
+@MainActor
+private final class SentenceCardTranslationProvider: TranslationProviding {
+  private let translations: [String: String]
+  private(set) var translatedSources: [String] = []
+
+  init(translations: [String: String]) {
+    self.translations = translations
+  }
+
+  func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+    throw TranslationError.invalidResponse
+  }
+
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    translatedSources.append(sourceText)
+    guard let translation = translations[sourceText] else {
+      throw TranslationError.invalidResponse
+    }
+    return LongTextTranslationResult(
+      sourceText: sourceText,
+      translatedText: translation
     )
   }
 }

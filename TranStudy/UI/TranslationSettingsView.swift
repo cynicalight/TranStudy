@@ -53,6 +53,20 @@ struct TranslationSettingsView: View {
 
         Section {
           Toggle(
+            "允许加入句子卡",
+            isOn: Binding(
+              get: { shell.isSentenceCardsEnabled },
+              set: { shell.setSentenceCardsEnabled($0) }
+            )
+          )
+        } header: {
+          Label("句子卡", systemImage: "text.quote")
+        } footer: {
+          Text("开启后，长文本结果会显示“加入所在句”。翻译成功本身不会自动保存。")
+        }
+
+        Section {
+          Toggle(
             "启用全局划词",
             isOn: Binding(
               get: { shell.selectionConfiguration.isEnabled },

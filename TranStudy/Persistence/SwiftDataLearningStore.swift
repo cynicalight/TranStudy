@@ -8,6 +8,11 @@ enum LearningStoreError: Error {
 
 @MainActor
 final class SwiftDataLearningStore: LearningStoring {
+  private struct LearningIdentity: Hashable {
+    let kind: LearningContentKind
+    let value: String
+  }
+
   private let context: ModelContext
 
   init(container: ModelContainer) {
@@ -22,8 +27,8 @@ final class SwiftDataLearningStore: LearningStoring {
 
     return LearningSummary(
       dueCount: dueCount,
-      wordCount: records.count,
-      sentenceCount: 0
+      wordCount: records.count(where: { learningKind(for: $0) == .word }),
+      sentenceCount: records.count(where: { learningKind(for: $0) == .sentence })
     )
   }
 
@@ -113,14 +118,15 @@ final class SwiftDataLearningStore: LearningStoring {
 
   func add(_ addition: LearningAddition) async throws {
     let draft = addition.draft
-    let normalizedForm = NormalizedCanonicalForm(draft.canonicalForm).value
+    let normalizedForm = normalizedIdentity(for: addition).value
     guard !normalizedForm.isEmpty else {
       throw LearningStoreError.emptyCanonicalForm
     }
     let records = try consolidatedRecords()
 
     if let existingRecord = records.first(where: {
-      normalizedCanonicalForm(for: $0) == normalizedForm
+      normalizedIdentity(for: $0)
+        == LearningIdentity(kind: addition.kind, value: normalizedForm)
     }) {
       let shouldUpdateLatestSnapshot =
         addition.createdAt >= effectiveLastEncounteredAt(for: existingRecord)
@@ -140,9 +146,13 @@ final class SwiftDataLearningStore: LearningStoring {
     }
 
     let record = LearningRecord(
+      kind: addition.kind,
       createdAt: addition.createdAt,
-      sourceText: draft.sourceText,
-      canonicalForm: draft.canonicalForm.trimmingCharacters(in: .whitespacesAndNewlines),
+      sourceText: displaySourceText(for: addition),
+      canonicalForm:
+        addition.kind == .sentence
+        ? displaySourceText(for: addition)
+        : draft.canonicalForm.trimmingCharacters(in: .whitespacesAndNewlines),
       pronunciation: draft.pronunciation,
       partOfSpeech: draft.partOfSpeech,
       contextualMeaning: draft.contextualMeaning,
@@ -159,11 +169,15 @@ final class SwiftDataLearningStore: LearningStoring {
   }
 
   func mergeSummary(for addition: LearningAddition) async throws -> LearningMergeSummary? {
-    let normalizedForm = NormalizedCanonicalForm(addition.draft.canonicalForm).value
+    guard addition.kind == .word else {
+      return nil
+    }
+    let normalizedForm = normalizedIdentity(for: addition).value
     let records = try consolidatedRecords()
     guard
       let existingRecord = records.first(where: {
-        normalizedCanonicalForm(for: $0) == normalizedForm
+        learningKind(for: $0) == .word
+          && normalizedCanonicalForm(for: $0) == normalizedForm
       })
     else {
       return nil
@@ -192,6 +206,9 @@ final class SwiftDataLearningStore: LearningStoring {
     guard let sourceRecord = records.first(where: { $0.id == itemID }) else {
       return .updated
     }
+    guard learningKind(for: sourceRecord) == .word else {
+      return .updated
+    }
 
     if normalizedCanonicalForm(for: sourceRecord) == normalizedForm {
       sourceRecord.canonicalForm = trimmedCanonicalForm
@@ -202,7 +219,8 @@ final class SwiftDataLearningStore: LearningStoring {
 
     guard
       let targetRecord = records.first(where: {
-        $0.id != itemID && normalizedCanonicalForm(for: $0) == normalizedForm
+        $0.id != itemID && learningKind(for: $0) == .word
+          && normalizedCanonicalForm(for: $0) == normalizedForm
       })
     else {
       sourceRecord.canonicalForm = trimmedCanonicalForm
@@ -234,6 +252,7 @@ final class SwiftDataLearningStore: LearningStoring {
 
         return LearningItem(
           id: record.id,
+          kind: learningKind(for: record),
           sourceText: record.sourceText,
           canonicalForm: record.canonicalForm,
           pronunciation: record.pronunciation,
@@ -254,9 +273,7 @@ final class SwiftDataLearningStore: LearningStoring {
     var descriptor = FetchDescriptor<LearningRecord>()
     descriptor.includePendingChanges = true
     let records = try context.fetch(descriptor)
-    let groupedRecords = Dictionary(grouping: records) {
-      normalizedCanonicalForm(for: $0)
-    }
+    let groupedRecords = Dictionary(grouping: records, by: normalizedIdentity(for:))
     var didChange = false
 
     for record in records where record.nextReviewAt == nil {
@@ -264,8 +281,8 @@ final class SwiftDataLearningStore: LearningStoring {
       didChange = true
     }
 
-    for (normalizedForm, duplicates) in groupedRecords
-    where !normalizedForm.isEmpty && duplicates.count > 1 {
+    for (identity, duplicates) in groupedRecords
+    where !identity.value.isEmpty && duplicates.count > 1 {
       let orderedDuplicates = duplicates.sorted { $0.createdAt < $1.createdAt }
       guard let targetRecord = orderedDuplicates.first else {
         continue
@@ -318,10 +335,41 @@ final class SwiftDataLearningStore: LearningStoring {
     return NormalizedCanonicalForm(record.canonicalForm).value
   }
 
+  private func normalizedIdentity(for addition: LearningAddition) -> LearningIdentity {
+    LearningIdentity(
+      kind: addition.kind,
+      value:
+        addition.kind == .sentence
+        ? TranslationTextNormalizer.collapseWhitespace(in: addition.draft.sourceText)
+        : NormalizedCanonicalForm(addition.draft.canonicalForm).value
+    )
+  }
+
+  private func normalizedIdentity(for record: LearningRecord) -> LearningIdentity {
+    let kind = learningKind(for: record)
+    return LearningIdentity(
+      kind: kind,
+      value:
+        kind == .sentence
+        ? TranslationTextNormalizer.collapseWhitespace(in: record.sourceText)
+        : normalizedCanonicalForm(for: record)
+    )
+  }
+
+  private func learningKind(for record: LearningRecord) -> LearningContentKind {
+    LearningContentKind(rawValue: record.kindRawValue) ?? .word
+  }
+
+  private func displaySourceText(for addition: LearningAddition) -> String {
+    addition.kind == .sentence
+      ? TranslationTextNormalizer.collapseWhitespace(in: addition.draft.sourceText)
+      : addition.draft.sourceText
+  }
+
   private func makeEncounter(from addition: LearningAddition) -> LearningEncounterRecord {
     let draft = addition.draft
     return LearningEncounterRecord(
-      sourceText: draft.sourceText,
+      sourceText: displaySourceText(for: addition),
       pronunciation: draft.pronunciation,
       partOfSpeech: draft.partOfSpeech,
       contextualMeaning: draft.contextualMeaning,
@@ -337,7 +385,7 @@ final class SwiftDataLearningStore: LearningStoring {
       return
     }
 
-    record.normalizedCanonicalForm = NormalizedCanonicalForm(record.canonicalForm).value
+    record.normalizedCanonicalForm = normalizedIdentity(for: record).value
     record.lastEncounteredAt = record.createdAt
     record.encounters.append(
       LearningEncounterRecord(
@@ -357,7 +405,10 @@ final class SwiftDataLearningStore: LearningStoring {
     from addition: LearningAddition
   ) {
     let draft = addition.draft
-    record.sourceText = draft.sourceText
+    record.sourceText = displaySourceText(for: addition)
+    if addition.kind == .sentence {
+      record.canonicalForm = displaySourceText(for: addition)
+    }
     record.pronunciation = draft.pronunciation
     record.partOfSpeech = draft.partOfSpeech
     record.contextualMeaning = draft.contextualMeaning

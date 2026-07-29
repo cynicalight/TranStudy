@@ -6,6 +6,84 @@ import Testing
 
 @MainActor
 struct SwiftDataLearningStoreTests {
+  @Test("sentence cards merge only after whitespace normalization")
+  func sentenceCardsUseExactWhitespaceNormalizedIdentity() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+
+    try await store.add(
+      LearningAddition(
+        kind: .sentence,
+        draft: TranslationDraft(
+          sourceText: " She   ran home. ",
+          canonicalForm: "She ran home.",
+          pronunciation: "",
+          partOfSpeech: "",
+          contextualMeaning: "",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: Date(timeIntervalSince1970: 1_000)
+      ))
+    try await store.add(
+      LearningAddition(
+        kind: .sentence,
+        draft: TranslationDraft(
+          sourceText: "She ran home.",
+          canonicalForm: "She ran home.",
+          pronunciation: "",
+          partOfSpeech: "",
+          contextualMeaning: "",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她回家了。"
+        ),
+        sourceApplicationName: "Preview",
+        createdAt: Date(timeIntervalSince1970: 2_000)
+      ))
+    try await store.add(
+      LearningAddition(
+        kind: .sentence,
+        draft: TranslationDraft(
+          sourceText: "she ran home.",
+          canonicalForm: "she ran home.",
+          pronunciation: "",
+          partOfSpeech: "",
+          contextualMeaning: "",
+          exampleSentence: "she ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "TextEdit",
+        createdAt: Date(timeIntervalSince1970: 3_000)
+      ))
+
+    let items = try await store.items()
+    let mergedItem = try #require(
+      items.first(where: { $0.sourceText == "She ran home." })
+    )
+    let summary = try await store.summary(at: Date(timeIntervalSince1970: 3_000))
+    let review = try await store.recordReview(
+      itemID: mergedItem.id,
+      rating: .easy,
+      reviewedAt: Date(timeIntervalSince1970: 3_000)
+    )
+
+    #expect(items.count == 2)
+    #expect(items.allSatisfy { $0.kind == .sentence })
+    #expect(mergedItem.encounters.count == 2)
+    #expect(mergedItem.sourceApplicationName == "Preview")
+    #expect(mergedItem.sentenceTranslation == "她回家了。")
+    #expect(summary.wordCount == 0)
+    #expect(summary.sentenceCount == 2)
+    #expect(review.intervalDays == 5)
+  }
+
   @Test("joined learning survives reopening the SwiftData store")
   func joinedLearningSurvivesReopeningStore() async throws {
     let directory = FileManager.default.temporaryDirectory

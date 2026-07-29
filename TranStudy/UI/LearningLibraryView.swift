@@ -24,24 +24,33 @@ struct LearningLibraryView: View {
         List(shell.learningItems) { item in
           VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline) {
-              Text(item.canonicalForm)
+              Text(item.kind == .sentence ? item.sourceText : item.canonicalForm)
                 .font(.title3.weight(.semibold))
               if !item.pronunciation.isEmpty {
                 Text(item.pronunciation)
                   .foregroundStyle(.secondary)
               }
               Spacer()
-              Button {
-                editedCanonicalForm = item.canonicalForm
-                editingItem = item
-              } label: {
-                Image(systemName: "pencil")
+              if item.kind == .word {
+                Button {
+                  editedCanonicalForm = item.canonicalForm
+                  editingItem = item
+                } label: {
+                  Image(systemName: "pencil")
+                }
+                .buttonStyle(.borderless)
+                .help("修改词典原形")
+                .accessibilityLabel("修改 \(item.canonicalForm) 的词典原形")
               }
-              .buttonStyle(.borderless)
-              .help("修改词典原形")
-              .accessibilityLabel("修改 \(item.canonicalForm) 的词典原形")
 
-              if !item.partOfSpeech.isEmpty {
+              if item.kind == .sentence {
+                Text("句子卡")
+                  .font(.caption.weight(.medium))
+                  .foregroundStyle(.purple)
+                  .padding(.horizontal, 8)
+                  .padding(.vertical, 3)
+                  .background(.purple.opacity(0.1), in: .capsule)
+              } else if !item.partOfSpeech.isEmpty {
                 Text(item.partOfSpeech)
                   .font(.caption.weight(.medium))
                   .foregroundStyle(.secondary)
@@ -51,16 +60,22 @@ struct LearningLibraryView: View {
               }
             }
 
-            Text(item.contextualMeaning.isEmpty ? item.sourceText : item.contextualMeaning)
-              .font(.body.weight(.medium))
+            if item.kind == .sentence {
+              Text(item.sentenceTranslation)
+                .font(.body)
+                .foregroundStyle(.secondary)
+            } else {
+              Text(item.contextualMeaning.isEmpty ? item.sourceText : item.contextualMeaning)
+                .font(.body.weight(.medium))
 
-            Text(item.exampleSentence)
-              .italic()
-              .foregroundStyle(.secondary)
+              Text(item.exampleSentence)
+                .italic()
+                .foregroundStyle(.secondary)
 
-            Text(item.sentenceTranslation)
-              .font(.callout)
-              .foregroundStyle(.secondary)
+              Text(item.sentenceTranslation)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
 
             HStack(spacing: 5) {
               Image(systemName: "doc.on.clipboard")
@@ -75,10 +90,14 @@ struct LearningLibraryView: View {
             .foregroundStyle(.tertiary)
 
             if !item.encounters.isEmpty {
-              DisclosureGroup("\(item.encounters.count) 次真实语境") {
+              DisclosureGroup(
+                item.kind == .sentence
+                  ? "\(item.encounters.count) 次遇见"
+                  : "\(item.encounters.count) 次真实语境"
+              ) {
                 VStack(alignment: .leading, spacing: 12) {
                   ForEach(item.encounters) { encounter in
-                    encounterView(encounter)
+                    encounterView(encounter, kind: item.kind)
                   }
                 }
                 .padding(.top, 8)
@@ -151,7 +170,7 @@ struct LearningLibraryView: View {
 
   private var librarySubtitle: String {
     if shell.learningItems.isEmpty {
-      return "从真实语境中积累值得记住的单词和短语。"
+      return "从真实语境中积累值得记住的单词、短语和句子。"
     }
     return "已收录 \(shell.learningItems.count) 条学习内容，按最近遇见排序。"
   }
@@ -195,16 +214,19 @@ struct LearningLibraryView: View {
     )
   }
 
-  private func encounterView(_ encounter: LearningEncounter) -> some View {
+  private func encounterView(
+    _ encounter: LearningEncounter,
+    kind: LearningContentKind
+  ) -> some View {
     VStack(alignment: .leading, spacing: 5) {
       HStack {
         Text(encounter.sourceText)
           .fontWeight(.semibold)
-        if !encounter.pronunciation.isEmpty {
+        if kind == .word, !encounter.pronunciation.isEmpty {
           Text(encounter.pronunciation)
             .foregroundStyle(.secondary)
         }
-        if !encounter.partOfSpeech.isEmpty {
+        if kind == .word, !encounter.partOfSpeech.isEmpty {
           Text(encounter.partOfSpeech)
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -215,10 +237,10 @@ struct LearningLibraryView: View {
           .foregroundStyle(.tertiary)
       }
 
-      if !encounter.contextualMeaning.isEmpty {
+      if kind == .word, !encounter.contextualMeaning.isEmpty {
         Text(encounter.contextualMeaning)
       }
-      if !encounter.exampleSentence.isEmpty {
+      if kind == .word, !encounter.exampleSentence.isEmpty {
         Text(encounter.exampleSentence)
           .italic()
           .foregroundStyle(.secondary)

@@ -6,6 +6,7 @@ struct LongTextTranslationView: View {
   let shell: ApplicationShell
   let result: LongTextTranslationResult
   let onTranslateSelection: (NSRange) -> Void
+  let onAddSentence: (NSRange) -> Void
   private let tokens: [LongTextWordToken]
   @State private var selectedTokenRange: ClosedRange<Int>?
   @State private var sourceContentHeight: CGFloat = 32
@@ -14,11 +15,13 @@ struct LongTextTranslationView: View {
   init(
     shell: ApplicationShell,
     result: LongTextTranslationResult,
-    onTranslateSelection: @escaping (NSRange) -> Void
+    onTranslateSelection: @escaping (NSRange) -> Void,
+    onAddSentence: @escaping (NSRange) -> Void
   ) {
     self.shell = shell
     self.result = result
     self.onTranslateSelection = onTranslateSelection
+    self.onAddSentence = onAddSentence
     tokens = LongTextWordToken.tokenize(result.sourceText)
   }
 
@@ -73,6 +76,20 @@ struct LongTextTranslationView: View {
       HStack {
         CopyTextButton(text: result.sourceText, accessibilityLabel: "复制原文")
         Spacer()
+        if shell.isSentenceCardsEnabled {
+          Button {
+            onAddSentence(selectedRange)
+          } label: {
+            if shell.isAddingSentenceCard {
+              ProgressView()
+                .controlSize(.small)
+            } else {
+              Label("加入所在句", systemImage: "quote.bubble")
+            }
+          }
+          .buttonStyle(.bordered)
+          .disabled(!shell.canAddLongTextSentence(selectedRange))
+        }
         Button {
           onTranslateSelection(selectedRange)
         } label: {
@@ -81,6 +98,21 @@ struct LongTextTranslationView: View {
         .buttonStyle(.borderedProminent)
         .environment(\.controlActiveState, .active)
         .disabled(!shell.canTranslateLongTextSelection(selectedRange))
+      }
+
+      if shell.isSentenceCardsEnabled, let status = shell.sentenceCardAdditionStatus {
+        Label {
+          Text(status == .added ? "已加入句子卡" : "加入失败，请重试")
+        } icon: {
+          Image(
+            systemName: status == .added
+              ? "checkmark.circle.fill"
+              : "exclamationmark.circle"
+          )
+        }
+        .font(.caption)
+        .foregroundStyle(status == .added ? .green : .red)
+        .frame(maxWidth: .infinity, alignment: .trailing)
       }
 
       Divider()
@@ -109,6 +141,9 @@ struct LongTextTranslationView: View {
     .padding(4)
     .onChange(of: result.sourceText) {
       selectedTokenRange = nil
+    }
+    .onChange(of: selectedTokenRange) {
+      shell.clearSentenceCardAdditionStatus()
     }
   }
 
@@ -313,7 +348,8 @@ private struct WordCapsuleFlowLayout: Layout {
         sourceText: "The team remained resilient after the setback. They kept improving.",
         translatedText: "团队在遭遇挫折后依然保持韧性。他们继续不断进步。"
       ),
-      onTranslateSelection: { _ in }
+      onTranslateSelection: { _ in },
+      onAddSentence: { _ in }
     )
     .padding()
     .frame(width: 500)

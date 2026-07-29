@@ -15,6 +15,7 @@ struct ApplicationEnvironment {
   let providerConfigurationStore: any TranslationProviderConfigurationStoring
   let selectionConfigurationStore: any SelectionConfigurationStoring
   let shortcutStore: any TranslationShortcutStoring
+  let sentenceCardConfigurationStore: any SentenceCardConfigurationStoring
 }
 
 extension ApplicationEnvironment {
@@ -42,7 +43,8 @@ extension ApplicationEnvironment {
       panelPositionStore: UserDefaultsTranslationPanelPositionStore(),
       providerConfigurationStore: providerConfigurationStore,
       selectionConfigurationStore: selectionConfigurationStore,
-      shortcutStore: UserDefaultsTranslationShortcutStore()
+      shortcutStore: UserDefaultsTranslationShortcutStore(),
+      sentenceCardConfigurationStore: UserDefaultsSentenceCardConfigurationStore()
     )
   }
 }

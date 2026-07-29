@@ -16,7 +16,9 @@ struct SelectionSentenceContext: Equatable {
       .replacingOccurrences(of: "\n", with: " ")
     guard
       selectedRange.location >= 0,
-      selectedRange.location <= nsDocument.length
+      selectedRange.location <= nsDocument.length,
+      selectedRange.length >= 0,
+      selectedRange.length <= nsDocument.length - selectedRange.location
     else {
       return nil
     }
@@ -42,7 +44,10 @@ struct SelectionSentenceContext: Equatable {
     guard
       let targetIndex = sentences.firstIndex(where: { sentence in
         NSLocationInRange(selectionLocation, sentence.range)
-      })
+      }),
+      selectedRange.location >= sentences[targetIndex].range.location,
+      selectedRange.location + selectedRange.length
+        <= NSMaxRange(sentences[targetIndex].range)
     else {
       return nil
     }

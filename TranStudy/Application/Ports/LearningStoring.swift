@@ -1,5 +1,10 @@
 import Foundation
 
+enum LearningContentKind: String, Codable, Equatable, Hashable, Sendable {
+  case word
+  case sentence
+}
+
 struct LearningSummary: Equatable, Sendable {
   let dueCount: Int
   let wordCount: Int
@@ -13,6 +18,7 @@ struct LearningSummary: Equatable, Sendable {
 }
 
 struct LearningAddition: Equatable, Sendable {
+  let kind: LearningContentKind
   let draft: TranslationDraft
   let sourceApplicationName: String
   let createdAt: Date
@@ -20,12 +26,14 @@ struct LearningAddition: Equatable, Sendable {
   let isPaused: Bool
 
   init(
+    kind: LearningContentKind = .word,
     draft: TranslationDraft,
     sourceApplicationName: String,
     createdAt: Date,
     nextReviewAt: Date? = nil,
     isPaused: Bool = false
   ) {
+    self.kind = kind
     self.draft = draft
     self.sourceApplicationName = sourceApplicationName
     self.createdAt = createdAt
@@ -85,6 +93,7 @@ struct LearningReviewEvent: Equatable, Identifiable, Sendable {
 
 struct LearningItem: Equatable, Identifiable, Sendable {
   let id: UUID
+  let kind: LearningContentKind
   let sourceText: String
   let canonicalForm: String
   let pronunciation: String
@@ -100,6 +109,7 @@ struct LearningItem: Equatable, Identifiable, Sendable {
 
   init(
     id: UUID,
+    kind: LearningContentKind = .word,
     sourceText: String,
     canonicalForm: String,
     pronunciation: String,
@@ -114,6 +124,7 @@ struct LearningItem: Equatable, Identifiable, Sendable {
     isPaused: Bool = false
   ) {
     self.id = id
+    self.kind = kind
     self.sourceText = sourceText
     self.canonicalForm = canonicalForm
     self.pronunciation = pronunciation

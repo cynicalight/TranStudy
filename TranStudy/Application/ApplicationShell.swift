@@ -22,6 +22,11 @@ enum TranslationShortcutRegistrationStatus: Equatable {
   case failed(TranslationShortcutKey)
 }
 
+enum SentenceCardAdditionStatus: Equatable {
+  case added
+  case failed
+}
+
 @MainActor
 @Observable
 final class ApplicationShell {
@@ -48,6 +53,9 @@ final class ApplicationShell {
   private(set) var translationProviderConfiguration: TranslationProviderConfiguration
   private(set) var selectionConfiguration: SelectionConfiguration
   private(set) var translationShortcut: TranslationShortcutKey
+  private(set) var isSentenceCardsEnabled: Bool
+  private(set) var isAddingSentenceCard = false
+  private(set) var sentenceCardAdditionStatus: SentenceCardAdditionStatus?
   private(set) var translationShortcutRegistrationStatus: TranslationShortcutRegistrationStatus =
     .unknown
   @ObservationIgnored var onTranslationShortcutChange: ((TranslationShortcutKey) -> Bool)?
@@ -71,6 +79,7 @@ final class ApplicationShell {
     translationProviderConfiguration = environment.providerConfigurationStore.load()
     selectionConfiguration = environment.selectionConfigurationStore.load()
     translationShortcut = environment.shortcutStore.load()
+    isSentenceCardsEnabled = environment.sentenceCardConfigurationStore.load()
   }
 
   func refreshTodayReview() async {
@@ -159,6 +168,7 @@ final class ApplicationShell {
     _ inputText: String,
     selection: SelectionSnapshot?
   ) async {
+    sentenceCardAdditionStatus = nil
     let sourceText = TranslationTextNormalizer.collapseWhitespace(in: inputText)
     guard !sourceText.isEmpty else {
       selectionDebugLog(
@@ -289,6 +299,77 @@ final class ApplicationShell {
 
   func canTranslateLongTextSelection(_ selectedRange: NSRange) -> Bool {
     longTextSelectionRequest(for: selectedRange) != nil
+  }
+
+  func canAddLongTextSentence(_ selectedRange: NSRange) -> Bool {
+    isSentenceCardsEnabled && !isAddingSentenceCard
+      && longTextSentence(for: selectedRange) != nil
+  }
+
+  func addLongTextSentence(_ selectedRange: NSRange) async {
+    guard
+      canAddLongTextSentence(selectedRange),
+      let sentence = longTextSentence(for: selectedRange)
+    else {
+      return
+    }
+
+    isAddingSentenceCard = true
+    sentenceCardAdditionStatus = nil
+    defer {
+      isAddingSentenceCard = false
+    }
+
+    do {
+      let result = try await environment.translation.translateLongText(sentence)
+      let draft = TranslationDraft(
+        sourceText: sentence,
+        canonicalForm: sentence,
+        pronunciation: "",
+        partOfSpeech: "",
+        contextualMeaning: "",
+        exampleSentence: sentence,
+        sentenceTranslation: result.translatedText
+      )
+      try await environment.learningStore.add(
+        LearningAddition(
+          kind: .sentence,
+          draft: draft,
+          sourceApplicationName: translationSourceApplicationName,
+          createdAt: environment.clock.now
+        ))
+      await refreshTodayReview()
+      await refreshLibrary()
+      sentenceCardAdditionStatus = .added
+    } catch {
+      sentenceCardAdditionStatus = .failed
+      selectionDebugLog(
+        "sentence card addition failed: errorType=\(String(reflecting: type(of: error)))"
+      )
+    }
+  }
+
+  private func longTextSentence(for selectedRange: NSRange) -> String? {
+    guard let longTextTranslation else {
+      return nil
+    }
+    let source = longTextTranslation.sourceText as NSString
+    guard
+      selectedRange.location >= 0,
+      selectedRange.length > 0,
+      selectedRange.location <= source.length,
+      selectedRange.length <= source.length - selectedRange.location,
+      let context = SelectionSentenceContext.extract(
+        from: longTextTranslation.sourceText,
+        selectedRange: CFRange(
+          location: selectedRange.location,
+          length: selectedRange.length
+        )
+      )
+    else {
+      return nil
+    }
+    return TranslationTextNormalizer.collapseWhitespace(in: context.targetSentence)
   }
 
   private func longTextSelectionRequest(for selectedRange: NSRange) -> TranslationRequest? {
@@ -511,6 +592,15 @@ final class ApplicationShell {
     selectionConfiguration.isEnabled = isEnabled
     environment.selectionConfigurationStore.save(selectionConfiguration)
     selectionDebugLog("selection setting changed: enabled=\(isEnabled)")
+  }
+
+  func setSentenceCardsEnabled(_ isEnabled: Bool) {
+    isSentenceCardsEnabled = isEnabled
+    environment.sentenceCardConfigurationStore.save(isEnabled)
+  }
+
+  func clearSentenceCardAdditionStatus() {
+    sentenceCardAdditionStatus = nil
   }
 
   func setTranslationShortcut(_ shortcut: TranslationShortcutKey) {

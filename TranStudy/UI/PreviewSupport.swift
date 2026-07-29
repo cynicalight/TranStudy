@@ -26,7 +26,8 @@
             configuration: providerConfiguration
           ),
           selectionConfigurationStore: PreviewSelectionConfigurationStore(),
-          shortcutStore: PreviewTranslationShortcutStore()
+          shortcutStore: PreviewTranslationShortcutStore(),
+          sentenceCardConfigurationStore: PreviewSentenceCardConfigurationStore()
         ))
     }
 
@@ -73,13 +74,24 @@
       return TranslationPanelView(
         shell: shell,
         onDismiss: {},
-        onTranslateLongTextSelection: { _ in }
+        onTranslateLongTextSelection: { _ in },
+        onAddLongTextSentence: { _ in }
       )
       .frame(height: 470)
       .task {
         await shell.translateClipboard()
       }
     }
+  }
+
+  private struct PreviewSentenceCardConfigurationStore:
+    SentenceCardConfigurationStoring
+  {
+    func load() -> Bool {
+      true
+    }
+
+    func save(_ isEnabled: Bool) {}
   }
 
   enum PreviewFixtures {

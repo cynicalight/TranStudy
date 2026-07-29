@@ -130,6 +130,9 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         onTranslateLongTextSelection: { [weak self] selectedRange in
           self?.translateLongTextSelection(selectedRange)
         },
+        onAddLongTextSentence: { [weak self] selectedRange in
+          self?.addLongTextSentence(selectedRange)
+        },
         onContentSizeChange: { [weak self, weak panel] size, fitsContent in
           guard let self, let panel else {
             return
@@ -159,6 +162,16 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         return
       }
       await shell.translateLongTextSelection(selectedRange)
+    }
+  }
+
+  private func addLongTextSentence(_ selectedRange: NSRange) {
+    translationTask?.cancel()
+    translationTask = Task { [weak self] in
+      guard let self else {
+        return
+      }
+      await shell.addLongTextSentence(selectedRange)
     }
   }
 

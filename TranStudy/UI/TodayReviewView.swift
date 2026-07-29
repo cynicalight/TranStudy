@@ -87,7 +87,7 @@ private struct ReviewSessionView: View {
         isBackFaceInteractive: hasCompletedReviewFlip,
         onFlip: shell.revealCurrentReviewAnswer
       ) {
-        Text(item.canonicalForm)
+        Text(item.kind == .sentence ? item.sourceText : item.canonicalForm)
           .font(.system(size: 48, weight: .semibold, design: .rounded))
           .minimumScaleFactor(0.65)
           .multilineTextAlignment(.center)
@@ -156,59 +156,67 @@ private struct ReviewSessionView: View {
 
   private func reviewAnswer(_ item: LearningItem) -> some View {
     VStack(alignment: .leading, spacing: 16) {
-      HStack(alignment: .firstTextBaseline, spacing: 10) {
-        Text(item.canonicalForm)
-          .font(.largeTitle.weight(.semibold))
-        if !item.pronunciation.isEmpty {
-          Text(item.pronunciation)
-            .font(.title3)
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-        if !item.partOfSpeech.isEmpty {
-          Text(item.partOfSpeech)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(.quaternary, in: .capsule)
-        }
-      }
-
-      Text(item.contextualMeaning)
-        .font(.title3.weight(.medium))
-
-      VStack(alignment: .leading, spacing: 7) {
-        Text(item.exampleSentence)
-          .font(.body)
-          .italic()
+      if item.kind == .sentence {
+        Label("句子卡", systemImage: "text.quote")
+          .font(.caption.weight(.medium))
+          .foregroundStyle(.purple)
         Text(item.sentenceTranslation)
-          .foregroundStyle(.secondary)
-      }
+          .font(.title2.weight(.medium))
+      } else {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+          Text(item.canonicalForm)
+            .font(.largeTitle.weight(.semibold))
+          if !item.pronunciation.isEmpty {
+            Text(item.pronunciation)
+              .font(.title3)
+              .foregroundStyle(.secondary)
+          }
+          Spacer()
+          if !item.partOfSpeech.isEmpty {
+            Text(item.partOfSpeech)
+              .font(.caption.weight(.medium))
+              .foregroundStyle(.secondary)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 3)
+              .background(.quaternary, in: .capsule)
+          }
+        }
 
-      let otherEncounters = Array(item.encounters.dropFirst())
-      if !otherEncounters.isEmpty {
-        DisclosureGroup("其他义项与例句（\(otherEncounters.count)）") {
-          VStack(alignment: .leading, spacing: 12) {
-            ForEach(otherEncounters) { encounter in
-              VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                  Text(encounter.contextualMeaning)
-                    .fontWeight(.medium)
-                  if !encounter.partOfSpeech.isEmpty {
-                    Text(encounter.partOfSpeech)
-                      .font(.caption)
-                      .foregroundStyle(.secondary)
+        Text(item.contextualMeaning)
+          .font(.title3.weight(.medium))
+
+        VStack(alignment: .leading, spacing: 7) {
+          Text(item.exampleSentence)
+            .font(.body)
+            .italic()
+          Text(item.sentenceTranslation)
+            .foregroundStyle(.secondary)
+        }
+
+        let otherEncounters = Array(item.encounters.dropFirst())
+        if !otherEncounters.isEmpty {
+          DisclosureGroup("其他义项与例句（\(otherEncounters.count)）") {
+            VStack(alignment: .leading, spacing: 12) {
+              ForEach(otherEncounters) { encounter in
+                VStack(alignment: .leading, spacing: 4) {
+                  HStack {
+                    Text(encounter.contextualMeaning)
+                      .fontWeight(.medium)
+                    if !encounter.partOfSpeech.isEmpty {
+                      Text(encounter.partOfSpeech)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                   }
+                  Text(encounter.exampleSentence)
+                    .italic()
+                  Text(encounter.sentenceTranslation)
+                    .foregroundStyle(.secondary)
                 }
-                Text(encounter.exampleSentence)
-                  .italic()
-                Text(encounter.sentenceTranslation)
-                  .foregroundStyle(.secondary)
               }
             }
+            .padding(.top, 8)
           }
-          .padding(.top, 8)
         }
       }
     }

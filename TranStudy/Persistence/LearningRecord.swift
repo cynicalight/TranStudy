@@ -4,6 +4,7 @@ import SwiftData
 @Model
 final class LearningRecord {
   @Attribute(.unique) var id: UUID
+  var kindRawValue: String = LearningContentKind.word.rawValue
   var createdAt: Date
   var sourceText: String = ""
   var canonicalForm: String = ""
@@ -28,6 +29,7 @@ final class LearningRecord {
 
   init(
     id: UUID = UUID(),
+    kind: LearningContentKind = .word,
     createdAt: Date = Date(),
     sourceText: String,
     canonicalForm: String,
@@ -41,6 +43,7 @@ final class LearningRecord {
     isPaused: Bool = false
   ) {
     self.id = id
+    kindRawValue = kind.rawValue
     self.createdAt = createdAt
     self.sourceText = sourceText
     self.canonicalForm = canonicalForm
@@ -50,7 +53,10 @@ final class LearningRecord {
     self.exampleSentence = exampleSentence
     self.sentenceTranslation = sentenceTranslation
     self.sourceApplicationName = sourceApplicationName
-    normalizedCanonicalForm = NormalizedCanonicalForm(canonicalForm).value
+    normalizedCanonicalForm =
+      kind == .sentence
+      ? TranslationTextNormalizer.collapseWhitespace(in: sourceText)
+      : NormalizedCanonicalForm(canonicalForm).value
     lastEncounteredAt = createdAt
     self.nextReviewAt = nextReviewAt
     self.isPaused = isPaused
