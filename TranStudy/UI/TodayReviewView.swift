@@ -13,6 +13,27 @@ struct TodayReviewView: View {
             systemImage: "rectangle.stack.fill"
           )
 
+          HStack(spacing: 14) {
+            SummaryCard(
+              title: "待复习",
+              value: shell.learningSummary.dueCount,
+              systemImage: "clock",
+              tint: .orange
+            )
+            SummaryCard(
+              title: "单词",
+              value: shell.learningSummary.wordCount,
+              systemImage: "textformat.abc",
+              tint: .blue
+            )
+            SummaryCard(
+              title: "句子",
+              value: shell.learningSummary.sentenceCount,
+              systemImage: "text.quote",
+              tint: .purple
+            )
+          }
+
           NavigationLink {
             ReviewSessionView(shell: shell)
           } label: {
@@ -398,8 +419,47 @@ extension ReviewRating {
   }
 }
 
+private struct SummaryCard: View {
+  let title: String
+  let value: Int
+  let systemImage: String
+  let tint: Color
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        Image(systemName: systemImage)
+          .foregroundStyle(tint)
+        Spacer()
+        Text(title)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+
+      Text(value, format: .number)
+        .font(.system(size: 30, weight: .semibold, design: .rounded))
+        .contentTransition(.numericText())
+    }
+    .padding(18)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentSurface()
+    .accessibilityElement(children: .combine)
+  }
+}
+
 #if DEBUG
   #Preview("今日复习") {
     PreviewFactory.todayReviewView()
+  }
+
+  #Preview("统计卡片") {
+    SummaryCard(
+      title: "待复习",
+      value: 4,
+      systemImage: "clock",
+      tint: .orange
+    )
+    .padding()
+    .frame(width: 260)
   }
 #endif
