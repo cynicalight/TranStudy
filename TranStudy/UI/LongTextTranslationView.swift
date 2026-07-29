@@ -23,10 +23,6 @@ struct LongTextTranslationView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       VStack(alignment: .leading, spacing: 5) {
-        HStack {
-          Spacer()
-          CopyTextButton(text: result.sourceText, accessibilityLabel: "复制原文")
-        }
         ScrollView {
           WordCapsuleFlowLayout(spacing: 3) {
             ForEach(Array(tokens.enumerated()), id: \.element.id) { index, token in
@@ -65,6 +61,7 @@ struct LongTextTranslationView: View {
         .frame(height: 115)
         .background(.background.opacity(0.45))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        CopyTextButton(text: result.sourceText, accessibilityLabel: "复制原文")
       }
 
       HStack {
@@ -84,24 +81,20 @@ struct LongTextTranslationView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 5) {
-        HStack {
-          Text("译文")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          Spacer()
-          CopyTextButton(text: result.translatedText, accessibilityLabel: "复制译文")
-        }
         ScrollView {
           Text(result.translatedText)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(height: 115)
+        HStack {
+          CopyTextButton(text: result.translatedText, accessibilityLabel: "复制译文")
+          Spacer()
+          Label("长文本译文不会自动加入学习", systemImage: "lock.open.display")
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+        }
       }
-
-      Label("长文本译文不会自动加入学习", systemImage: "lock.open.display")
-        .font(.caption)
-        .foregroundStyle(.tertiary)
     }
     .padding(4)
     .onChange(of: result.sourceText) {
