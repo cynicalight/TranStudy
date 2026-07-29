@@ -153,9 +153,18 @@ struct LearningLibraryView: View {
         }
         .transition(.opacity.combined(with: .move(edge: .trailing)))
       } else {
-        Button("选择") {
+        Button {
           shell.beginLibrarySelection()
+        } label: {
+          Image(systemName: "checkmark")
+            .font(.callout.weight(.semibold))
+            .frame(width: 30, height: 30)
+            .contentShape(.circle)
+            .adaptiveGlass(cornerRadius: 15)
         }
+        .buttonStyle(.plain)
+        .help("选择")
+        .accessibilityLabel("选择")
         .disabled(shell.displayedLearningItems.isEmpty)
         .transition(.opacity.combined(with: .move(edge: .trailing)))
       }
