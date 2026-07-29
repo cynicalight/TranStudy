@@ -194,6 +194,10 @@ final class SelectionInteractionController {
         selectionDebugLog("snapshot capture failed: provider returned nil")
         return
       }
+      guard snapshot.hasContext else {
+        selectionDebugLog("snapshot capture failed: sentence context unavailable")
+        return
+      }
       guard !Task.isCancelled else {
         selectionDebugLog("snapshot capture cancelled")
         return

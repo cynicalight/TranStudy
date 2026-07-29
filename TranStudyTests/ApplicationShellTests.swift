@@ -118,6 +118,71 @@ struct ApplicationShellTests {
     #expect(shell.translationDraft?.exampleSentence == "She ran home.")
   }
 
+  @Test("a selection without sentence context never starts translation")
+  func selectionWithoutSentenceContextNeverStartsTranslation() async {
+    let translator = TestTranslationProvider(
+      result: TranslationResult(
+        sourceText: "ran",
+        canonicalForm: "run",
+        pronunciation: "/ræn/",
+        partOfSpeech: "verb",
+        contextualMeaning: "跑",
+        exampleSentence: "She ran home.",
+        sentenceTranslation: "她跑回了家。"
+      ))
+    let shell = ApplicationShell(
+      environment: .test(translation: translator)
+    )
+    let snapshot = SelectionSnapshot(
+      selectedText: "ran",
+      targetSentence: nil,
+      previousSentence: nil,
+      nextSentence: nil,
+      screenPosition: CGPoint(x: 640, y: 420),
+      sourceApplicationName: "Unsupported Reader"
+    )
+
+    await shell.translateSelection(snapshot)
+
+    #expect(translator.lastRequest == nil)
+    #expect(shell.translationDraft == nil)
+    #expect(shell.translationStatus == .failed)
+  }
+
+  @Test("selection pause and application exclusions persist immediately")
+  func selectionPrivacySettingsPersistImmediately() {
+    let configurationStore = TestSelectionConfigurationStore()
+    let shell = ApplicationShell(
+      environment: .test(selectionConfigurationStore: configurationStore)
+    )
+
+    shell.setSelectionEnabled(false)
+    shell.excludeApplication(
+      bundleIdentifier: " com.example.Reader ",
+      displayName: " Reader "
+    )
+    shell.excludeApplication(
+      bundleIdentifier: "COM.EXAMPLE.READER",
+      displayName: "Duplicate"
+    )
+
+    #expect(
+      configurationStore.savedConfiguration
+        == SelectionConfiguration(
+          isEnabled: false,
+          excludedApplications: [
+            ExcludedApplication(
+              bundleIdentifier: "com.example.Reader",
+              displayName: "Reader"
+            )
+          ]
+        ))
+
+    shell.includeApplication(bundleIdentifier: "COM.EXAMPLE.READER")
+
+    #expect(configurationStore.savedConfiguration.excludedApplications.isEmpty)
+  }
+
   @Test("only joining learning persists the edited session draft")
   func onlyJoiningLearningPersistsEditedSessionDraft() async throws {
     let learningStore = TestLearningStore()

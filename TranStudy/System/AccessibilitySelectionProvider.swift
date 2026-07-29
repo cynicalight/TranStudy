@@ -12,17 +12,20 @@ final class AccessibilitySelectionProvider: SelectionProviding {
   private struct ActiveSelection {
     let application: NSRunningApplication
     let element: AXUIElement
-    let selectedText: String
     let fingerprint: SelectionFingerprint
+  }
+
+  private struct SelectedElement {
+    let element: AXUIElement
+    let rangeIdentity: String
   }
 
   private struct SelectionFingerprint: Equatable {
     let processIdentifier: pid_t
-    let selectedText: String
     let rangeIdentity: String
 
     var debugSummary: String {
-      "pid=\(processIdentifier) selectedLength=\(selectedText.count) range=\(rangeIdentity)"
+      "pid=\(processIdentifier) range=\(rangeIdentity)"
     }
   }
 
@@ -80,20 +83,23 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       )
       return nil
     }
-
-    let context = selectionContext(in: activeSelection.element)
-    if let context {
-      selectionDebugLog(
-        "snapshot context captured: targetLength=\(context.targetSentence.count) previous=\(context.previousSentence != nil) next=\(context.nextSentence != nil)"
-      )
-    } else {
-      selectionDebugLog("snapshot captured without sentence context; fallback translation allowed")
+    guard let selectedText = selectedText(in: activeSelection.element) else {
+      selectionDebugLog("snapshot failed: selected text unavailable")
+      return nil
     }
+
+    guard let context = selectionContext(in: activeSelection.element) else {
+      selectionDebugLog("snapshot failed: sentence context unavailable")
+      return nil
+    }
+    selectionDebugLog(
+      "snapshot context captured: targetLength=\(context.targetSentence.count) previous=\(context.previousSentence != nil) next=\(context.nextSentence != nil)"
+    )
     return SelectionSnapshot(
-      selectedText: activeSelection.selectedText,
-      targetSentence: context?.targetSentence,
-      previousSentence: context?.previousSentence,
-      nextSentence: context?.nextSentence,
+      selectedText: selectedText,
+      targetSentence: context.targetSentence,
+      previousSentence: context.previousSentence,
+      nextSentence: context.nextSentence,
       screenPosition: candidatePosition,
       sourceApplicationName: sourceApplicationName(for: activeSelection.application)
     )
@@ -149,48 +155,19 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       }
       return nil
     }
-    guard let element = selectedElement(in: application, logFailures: logFailures) else {
+    guard
+      let selectedElement = selectedElement(in: application, logFailures: logFailures)
+    else {
       return nil
     }
-    guard let selectedText = selectedText(in: element) else {
-      if logFailures {
-        selectionDebugLog("AX selection unavailable: selected text is empty")
-      }
-      return nil
-    }
-    let fingerprint = selectionFingerprint(
-      application: application,
-      element: element,
-      selectedText: selectedText
+    let fingerprint = SelectionFingerprint(
+      processIdentifier: application.processIdentifier,
+      rangeIdentity: selectedElement.rangeIdentity
     )
     return ActiveSelection(
       application: application,
-      element: element,
-      selectedText: selectedText,
+      element: selectedElement.element,
       fingerprint: fingerprint
-    )
-  }
-
-  private func selectionFingerprint(
-    application: NSRunningApplication,
-    element: AXUIElement,
-    selectedText: String
-  ) -> SelectionFingerprint {
-    let rangeIdentity: String
-    if let range = selectedRange(in: element) {
-      rangeIdentity = "range:\(range.location):\(range.length)"
-    } else if let range = textMarkerRangeAttribute(
-      kAXSelectedTextMarkerRangeAttribute as CFString,
-      from: element
-    ) {
-      rangeIdentity = "marker:\(CFHash(range))"
-    } else {
-      rangeIdentity = "text-only"
-    }
-    return SelectionFingerprint(
-      processIdentifier: application.processIdentifier,
-      selectedText: selectedText,
-      rangeIdentity: rangeIdentity
     )
   }
 
@@ -216,7 +193,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
   private func selectedElement(
     in application: NSRunningApplication,
     logFailures: Bool
-  ) -> AXUIElement? {
+  ) -> SelectedElement? {
     let applicationElement = AXUIElementCreateApplication(application.processIdentifier)
     var focusedValue: CFTypeRef?
     let focusedError = AXUIElementCopyAttributeValue(
@@ -260,22 +237,44 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     }
 
     for (depth, element) in ancestry.enumerated() {
-      if selectedText(in: element) != nil {
+      if let rangeIdentity = nonemptySelectionRangeIdentity(in: element) {
         if logFailures {
           let role = stringAttribute(kAXRoleAttribute as CFString, from: element) ?? "unknown"
           let subrole =
             stringAttribute(kAXSubroleAttribute as CFString, from: element) ?? "none"
           selectionDebugLog(
-            "AX element containing selected text found at ancestorDepth=\(depth) role=\(role) subrole=\(subrole)"
+            "AX element containing a nonempty selection range found at ancestorDepth=\(depth) role=\(role) subrole=\(subrole)"
           )
         }
-        return element
+        return SelectedElement(element: element, rangeIdentity: rangeIdentity)
       }
     }
     if logFailures {
-      selectionDebugLog("AX selection unavailable: no selected text in focused element ancestry")
+      selectionDebugLog(
+        "AX selection unavailable: no nonempty selection range in focused element ancestry"
+      )
     }
     return nil
+  }
+
+  private func nonemptySelectionRangeIdentity(in element: AXUIElement) -> String? {
+    if let range = selectedRange(in: element), range.length > 0 {
+      return "range:\(range.location):\(range.length)"
+    }
+    guard
+      let range = textMarkerRangeAttribute(
+        kAXSelectedTextMarkerRangeAttribute as CFString,
+        from: element
+      )
+    else {
+      return nil
+    }
+    let start = AXTextMarkerRangeCopyStartMarker(range)
+    let end = AXTextMarkerRangeCopyEndMarker(range)
+    guard !CFEqual(start, end) else {
+      return nil
+    }
+    return "marker:\(CFHash(start)):\(CFHash(end))"
   }
 
   private func sensitiveControlRejectionReason(for element: AXUIElement) -> String? {

@@ -30,13 +30,16 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
   }
 
   func presentSelectionTranslation(_ snapshot: SelectionSnapshot) {
+    guard snapshot.hasContext else {
+      selectionDebugLog("selection translation panel skipped: sentence context unavailable")
+      return
+    }
     selectionDebugLog(
       "present selection translation panel: app=\(snapshot.sourceApplicationName) selectedLength=\(snapshot.selectedText.count)"
     )
     translationTask?.cancel()
     shell.prepareSelectionTranslationPresentation(
-      sourceApplicationName: snapshot.sourceApplicationName,
-      hasContext: snapshot.hasContext
+      sourceApplicationName: snapshot.sourceApplicationName
     )
     showPanel()
     translationTask = Task { [weak self] in

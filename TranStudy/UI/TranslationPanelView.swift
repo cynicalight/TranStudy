@@ -16,10 +16,6 @@ struct TranslationPanelView: View {
     VStack(alignment: .leading, spacing: 14) {
       panelHeader
 
-      if shell.isSelectionContextUnavailable {
-        contextFallbackNotice
-      }
-
       content
     }
     .padding(14)
@@ -53,20 +49,6 @@ struct TranslationPanelView: View {
           + "已有 \(summary.existingEncounterCount) 条语境会全部保留，并新增当前语境。"
       )
     }
-  }
-
-  private var contextFallbackNotice: some View {
-    HStack(alignment: .top, spacing: 10) {
-      Image(systemName: "info.circle.fill")
-        .foregroundStyle(.orange)
-      VStack(alignment: .leading, spacing: 3) {
-        Text("当前应用无法取得完整上下文，本次仅根据目标词翻译。")
-          .font(.callout.weight(.medium))
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(10)
-    .background(.orange.opacity(0.08), in: .rect(cornerRadius: 10))
   }
 
   private var panelHeader: some View {

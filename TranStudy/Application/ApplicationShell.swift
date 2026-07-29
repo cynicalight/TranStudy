@@ -50,7 +50,6 @@ final class ApplicationShell {
   private(set) var translationShortcut: TranslationShortcutKey
   private(set) var translationShortcutRegistrationStatus: TranslationShortcutRegistrationStatus =
     .unknown
-  private(set) var isSelectionContextUnavailable = false
   @ObservationIgnored var onTranslationShortcutChange: ((TranslationShortcutKey) -> Bool)?
   private var activeTranslationID: UUID?
   private var translationSuggestedCanonicalForm = ""
@@ -148,6 +147,11 @@ final class ApplicationShell {
   }
 
   func translateSelection(_ snapshot: SelectionSnapshot) async {
+    guard snapshot.hasContext else {
+      selectionDebugLog("selection translation rejected: sentence context unavailable")
+      translationStatus = .failed
+      return
+    }
     await translateInput(snapshot.selectedText, selection: snapshot)
   }
 
@@ -179,7 +183,6 @@ final class ApplicationShell {
 
     if isWordOrShortPhrase {
       if let selection {
-        isSelectionContextUnavailable = !selection.hasContext
         await translate(
           TranslationRequest(
             sourceText: sourceText,
@@ -191,7 +194,6 @@ final class ApplicationShell {
         await translate(TranslationRequest(sourceText: sourceText))
       }
     } else {
-      isSelectionContextUnavailable = false
       await translateLongText(sourceText)
     }
   }
@@ -282,7 +284,6 @@ final class ApplicationShell {
     }
 
     translationPresentationTitle = "学习长文本选词"
-    isSelectionContextUnavailable = false
     await translate(request)
   }
 
@@ -483,15 +484,11 @@ final class ApplicationShell {
     return clipboardText
   }
 
-  func prepareSelectionTranslationPresentation(
-    sourceApplicationName: String,
-    hasContext: Bool
-  ) {
+  func prepareSelectionTranslationPresentation(sourceApplicationName: String) {
     prepareTranslationPresentation(
       title: "翻译划词",
       sourceApplicationName: sourceApplicationName
     )
-    isSelectionContextUnavailable = !hasContext
   }
 
   private func prepareTranslationPresentation(
@@ -507,7 +504,6 @@ final class ApplicationShell {
     translationSourceApplicationName = sourceApplicationName
     pendingLearningMerge = nil
     pendingLearningAddition = nil
-    isSelectionContextUnavailable = false
     translationStatus = .loading
   }
 

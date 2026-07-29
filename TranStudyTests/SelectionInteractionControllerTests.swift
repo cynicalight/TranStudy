@@ -52,6 +52,46 @@ struct SelectionInteractionControllerTests {
     #expect(indicator.dismissCount > 0)
   }
 
+  @Test("contextless selection never reaches the translation panel")
+  func contextlessSelectionNeverReachesTranslationPanel() async {
+    let point = CGPoint(x: 640, y: 420)
+    let candidate = SelectionCandidate(
+      screenPosition: point,
+      sourceApplicationName: "Unsupported Reader"
+    )
+    let snapshot = SelectionSnapshot(
+      selectedText: "ran",
+      targetSentence: nil,
+      previousSentence: nil,
+      nextSentence: nil,
+      screenPosition: point,
+      sourceApplicationName: "Unsupported Reader"
+    )
+    let selection = TestSelectionProvider(candidate: candidate, snapshot: snapshot)
+    let events = TestSelectionEventMonitor()
+    let indicator = TestSelectionIndicator()
+    var capturedSnapshots: [SelectionSnapshot] = []
+    let controller = SelectionInteractionController(
+      selection: selection,
+      events: events,
+      indicator: indicator,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
+      indicatorLifetime: .seconds(30)
+    ) { capturedSnapshots.append($0) }
+
+    controller.start()
+    events.send(.leftMouseDown(at: CGPoint(x: point.x - 10, y: point.y), clickCount: 1))
+    events.send(.leftMouseUp(at: point, clickCount: 1))
+    try? await Task.sleep(for: .milliseconds(5))
+
+    indicator.select()
+    try? await Task.sleep(for: .milliseconds(5))
+
+    #expect(selection.snapshotRequestCount == 1)
+    #expect(capturedSnapshots.isEmpty)
+  }
+
   @Test("escape dismisses the selection indicator")
   func escapeDismissesSelectionIndicator() {
     let events = TestSelectionEventMonitor()
