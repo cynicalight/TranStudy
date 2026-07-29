@@ -27,6 +27,11 @@ enum SentenceCardAdditionStatus: Equatable {
   case failed
 }
 
+enum LearningLibraryScope: Equatable {
+  case active
+  case archived
+}
+
 @MainActor
 @Observable
 final class ApplicationShell {
@@ -43,6 +48,10 @@ final class ApplicationShell {
   private(set) var translationPresentationTitle = "翻译剪贴板"
   private(set) var longTextTranslation: LongTextTranslationResult?
   private(set) var learningItems: [LearningItem] = []
+  private(set) var archivedLearningItems: [LearningItem] = []
+  private(set) var libraryScope: LearningLibraryScope = .active
+  private(set) var isLibrarySelecting = false
+  private(set) var selectedLearningItemIDs: Set<UUID> = []
   private(set) var reviewQueue: [LearningItem] = []
   private(set) var isReviewAnswerVisible = false
   private(set) var isReviewRating = false
@@ -480,8 +489,98 @@ final class ApplicationShell {
   func refreshLibrary() async {
     do {
       learningItems = try await environment.learningStore.items()
+      archivedLearningItems = try await environment.learningStore.archivedItems()
     } catch {
       // A later ticket exposes recoverable library loading failures.
+    }
+  }
+
+  var displayedLearningItems: [LearningItem] {
+    libraryScope == .active ? learningItems : archivedLearningItems
+  }
+
+  func setLibraryScope(_ scope: LearningLibraryScope) {
+    libraryScope = scope
+    cancelLibrarySelection()
+  }
+
+  func beginLibrarySelection() {
+    isLibrarySelecting = true
+    selectedLearningItemIDs = []
+  }
+
+  func cancelLibrarySelection() {
+    isLibrarySelecting = false
+    selectedLearningItemIDs = []
+  }
+
+  func toggleLibrarySelection(_ itemID: UUID) {
+    guard isLibrarySelecting, displayedLearningItems.contains(where: { $0.id == itemID }) else {
+      return
+    }
+    if selectedLearningItemIDs.contains(itemID) {
+      selectedLearningItemIDs.remove(itemID)
+    } else {
+      selectedLearningItemIDs.insert(itemID)
+    }
+  }
+
+  func selectAllLibraryItems() {
+    guard isLibrarySelecting else {
+      return
+    }
+    selectedLearningItemIDs = Set(displayedLearningItems.map(\.id))
+  }
+
+  func archiveSelectedLibraryItems() async {
+    await setSelectedLibraryItemsArchived(at: environment.clock.now)
+  }
+
+  func restoreSelectedLibraryItems() async {
+    await setSelectedLibraryItemsArchived(at: nil)
+  }
+
+  private func setSelectedLibraryItemsArchived(at archivedAt: Date?) async {
+    let selectedIDs = Array(selectedLearningItemIDs)
+    guard !selectedIDs.isEmpty else {
+      return
+    }
+    do {
+      try await environment.learningStore.setArchived(
+        itemIDs: selectedIDs,
+        archivedAt: archivedAt
+      )
+      cancelLibrarySelection()
+      await refreshTodayReview()
+      await refreshLibrary()
+    } catch {
+      // Keep the selection so the user can retry.
+    }
+  }
+
+  func saveLearningItem(
+    itemID: UUID,
+    canonicalForm: String,
+    details: LearningItemDetailsUpdate
+  ) async -> Bool {
+    do {
+      let result = try await environment.learningStore.updateItem(
+        itemID: itemID,
+        canonicalForm: canonicalForm,
+        details: details
+      )
+      switch result {
+      case .updated, .merged:
+        pendingLibraryMerge = nil
+        pendingLibraryCanonicalUpdate = nil
+        await refreshLibrary()
+      case .requiresConfirmation(let summary):
+        pendingLibraryMerge = summary
+        pendingLibraryCanonicalUpdate = (itemID, canonicalForm)
+      }
+      return true
+    } catch {
+      return false
     }
   }
 

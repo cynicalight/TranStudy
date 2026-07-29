@@ -14,10 +14,12 @@ final class LearningRecord {
   var exampleSentence: String = ""
   var sentenceTranslation: String = ""
   var sourceApplicationName: String = ""
+  var userNote: String = ""
   var normalizedCanonicalForm: String = ""
   var lastEncounteredAt: Date = Date()
   var nextReviewAt: Date?
   var isPaused: Bool = false
+  var archivedAt: Date?
   var reviewIntervalDays: Double = 1
   var reviewEase: Double = 2.5
   var reviewCount: Int = 0
@@ -26,6 +28,8 @@ final class LearningRecord {
   var encounters: [LearningEncounterRecord] = []
   @Relationship(deleteRule: .cascade, inverse: \ReviewEventRecord.learningRecord)
   var reviewEvents: [ReviewEventRecord] = []
+  @Relationship(deleteRule: .cascade, inverse: \LearningCustomExampleRecord.learningRecord)
+  var customExamples: [LearningCustomExampleRecord] = []
 
   init(
     id: UUID = UUID(),

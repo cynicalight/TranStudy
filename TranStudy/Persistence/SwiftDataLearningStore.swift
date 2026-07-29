@@ -20,7 +20,7 @@ final class SwiftDataLearningStore: LearningStoring {
   }
 
   func summary(at date: Date) async throws -> LearningSummary {
-    let records = try consolidatedRecords()
+    let records = try consolidatedRecords().filter { $0.archivedAt == nil }
     let dueCount = records.count(where: {
       !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= date
     })
@@ -196,13 +196,57 @@ final class SwiftDataLearningStore: LearningStoring {
     canonicalForm: String,
     confirmMerge: Bool
   ) async throws -> LearningCanonicalUpdateResult {
+    let records = try consolidatedRecords()
+    let result = applyCanonicalForm(
+      itemID: itemID,
+      canonicalForm: canonicalForm,
+      confirmMerge: confirmMerge,
+      records: records
+    )
+    if case .requiresConfirmation = result {
+      return result
+    }
+    try saveOrRollback()
+    return result
+  }
+
+  func updateItem(
+    itemID: UUID,
+    canonicalForm: String,
+    details: LearningItemDetailsUpdate
+  ) async throws -> LearningCanonicalUpdateResult {
+    let trimmedCanonicalForm = canonicalForm.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !NormalizedCanonicalForm(trimmedCanonicalForm).value.isEmpty else {
+      throw LearningStoreError.emptyCanonicalForm
+    }
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+
+    applyDetails(details, to: record)
+    let result = applyCanonicalForm(
+      itemID: itemID,
+      canonicalForm: canonicalForm,
+      confirmMerge: false,
+      records: records
+    )
+    try saveOrRollback()
+    return result
+  }
+
+  private func applyCanonicalForm(
+    itemID: UUID,
+    canonicalForm: String,
+    confirmMerge: Bool,
+    records: [LearningRecord]
+  ) -> LearningCanonicalUpdateResult {
     let trimmedCanonicalForm = canonicalForm.trimmingCharacters(in: .whitespacesAndNewlines)
     let normalizedForm = NormalizedCanonicalForm(trimmedCanonicalForm).value
     guard !normalizedForm.isEmpty else {
       return .updated
     }
 
-    let records = try consolidatedRecords()
     guard let sourceRecord = records.first(where: { $0.id == itemID }) else {
       return .updated
     }
@@ -213,7 +257,6 @@ final class SwiftDataLearningStore: LearningStoring {
     if normalizedCanonicalForm(for: sourceRecord) == normalizedForm {
       sourceRecord.canonicalForm = trimmedCanonicalForm
       sourceRecord.normalizedCanonicalForm = normalizedForm
-      try context.save()
       return .updated
     }
 
@@ -225,7 +268,6 @@ final class SwiftDataLearningStore: LearningStoring {
     else {
       sourceRecord.canonicalForm = trimmedCanonicalForm
       sourceRecord.normalizedCanonicalForm = normalizedForm
-      try context.save()
       return .updated
     }
 
@@ -239,13 +281,100 @@ final class SwiftDataLearningStore: LearningStoring {
       return .requiresConfirmation(mergeSummary)
     }
 
-    merge(sourceRecord, into: targetRecord)
-    try context.save()
+    merge(sourceRecord, into: targetRecord, preferSourceSnapshot: true)
     return .merged
   }
 
+  func updateDetails(
+    itemID: UUID,
+    details: LearningItemDetailsUpdate
+  ) async throws {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+
+    applyDetails(details, to: record)
+    try saveOrRollback()
+  }
+
+  private func applyDetails(
+    _ details: LearningItemDetailsUpdate,
+    to record: LearningRecord
+  ) {
+    backfillLegacyEncounterIfNeeded(record)
+    record.pronunciation = details.pronunciation.trimmingCharacters(in: .whitespacesAndNewlines)
+    record.partOfSpeech = details.partOfSpeech.trimmingCharacters(in: .whitespacesAndNewlines)
+    record.contextualMeaning =
+      details.contextualMeaning.trimmingCharacters(in: .whitespacesAndNewlines)
+    record.exampleSentence =
+      TranslationTextNormalizer.collapseWhitespace(in: details.exampleSentence)
+    record.sentenceTranslation =
+      TranslationTextNormalizer.collapseWhitespace(in: details.sentenceTranslation)
+    record.userNote = details.userNote.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    let existingExamples = Dictionary(
+      uniqueKeysWithValues: record.customExamples.map { ($0.id, $0) }
+    )
+    let updatedExamples: [LearningCustomExampleRecord] =
+      details.customExamples.enumerated().compactMap { index, example in
+        let englishText = TranslationTextNormalizer.collapseWhitespace(in: example.englishText)
+        guard !englishText.isEmpty else {
+          return nil
+        }
+        let persistedExample =
+          existingExamples[example.id]
+          ?? LearningCustomExampleRecord(
+            id: example.id,
+            englishText: englishText,
+            chineseTranslation: "",
+            sortOrder: index
+          )
+        persistedExample.englishText = englishText
+        persistedExample.chineseTranslation =
+          TranslationTextNormalizer.collapseWhitespace(in: example.chineseTranslation)
+        persistedExample.sortOrder = index
+        return persistedExample
+      }
+    let updatedIDs = Set(updatedExamples.map(\.id))
+    for example in record.customExamples where !updatedIDs.contains(example.id) {
+      context.delete(example)
+    }
+    record.customExamples = updatedExamples
+  }
+
+  private func saveOrRollback() throws {
+    do {
+      try context.save()
+    } catch {
+      context.rollback()
+      throw error
+    }
+  }
+
   func items() async throws -> [LearningItem] {
+    try learningItems(archived: false)
+  }
+
+  func archivedItems() async throws -> [LearningItem] {
+    try learningItems(archived: true)
+  }
+
+  func setArchived(itemIDs: [UUID], archivedAt: Date?) async throws {
+    let selectedIDs = Set(itemIDs)
+    guard !selectedIDs.isEmpty else {
+      return
+    }
+    let records = try consolidatedRecords()
+    for record in records where selectedIDs.contains(record.id) {
+      record.archivedAt = archivedAt
+    }
+    try context.save()
+  }
+
+  private func learningItems(archived: Bool) throws -> [LearningItem] {
     try consolidatedRecords()
+      .filter { ($0.archivedAt != nil) == archived }
       .sorted { effectiveLastEncounteredAt(for: $0) > effectiveLastEncounteredAt(for: $1) }
       .map { record in
         let encounters = encounterItems(for: record)
@@ -263,8 +392,24 @@ final class SwiftDataLearningStore: LearningStoring {
           sourceApplicationName: record.sourceApplicationName,
           createdAt: record.createdAt,
           encounters: encounters,
+          userNote: record.userNote,
+          customExamples: record.customExamples
+            .sorted {
+              if $0.sortOrder != $1.sortOrder {
+                return $0.sortOrder < $1.sortOrder
+              }
+              return $0.id.uuidString < $1.id.uuidString
+            }
+            .map {
+              LearningCustomExample(
+                id: $0.id,
+                englishText: $0.englishText,
+                chineseTranslation: $0.chineseTranslation
+              )
+            },
           nextReviewAt: record.nextReviewAt,
-          isPaused: record.isPaused
+          isPaused: record.isPaused,
+          archivedAt: record.archivedAt
         )
       }
   }
@@ -454,12 +599,15 @@ final class SwiftDataLearningStore: LearningStoring {
 
   private func merge(
     _ sourceRecord: LearningRecord,
-    into targetRecord: LearningRecord
+    into targetRecord: LearningRecord,
+    preferSourceSnapshot: Bool = false
   ) {
     backfillLegacyEncounterIfNeeded(sourceRecord)
     backfillLegacyEncounterIfNeeded(targetRecord)
 
-    if sourceRecord.lastEncounteredAt > targetRecord.lastEncounteredAt {
+    if preferSourceSnapshot
+      || sourceRecord.lastEncounteredAt > targetRecord.lastEncounteredAt
+    {
       copyLatestSnapshot(from: sourceRecord, to: targetRecord)
     }
 
@@ -477,6 +625,15 @@ final class SwiftDataLearningStore: LearningStoring {
     targetRecord.lapseCount += sourceRecord.lapseCount
     let sourceReviewEvents = Array(sourceRecord.reviewEvents)
     targetRecord.reviewEvents.append(contentsOf: sourceReviewEvents)
+    let sourceCustomExamples = Array(sourceRecord.customExamples)
+    targetRecord.customExamples.append(contentsOf: sourceCustomExamples)
+    for (index, example) in targetRecord.customExamples.enumerated() {
+      example.sortOrder = index
+    }
+    targetRecord.userNote = mergedUserNote(
+      targetRecord.userNote,
+      sourceRecord.userNote
+    )
     targetRecord.createdAt = min(targetRecord.createdAt, sourceRecord.createdAt)
     targetRecord.lastEncounteredAt = max(
       targetRecord.lastEncounteredAt,
@@ -487,6 +644,10 @@ final class SwiftDataLearningStore: LearningStoring {
       sourceRecord.nextReviewAt
     )
     targetRecord.isPaused = targetRecord.isPaused && sourceRecord.isPaused
+    targetRecord.archivedAt = earlierArchiveState(
+      targetRecord.archivedAt,
+      sourceRecord.archivedAt
+    )
     context.delete(sourceRecord)
   }
 
@@ -523,5 +684,23 @@ final class SwiftDataLearningStore: LearningStoring {
     case (.none, _):
       false
     }
+  }
+
+  private func earlierArchiveState(_ first: Date?, _ second: Date?) -> Date? {
+    guard let first, let second else {
+      return nil
+    }
+    return min(first, second)
+  }
+
+  private func mergedUserNote(_ first: String, _ second: String) -> String {
+    let notes = [first, second]
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    var uniqueNotes: [String] = []
+    for note in notes where !uniqueNotes.contains(note) {
+      uniqueNotes.append(note)
+    }
+    return uniqueNotes.joined(separator: "\n\n")
   }
 }

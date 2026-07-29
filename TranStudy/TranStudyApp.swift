@@ -12,7 +12,8 @@ struct TranStudyApp: App {
       let container = try ModelContainer(
         for: LearningRecord.self,
         LearningEncounterRecord.self,
-        ReviewEventRecord.self
+        ReviewEventRecord.self,
+        LearningCustomExampleRecord.self
       )
       let learningStore = SwiftDataLearningStore(container: container)
       let keychainAPIKeyStore = KeychainAPIKeyStore()

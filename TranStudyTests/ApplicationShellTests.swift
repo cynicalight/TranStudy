@@ -364,6 +364,75 @@ struct ApplicationShellTests {
     #expect(shell.learningItems == [expectedItem])
   }
 
+  @Test("library selection can select all, archive, and restore cards")
+  func librarySelectionArchivesAndRestoresCards() async {
+    let firstItem = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let secondItem = makeLearningItem(
+      id: UUID(uuidString: "A60B21B0-D9FC-4DBD-B818-A1819310E5E4")!,
+      canonicalForm: "pause"
+    )
+    let learningStore = TestLearningStore(items: [firstItem, secondItem])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+    await shell.refreshLibrary()
+
+    shell.beginLibrarySelection()
+    shell.toggleLibrarySelection(firstItem.id)
+    #expect(shell.selectedLearningItemIDs == [firstItem.id])
+
+    shell.selectAllLibraryItems()
+    #expect(shell.selectedLearningItemIDs == [firstItem.id, secondItem.id])
+
+    await shell.archiveSelectedLibraryItems()
+
+    #expect(shell.learningItems.isEmpty)
+    #expect(Set(shell.archivedLearningItems.map(\.id)) == [firstItem.id, secondItem.id])
+    #expect(!shell.isLibrarySelecting)
+
+    shell.setLibraryScope(.archived)
+    shell.beginLibrarySelection()
+    shell.selectAllLibraryItems()
+    await shell.restoreSelectedLibraryItems()
+
+    #expect(Set(shell.learningItems.map(\.id)) == [firstItem.id, secondItem.id])
+    #expect(shell.archivedLearningItems.isEmpty)
+  }
+
+  @Test("failed library detail save remains unsuccessful")
+  func failedLibraryDetailSaveRemainsUnsuccessful() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(
+          items: [item],
+          detailsUpdateError: TestLearningStoreError.updateFailed
+        )
+      ))
+
+    let didSave = await shell.saveLearningItem(
+      itemID: item.id,
+      canonicalForm: "run",
+      details: LearningItemDetailsUpdate(
+        pronunciation: "/rʌn/",
+        partOfSpeech: "verb",
+        contextualMeaning: "奔跑",
+        exampleSentence: "I run daily.",
+        sentenceTranslation: "我每天跑步。",
+        userNote: "测试",
+        customExamples: []
+      )
+    )
+
+    #expect(!didSave)
+  }
+
   @Test("renaming a library item to an existing word requires merge confirmation")
   func libraryCanonicalCorrectionRequiresMergeConfirmation() async {
     let itemID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
@@ -927,20 +996,26 @@ private final class TestLearningStore: LearningStoring {
   private(set) var canonicalUpdateInvocations: [CanonicalUpdateInvocation] = []
   private(set) var reviewInvocations: [ReviewInvocation] = []
   private var storedItems: [LearningItem]
+  private var storedArchivedItems: [LearningItem]
   private var storedDueItems: [LearningItem]
   private let storedMergeSummary: LearningMergeSummary?
   private var canonicalUpdateResults: [LearningCanonicalUpdateResult]
+  private let detailsUpdateError: TestLearningStoreError?
 
   init(
     items: [LearningItem] = [],
+    archivedItems: [LearningItem] = [],
     dueItems: [LearningItem] = [],
     mergeSummary: LearningMergeSummary? = nil,
-    canonicalUpdateResults: [LearningCanonicalUpdateResult] = []
+    canonicalUpdateResults: [LearningCanonicalUpdateResult] = [],
+    detailsUpdateError: TestLearningStoreError? = nil
   ) {
     storedItems = items
+    storedArchivedItems = archivedItems
     storedDueItems = dueItems
     storedMergeSummary = mergeSummary
     self.canonicalUpdateResults = canonicalUpdateResults
+    self.detailsUpdateError = detailsUpdateError
   }
 
   func summary(at date: Date) async throws -> LearningSummary {
@@ -997,9 +1072,48 @@ private final class TestLearningStore: LearningStoring {
     return canonicalUpdateResults.isEmpty ? .updated : canonicalUpdateResults.removeFirst()
   }
 
+  func updateDetails(
+    itemID: UUID,
+    details: LearningItemDetailsUpdate
+  ) async throws {
+    if let detailsUpdateError {
+      throw detailsUpdateError
+    }
+  }
+
+  func updateItem(
+    itemID: UUID,
+    canonicalForm: String,
+    details: LearningItemDetailsUpdate
+  ) async throws -> LearningCanonicalUpdateResult {
+    try await updateDetails(itemID: itemID, details: details)
+    return canonicalUpdateResults.isEmpty ? .updated : canonicalUpdateResults.removeFirst()
+  }
+
   func items() async throws -> [LearningItem] {
     storedItems
   }
+
+  func archivedItems() async throws -> [LearningItem] {
+    storedArchivedItems
+  }
+
+  func setArchived(itemIDs: [UUID], archivedAt: Date?) async throws {
+    let selectedIDs = Set(itemIDs)
+    if archivedAt == nil {
+      let restored = storedArchivedItems.filter { selectedIDs.contains($0.id) }
+      storedArchivedItems.removeAll { selectedIDs.contains($0.id) }
+      storedItems.append(contentsOf: restored)
+    } else {
+      let archived = storedItems.filter { selectedIDs.contains($0.id) }
+      storedItems.removeAll { selectedIDs.contains($0.id) }
+      storedArchivedItems.append(contentsOf: archived)
+    }
+  }
+}
+
+private enum TestLearningStoreError: Error {
+  case updateFailed
 }
 
 private struct CanonicalUpdateInvocation: Equatable {

@@ -199,6 +199,25 @@
     func items() async throws -> [LearningItem] {
       storedItems
     }
+
+    func archivedItems() async throws -> [LearningItem] {
+      []
+    }
+
+    func updateDetails(
+      itemID: UUID,
+      details: LearningItemDetailsUpdate
+    ) async throws {}
+
+    func updateItem(
+      itemID: UUID,
+      canonicalForm: String,
+      details: LearningItemDetailsUpdate
+    ) async throws -> LearningCanonicalUpdateResult {
+      .updated
+    }
+
+    func setArchived(itemIDs: [UUID], archivedAt: Date?) async throws {}
   }
 
   @MainActor

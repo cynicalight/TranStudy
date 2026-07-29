@@ -6,6 +6,294 @@ import Testing
 
 @MainActor
 struct SwiftDataLearningStoreTests {
+  @Test("archiving cards hides them from learning and restoring preserves schedule")
+  func archivingAndRestoringCardsPreservesLearningState() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    let dueAt = Date(timeIntervalSince1970: 2_000)
+
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "ran",
+          canonicalForm: "run",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: Date(timeIntervalSince1970: 1_000),
+        nextReviewAt: dueAt
+      ))
+    try await store.add(
+      LearningAddition(
+        kind: .sentence,
+        draft: TranslationDraft(
+          sourceText: "Keep moving forward.",
+          canonicalForm: "Keep moving forward.",
+          pronunciation: "",
+          partOfSpeech: "",
+          contextualMeaning: "",
+          exampleSentence: "Keep moving forward.",
+          sentenceTranslation: "继续前进。"
+        ),
+        sourceApplicationName: "Preview",
+        createdAt: Date(timeIntervalSince1970: 1_500),
+        nextReviewAt: dueAt
+      ))
+    let originalItems = try await store.items()
+    let wordID = try #require(originalItems.first(where: { $0.kind == .word })).id
+
+    try await store.setArchived(
+      itemIDs: originalItems.map(\.id),
+      archivedAt: Date(timeIntervalSince1970: 3_000)
+    )
+
+    #expect(try await store.items().isEmpty)
+    #expect(try await store.archivedItems().count == 2)
+    #expect(try await store.dueItems(at: dueAt).isEmpty)
+    #expect(
+      try await store.summary(at: dueAt)
+        == LearningSummary(dueCount: 0, wordCount: 0, sentenceCount: 0)
+    )
+
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "running",
+          canonicalForm: "run",
+          pronunciation: "/ˈrʌnɪŋ/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑步",
+          exampleSentence: "They are running.",
+          sentenceTranslation: "他们正在跑步。"
+        ),
+        sourceApplicationName: "TextEdit",
+        createdAt: Date(timeIntervalSince1970: 3_500)
+      ))
+
+    #expect(try await store.items().isEmpty)
+    let archivedWord = try #require(
+      try await store.archivedItems().first(where: { $0.id == wordID })
+    )
+    #expect(archivedWord.encounters.count == 2)
+
+    try await store.setArchived(itemIDs: [wordID], archivedAt: nil)
+
+    let restoredItem = try #require(try await store.items().first)
+    #expect(restoredItem.id == wordID)
+    #expect(restoredItem.nextReviewAt == dueAt)
+    #expect(restoredItem.archivedAt == nil)
+    #expect(try await store.archivedItems().count == 1)
+    #expect(try await store.dueItems(at: dueAt).map(\.id) == [wordID])
+  }
+
+  @Test("editing learning details preserves encounters and survives reopening")
+  func editingLearningDetailsPreservesHistory() async throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let databaseURL = directory.appending(path: "TranStudy.store")
+    try FileManager.default.createDirectory(
+      at: directory,
+      withIntermediateDirectories: true
+    )
+    defer {
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let exampleID = UUID()
+    let itemID: UUID
+
+    do {
+      let store = SwiftDataLearningStore(container: try makeContainer(at: databaseURL))
+      try await store.add(
+        LearningAddition(
+          draft: TranslationDraft(
+            sourceText: "ran",
+            canonicalForm: "run",
+            pronunciation: "/ræn/",
+            partOfSpeech: "verb",
+            contextualMeaning: "跑",
+            exampleSentence: "She ran home.",
+            sentenceTranslation: "她跑回了家。"
+          ),
+          sourceApplicationName: "Safari",
+          createdAt: Date(timeIntervalSince1970: 1_000)
+        ))
+      itemID = try #require(try await store.items().first).id
+
+      _ = try await store.updateItem(
+        itemID: itemID,
+        canonicalForm: "run",
+        details: LearningItemDetailsUpdate(
+          pronunciation: "/rʌn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "奔跑；经营",
+          exampleSentence: "She runs every morning.",
+          sentenceTranslation: "她每天早上跑步。",
+          userNote: "注意 run a business 的用法。",
+          customExamples: [
+            LearningCustomExample(
+              id: exampleID,
+              englishText: "They run a small café.",
+              chineseTranslation: "他们经营一家小咖啡馆。"
+            )
+          ]
+        ))
+    }
+
+    let reopenedStore = SwiftDataLearningStore(
+      container: try makeContainer(at: databaseURL)
+    )
+    let item = try #require(try await reopenedStore.items().first)
+
+    #expect(item.id == itemID)
+    #expect(item.pronunciation == "/rʌn/")
+    #expect(item.contextualMeaning == "奔跑；经营")
+    #expect(item.exampleSentence == "She runs every morning.")
+    #expect(item.sentenceTranslation == "她每天早上跑步。")
+    #expect(item.userNote == "注意 run a business 的用法。")
+    #expect(
+      item.customExamples
+        == [
+          LearningCustomExample(
+            id: exampleID,
+            englishText: "They run a small café.",
+            chineseTranslation: "他们经营一家小咖啡馆。"
+          )
+        ])
+    #expect(item.encounters.count == 1)
+    #expect(item.encounters.first?.exampleSentence == "She ran home.")
+    #expect(item.encounters.first?.sentenceTranslation == "她跑回了家。")
+  }
+
+  @Test("editing a legacy learning record first preserves its original encounter")
+  func editingLegacyRecordBackfillsOriginalEncounter() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
+      configurations: configuration
+    )
+    let context = ModelContext(container)
+    let record = LearningRecord(
+      createdAt: Date(timeIntervalSince1970: 1_000),
+      sourceText: "ran",
+      canonicalForm: "run",
+      pronunciation: "/ræn/",
+      partOfSpeech: "verb",
+      contextualMeaning: "跑",
+      exampleSentence: "She ran home.",
+      sentenceTranslation: "她跑回了家。",
+      sourceApplicationName: "Safari"
+    )
+    context.insert(record)
+    try context.save()
+    let store = SwiftDataLearningStore(container: container)
+
+    try await store.updateDetails(
+      itemID: record.id,
+      details: LearningItemDetailsUpdate(
+        pronunciation: "/rʌn/",
+        partOfSpeech: "verb",
+        contextualMeaning: "奔跑",
+        exampleSentence: "I run daily.",
+        sentenceTranslation: "我每天跑步。",
+        userNote: "",
+        customExamples: []
+      ))
+
+    let item = try #require(try await store.items().first)
+    #expect(item.exampleSentence == "I run daily.")
+    #expect(item.encounters.count == 1)
+    #expect(item.encounters.first?.contextualMeaning == "跑")
+    #expect(item.encounters.first?.exampleSentence == "She ran home.")
+  }
+
+  @Test("confirmed canonical merge keeps the details edited on the source item")
+  func canonicalMergeKeepsEditedSourceDetails() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "sprinted",
+          canonicalForm: "sprint",
+          pronunciation: "/sprɪnt/",
+          partOfSpeech: "verb",
+          contextualMeaning: "冲刺",
+          exampleSentence: "She sprinted first.",
+          sentenceTranslation: "她先冲刺了。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: Date(timeIntervalSince1970: 1_000)
+      ))
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "running",
+          canonicalForm: "run",
+          pronunciation: "/ˈrʌnɪŋ/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑步",
+          exampleSentence: "They were running later.",
+          sentenceTranslation: "他们后来在跑步。"
+        ),
+        sourceApplicationName: "Preview",
+        createdAt: Date(timeIntervalSince1970: 2_000)
+      ))
+    let sourceID = try #require(
+      try await store.items().first(where: { $0.canonicalForm == "sprint" })
+    ).id
+    let proposedResult = try await store.updateItem(
+      itemID: sourceID,
+      canonicalForm: "run",
+      details: LearningItemDetailsUpdate(
+        pronunciation: "/rʌn/",
+        partOfSpeech: "verb",
+        contextualMeaning: "用户修正的释义",
+        exampleSentence: "User-edited example.",
+        sentenceTranslation: "用户修改的例句。",
+        userNote: "用户笔记",
+        customExamples: []
+      ))
+    guard case .requiresConfirmation = proposedResult else {
+      Issue.record("Expected canonical merge confirmation")
+      return
+    }
+
+    _ = try await store.updateCanonicalForm(
+      itemID: sourceID,
+      canonicalForm: "run",
+      confirmMerge: true
+    )
+
+    let mergedItem = try #require(try await store.items().first)
+    #expect(try await store.items().count == 1)
+    #expect(mergedItem.contextualMeaning == "用户修正的释义")
+    #expect(mergedItem.exampleSentence == "User-edited example.")
+    #expect(mergedItem.sentenceTranslation == "用户修改的例句。")
+    #expect(mergedItem.userNote == "用户笔记")
+    #expect(mergedItem.encounters.count == 2)
+  }
+
   @Test("sentence cards merge only after whitespace normalization")
   func sentenceCardsUseExactWhitespaceNormalizedIdentity() async throws {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -13,6 +301,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -317,6 +606,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let context = ModelContext(container)
@@ -367,6 +657,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -415,6 +706,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -445,6 +737,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -495,6 +788,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let joinedAt = Date(timeIntervalSince1970: 10_000)
@@ -603,6 +897,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -648,6 +943,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -683,6 +979,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
     let store = SwiftDataLearningStore(container: container)
@@ -747,6 +1044,7 @@ struct SwiftDataLearningStoreTests {
       for: LearningRecord.self,
       LearningEncounterRecord.self,
       ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
       configurations: configuration
     )
   }

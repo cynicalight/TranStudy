@@ -54,6 +54,32 @@ struct LearningEncounter: Equatable, Identifiable, Sendable {
   let encounteredAt: Date
 }
 
+struct LearningCustomExample: Equatable, Identifiable, Sendable {
+  let id: UUID
+  let englishText: String
+  let chineseTranslation: String
+
+  init(
+    id: UUID = UUID(),
+    englishText: String,
+    chineseTranslation: String
+  ) {
+    self.id = id
+    self.englishText = englishText
+    self.chineseTranslation = chineseTranslation
+  }
+}
+
+struct LearningItemDetailsUpdate: Equatable, Sendable {
+  let pronunciation: String
+  let partOfSpeech: String
+  let contextualMeaning: String
+  let exampleSentence: String
+  let sentenceTranslation: String
+  let userNote: String
+  let customExamples: [LearningCustomExample]
+}
+
 struct LearningMergeSummary: Equatable, Sendable {
   let existingItemID: UUID
   let canonicalForm: String
@@ -104,8 +130,11 @@ struct LearningItem: Equatable, Identifiable, Sendable {
   let sourceApplicationName: String
   let createdAt: Date
   let encounters: [LearningEncounter]
+  let userNote: String
+  let customExamples: [LearningCustomExample]
   let nextReviewAt: Date?
   let isPaused: Bool
+  let archivedAt: Date?
 
   init(
     id: UUID,
@@ -120,8 +149,11 @@ struct LearningItem: Equatable, Identifiable, Sendable {
     sourceApplicationName: String,
     createdAt: Date,
     encounters: [LearningEncounter] = [],
+    userNote: String = "",
+    customExamples: [LearningCustomExample] = [],
     nextReviewAt: Date? = nil,
-    isPaused: Bool = false
+    isPaused: Bool = false,
+    archivedAt: Date? = nil
   ) {
     self.id = id
     self.kind = kind
@@ -135,8 +167,11 @@ struct LearningItem: Equatable, Identifiable, Sendable {
     self.sourceApplicationName = sourceApplicationName
     self.createdAt = createdAt
     self.encounters = encounters
+    self.userNote = userNote
+    self.customExamples = customExamples
     self.nextReviewAt = nextReviewAt
     self.isPaused = isPaused
+    self.archivedAt = archivedAt
   }
 }
 
@@ -157,7 +192,18 @@ protocol LearningStoring {
     canonicalForm: String,
     confirmMerge: Bool
   ) async throws -> LearningCanonicalUpdateResult
+  func updateDetails(
+    itemID: UUID,
+    details: LearningItemDetailsUpdate
+  ) async throws
+  func updateItem(
+    itemID: UUID,
+    canonicalForm: String,
+    details: LearningItemDetailsUpdate
+  ) async throws -> LearningCanonicalUpdateResult
   func items() async throws -> [LearningItem]
+  func archivedItems() async throws -> [LearningItem]
+  func setArchived(itemIDs: [UUID], archivedAt: Date?) async throws
 }
 
 extension LearningStoring {
