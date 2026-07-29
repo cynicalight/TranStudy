@@ -10,6 +10,10 @@ struct SelectionSentenceContext: Equatable {
     selectedRange: CFRange
   ) -> SelectionSentenceContext? {
     let nsDocument = documentText as NSString
+    let sentenceDocument =
+      documentText
+      .replacingOccurrences(of: "\r", with: " ")
+      .replacingOccurrences(of: "\n", with: " ")
     guard
       selectedRange.location >= 0,
       selectedRange.location <= nsDocument.length
@@ -18,13 +22,14 @@ struct SelectionSentenceContext: Equatable {
     }
 
     var sentences: [(text: String, range: NSRange)] = []
-    documentText.enumerateSubstrings(
-      in: documentText.startIndex..<documentText.endIndex,
+    sentenceDocument.enumerateSubstrings(
+      in: sentenceDocument.startIndex..<sentenceDocument.endIndex,
       options: [.bySentences, .substringNotRequired]
     ) { _, substringRange, _, _ in
-      let range = NSRange(substringRange, in: documentText)
-      let text = nsDocument.substring(with: range)
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let range = NSRange(substringRange, in: sentenceDocument)
+      let text = TranslationTextNormalizer.collapseWhitespace(
+        in: nsDocument.substring(with: range)
+      )
       if !text.isEmpty {
         sentences.append((text, range))
       }

@@ -149,13 +149,18 @@ final class ApplicationShell {
     _ inputText: String,
     selection: SelectionSnapshot?
   ) async {
-    let sourceText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let sourceText = TranslationTextNormalizer.collapseWhitespace(in: inputText)
     guard !sourceText.isEmpty else {
       selectionDebugLog(
         "translation input rejected: source=\(selection == nil ? "clipboard" : "selection") reason=empty"
       )
       translationStatus = .failed
       return
+    }
+    if sourceText.count != inputText.count {
+      selectionDebugLog(
+        "translation input whitespace normalized: originalLength=\(inputText.count) normalizedLength=\(sourceText.count)"
+      )
     }
 
     let isWordOrShortPhrase = Self.isWordOrShortPhrase(sourceText)

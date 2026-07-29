@@ -418,6 +418,37 @@ struct ApplicationShellTests {
     #expect(shell.translationStatus == .failed)
   }
 
+  @Test("long clipboard text collapses line breaks before contextual word selection")
+  func longClipboardTextCollapsesLineBreaksBeforeContextualWordSelection() async {
+    let source = """
+      In a realistic program, convention dictates that
+        if any method of
+        Point has a pointer receiver, then all methods of Point
+        should have a pointer receiver, even ones that don’t strictly need it.
+
+        We’ve broken this rule for Point so that we can show
+      """
+    let expectedSentence =
+      "In a realistic program, convention dictates that if any method of Point has a pointer receiver, then all methods of Point should have a pointer receiver, even ones that don’t strictly need it."
+    let expectedSource =
+      "\(expectedSentence) We’ve broken this rule for Point so that we can show"
+    let translator = TestLongTextTranslationProvider()
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: source),
+        translation: translator
+      ))
+
+    await shell.translateClipboard()
+
+    let selectedRange = (expectedSentence as NSString).range(of: "convention")
+    await shell.translateLongTextSelection(selectedRange)
+
+    #expect(translator.lastLongTextSource == expectedSource)
+    #expect(translator.lastRequest?.sourceText == "convention")
+    #expect(translator.lastRequest?.targetSentence == expectedSentence)
+  }
+
   @Test("closing the translation panel cancels its in-flight request")
   func closingTranslationPanelCancelsInFlightRequest() async {
     let translator = ControlledTranslationProvider()
@@ -595,6 +626,33 @@ private final class TestTranslationProvider: TranslationProviding {
     }
 
     return result
+  }
+}
+
+@MainActor
+private final class TestLongTextTranslationProvider: TranslationProviding {
+  private(set) var lastLongTextSource: String?
+  private(set) var lastRequest: TranslationRequest?
+
+  func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+    lastRequest = request
+    return TranslationResult(
+      sourceText: request.sourceText,
+      canonicalForm: request.sourceText,
+      pronunciation: "",
+      partOfSpeech: "noun",
+      contextualMeaning: "惯例",
+      exampleSentence: request.targetSentence ?? "",
+      sentenceTranslation: "例句翻译"
+    )
+  }
+
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    lastLongTextSource = sourceText
+    return LongTextTranslationResult(
+      sourceText: sourceText,
+      translatedText: "长文本译文"
+    )
   }
 }
 

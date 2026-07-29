@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -22,9 +23,10 @@ struct LongTextTranslationView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       VStack(alignment: .leading, spacing: 5) {
-//        Text("原文")
-//          .font(.caption)
-//          .foregroundStyle(.secondary)
+        HStack {
+          Spacer()
+          CopyTextButton(text: result.sourceText, accessibilityLabel: "复制原文")
+        }
         ScrollView {
           WordCapsuleFlowLayout(spacing: 3) {
             ForEach(Array(tokens.enumerated()), id: \.element.id) { index, token in
@@ -82,9 +84,13 @@ struct LongTextTranslationView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 5) {
-        Text("译文")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        HStack {
+          Text("译文")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          Spacer()
+          CopyTextButton(text: result.translatedText, accessibilityLabel: "复制译文")
+        }
         ScrollView {
           Text(result.translatedText)
             .textSelection(.enabled)
@@ -155,6 +161,24 @@ struct LongTextTranslationView: View {
     if expandedRange.count <= 8 {
       selectedTokenRange = expandedRange
     }
+  }
+}
+
+private struct CopyTextButton: View {
+  let text: String
+  let accessibilityLabel: String
+
+  var body: some View {
+    Button {
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(text, forType: .string)
+    } label: {
+      Image(systemName: "doc.on.doc")
+    }
+    .buttonStyle(.borderless)
+    .controlSize(.small)
+    .accessibilityLabel(accessibilityLabel)
+    .help(accessibilityLabel)
   }
 }
 

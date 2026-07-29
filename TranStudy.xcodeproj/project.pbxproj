@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		018DEF4BD8371867B9948186 /* TranslationTextNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E287D38C24C68E00F50B1B /* TranslationTextNormalizer.swift */; };
 		02EF0D00BFBACD2FD5EB9A98 /* TranslationPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B966A1D5F567119371D2A6 /* TranslationPanelController.swift */; };
 		044C8B4E7CD9F12623022A25 /* TranslationPanelPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B1C600B4594EF42D21A39C6 /* TranslationPanelPosition.swift */; };
 		06A8B4CA704849FF3FF39441 /* TranslationProviderConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFDDAB013A94CD551A257935 /* TranslationProviderConfigurationTests.swift */; };
@@ -95,6 +96,7 @@
 		0EDFA17B8138F7B3A2FC49ED /* TranslationProviderConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviderConfiguration.swift; sourceTree = "<group>"; };
 		17BE30085B3E542EBAA70D66 /* FileTranslationCacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTranslationCacheStore.swift; sourceTree = "<group>"; };
 		17DC4D9CDBDF6CD4445B1596 /* SystemSelectionEventMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSelectionEventMonitor.swift; sourceTree = "<group>"; };
+		18E287D38C24C68E00F50B1B /* TranslationTextNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationTextNormalizer.swift; sourceTree = "<group>"; };
 		1B2332215B11112DCD342C24 /* TranslationPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationPanelView.swift; sourceTree = "<group>"; };
 		1D681D142094206B09400C9F /* OpenAICompatibleTranslationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleTranslationProviderTests.swift; sourceTree = "<group>"; };
 		2301BC5DCDA1295502BC91BC /* SwiftDataLearningStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLearningStoreTests.swift; sourceTree = "<group>"; };
@@ -173,6 +175,7 @@
 				333A2FBB41FC174957BE90AC /* TranslationCacheKey.swift */,
 				EAD0603928223B27E98B195D /* TranslationDraft.swift */,
 				0EDFA17B8138F7B3A2FC49ED /* TranslationProviderConfiguration.swift */,
+				18E287D38C24C68E00F50B1B /* TranslationTextNormalizer.swift */,
 				4C7A46257717DB77687C19DF /* Ports */,
 			);
 			path = Application;
@@ -457,6 +460,7 @@
 				C7462FE9E4B8B84101F2DF43 /* TranslationProviding.swift in Sources */,
 				EB10F6E6BCA7DC87A3867ED2 /* TranslationSettingsView.swift in Sources */,
 				13E2910289DCDD3E9A651B6B /* TranslationShortcutStoring.swift in Sources */,
+				018DEF4BD8371867B9948186 /* TranslationTextNormalizer.swift in Sources */,
 				CC4CFB5B0FD46AA01BB62F7D /* URLSessionHTTPClient.swift in Sources */,
 				B673B7C619B55B391532CE34 /* UserDefaultsSelectionConfigurationStore.swift in Sources */,
 				5A0059377093C5088B0B2E35 /* UserDefaultsTranslationPanelPositionStore.swift in Sources */,
