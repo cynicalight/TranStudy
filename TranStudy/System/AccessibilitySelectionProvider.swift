@@ -98,7 +98,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     guard
       AXIsProcessTrusted(),
       let application = supportedFrontmostApplication(),
-      let element = selectedElement(),
+      let element = selectedElement(in: application),
       let selectedText = selectedText(in: element)
     else {
       return nil
@@ -154,12 +154,12 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     return application
   }
 
-  private func selectedElement() -> AXUIElement? {
-    let systemWideElement = AXUIElementCreateSystemWide()
+  private func selectedElement(in application: NSRunningApplication) -> AXUIElement? {
+    let applicationElement = AXUIElementCreateApplication(application.processIdentifier)
     guard
       let focusedElement = copyUIElementAttribute(
         kAXFocusedUIElementAttribute as CFString,
-        from: systemWideElement
+        from: applicationElement
       )
     else {
       return nil
