@@ -22,11 +22,11 @@ struct LongTextTranslationView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       VStack(alignment: .leading, spacing: 5) {
-        Text("英文原文")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+//        Text("原文")
+//          .font(.caption)
+//          .foregroundStyle(.secondary)
         ScrollView {
-          WordCapsuleFlowLayout(spacing: 7) {
+          WordCapsuleFlowLayout(spacing: 3) {
             ForEach(Array(tokens.enumerated()), id: \.element.id) { index, token in
               HStack(spacing: 1) {
                 if !token.leadingPunctuation.isEmpty {
@@ -59,15 +59,10 @@ struct LongTextTranslationView: View {
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(8)
         }
         .frame(height: 115)
         .background(.background.opacity(0.45))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay {
-          RoundedRectangle(cornerRadius: 8)
-            .stroke(.separator.opacity(0.7))
-        }
       }
 
       HStack {
@@ -87,7 +82,7 @@ struct LongTextTranslationView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 5) {
-        Text("中文译文")
+        Text("译文")
           .font(.caption)
           .foregroundStyle(.secondary)
         ScrollView {
