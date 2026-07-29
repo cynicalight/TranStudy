@@ -199,7 +199,6 @@ struct TranslationSettingsView: View {
       .frame(maxWidth: TranStudyDesign.pageWidth)
       .padding(.horizontal, 16)
     }
-    .navigationTitle("设置")
   }
 
   private var availableApplications: [NSRunningApplication] {

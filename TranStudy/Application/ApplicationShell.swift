@@ -27,7 +27,7 @@ enum TranslationShortcutRegistrationStatus: Equatable {
 final class ApplicationShell {
   let environment: ApplicationEnvironment
   let destinations = AppDestination.allCases
-  var selectedDestination: AppDestination? = .todayReview
+  var selectedDestination: AppDestination = .todayReview
   private(set) var learningSummary = LearningSummary.empty
   private(set) var lastReviewRefreshDate: Date?
   var translationDraft: TranslationDraft?

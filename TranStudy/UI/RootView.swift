@@ -5,18 +5,14 @@ struct RootView: View {
   let onTranslateClipboard: () -> Void
 
   var body: some View {
-    NavigationSplitView {
-      List(
-        shell.destinations,
-        selection: $shell.selectedDestination
-      ) { destination in
-        Label(destination.title, systemImage: destination.systemImage)
+    TabView(selection: $shell.selectedDestination) {
+      ForEach(shell.destinations) { destination in
+        destinationView(for: destination)
+          .tabItem {
+            Label(destination.title, systemImage: destination.systemImage)
+          }
           .tag(destination)
       }
-      .navigationTitle("TranStudy")
-      .navigationSplitViewColumnWidth(min: 180, ideal: 220)
-    } detail: {
-      destinationView
     }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
@@ -29,20 +25,14 @@ struct RootView: View {
   }
 
   @ViewBuilder
-  private var destinationView: some View {
-    switch shell.selectedDestination {
+  private func destinationView(for destination: AppDestination) -> some View {
+    switch destination {
     case .todayReview:
       TodayReviewView(shell: shell)
     case .library:
       LearningLibraryView(shell: shell)
     case .settings:
       TranslationSettingsView(shell: shell)
-    case nil:
-      ContentUnavailableView(
-        "TranStudy",
-        systemImage: "character.book.closed",
-        description: Text("从侧边栏选择一个区域。")
-      )
     }
   }
 }

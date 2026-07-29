@@ -91,7 +91,6 @@ struct LearningLibraryView: View {
         .listStyle(.inset)
       }
     }
-    .navigationTitle("单词库")
     .task {
       await shell.refreshLibrary()
     }

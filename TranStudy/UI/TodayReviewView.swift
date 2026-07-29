@@ -1,6 +1,37 @@
 import SwiftUI
 
 struct TodayReviewView: View {
+  let shell: ApplicationShell
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 28) {
+          PageHeader(
+            title: "今日复习",
+            subtitle: "把今天该记住的内容，变成一个轻松完成的小目标。",
+            systemImage: "rectangle.stack.fill"
+          )
+
+          NavigationLink {
+            ReviewSessionView(shell: shell)
+          } label: {
+            Label("开始复习", systemImage: "play.fill")
+              .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.large)
+          .disabled(shell.currentReviewItem == nil)
+        }
+        .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
+        .padding(32)
+        .frame(maxWidth: .infinity, alignment: .top)
+      }
+    }
+  }
+}
+
+private struct ReviewSessionView: View {
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
   @State private var hasCompletedReviewFlip = false
 
@@ -10,31 +41,10 @@ struct TodayReviewView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 28) {
         PageHeader(
-          title: "今日复习",
-          subtitle: "把今天该记住的内容，变成一个轻松完成的小目标。",
+          title: "卡片复习",
+          subtitle: "先回忆答案，再根据记忆情况完成评分。",
           systemImage: "rectangle.stack.fill"
         )
-
-        HStack(spacing: 14) {
-          SummaryCard(
-            title: "待复习",
-            value: shell.learningSummary.dueCount,
-            systemImage: "clock",
-            tint: .orange
-          )
-          SummaryCard(
-            title: "单词",
-            value: shell.learningSummary.wordCount,
-            systemImage: "textformat.abc",
-            tint: .blue
-          )
-          SummaryCard(
-            title: "句子",
-            value: shell.learningSummary.sentenceCount,
-            systemImage: "text.quote",
-            tint: .purple
-          )
-        }
 
         if let item = shell.currentReviewItem {
           reviewSession(item)
@@ -46,7 +56,7 @@ struct TodayReviewView: View {
       .padding(32)
       .frame(maxWidth: .infinity, alignment: .top)
     }
-    .navigationTitle("今日复习")
+    .navigationTitle("卡片复习")
   }
 
   private func reviewSession(_ item: LearningItem) -> some View {
@@ -388,47 +398,8 @@ extension ReviewRating {
   }
 }
 
-private struct SummaryCard: View {
-  let title: String
-  let value: Int
-  let systemImage: String
-  let tint: Color
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      HStack {
-        Image(systemName: systemImage)
-          .foregroundStyle(tint)
-        Spacer()
-        Text(title)
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
-
-      Text(value, format: .number)
-        .font(.system(size: 30, weight: .semibold, design: .rounded))
-        .contentTransition(.numericText())
-    }
-    .padding(18)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .contentSurface()
-    .accessibilityElement(children: .combine)
-  }
-}
-
 #if DEBUG
   #Preview("今日复习") {
     PreviewFactory.todayReviewView()
-  }
-
-  #Preview("统计卡片") {
-    SummaryCard(
-      title: "待复习",
-      value: 4,
-      systemImage: "clock",
-      tint: .orange
-    )
-    .padding()
-    .frame(width: 260)
   }
 #endif
