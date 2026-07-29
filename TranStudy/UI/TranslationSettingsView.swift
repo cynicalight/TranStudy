@@ -120,17 +120,6 @@ struct TranslationSettingsView: View {
         }
 
         Section {
-          compatibilityRow("Safari", detail: "网页文字与上下文")
-          compatibilityRow("Google Chrome", detail: "网页文字与上下文")
-          compatibilityRow("TextEdit", detail: "纯文本与上下文")
-          compatibilityRow("Preview", detail: "带文字层的 PDF；上下文尽力获取")
-        } header: {
-          Label("兼容性", systemImage: "checkmark.seal")
-        } footer: {
-          Text("图片、扫描 PDF 和其他不可访问文本不会尝试 OCR。其他应用按辅助功能信息尽力支持。")
-        }
-
-        Section {
           CenteredLabeledContent("位置") {
             TranStudySegmentedControl(
               options: TranslationPanelPosition.allCases,
@@ -207,6 +196,17 @@ struct TranslationSettingsView: View {
             "连接成功后，API Key 才会写入 macOS Keychain；不会进入学习数据库、缓存或日志。",
             systemImage: "lock.shield"
           )
+        }
+
+        Section {
+          compatibilityRow("Safari", detail: "网页文字与上下文")
+          compatibilityRow("Google Chrome", detail: "网页文字与上下文")
+          compatibilityRow("TextEdit", detail: "纯文本与上下文")
+          compatibilityRow("Preview", detail: "带文字层的 PDF；上下文尽力获取")
+        } header: {
+          Label("兼容性", systemImage: "checkmark.seal")
+        } footer: {
+          Text("图片、扫描 PDF 和其他不可访问文本不会尝试 OCR。其他应用按辅助功能信息尽力支持。")
         }
       }
       .formStyle(.grouped)

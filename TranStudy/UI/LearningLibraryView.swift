@@ -6,21 +6,20 @@ struct LearningLibraryView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      PageHeader(
-        title: "单词库",
-        subtitle: librarySubtitle,
-        systemImage: "books.vertical.fill"
-      )
-      .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
-      .padding(.horizontal, 32)
-      .padding(.top, 24)
-      .padding(.bottom, 16)
-
-      libraryToolbar
-        .frame(maxWidth: TranStudyDesign.pageWidth)
+      HStack {
+        PageHeader(
+          title: "单词库",
+          subtitle: librarySubtitle,
+          systemImage: "books.vertical.fill"
+        )
+        .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
         .padding(.horizontal, 32)
+        .padding(.top, 24)
         .padding(.bottom, 16)
 
+        libraryToolbar
+
+      }
       Divider()
 
       if shell.displayedLearningItems.isEmpty {
@@ -72,23 +71,7 @@ struct LearningLibraryView: View {
   }
 
   private var libraryToolbar: some View {
-    HStack(spacing: 12) {
-      TranStudySegmentedControl(
-        options: [LearningLibraryScope.active, .archived],
-        selection: Binding(
-          get: { shell.libraryScope },
-          set: { shell.setLibraryScope($0) }
-        ),
-        label: {
-          $0 == .active ? "学习中" : "已归档"
-        },
-        tint: {
-          $0 == .archived ? .red : .accentColor
-        }
-      )
-      .frame(width: 190)
-
-      Spacer()
+    HStack {
 
       if shell.isLibrarySelecting {
         Text("已选择 \(shell.selectedLearningItemIDs.count) 项")
@@ -122,6 +105,21 @@ struct LearningLibraryView: View {
         }
         .disabled(shell.displayedLearningItems.isEmpty)
       }
+
+      TranStudySegmentedControl(
+        options: [LearningLibraryScope.active, .archived],
+        selection: Binding(
+          get: { shell.libraryScope },
+          set: { shell.setLibraryScope($0) }
+        ),
+        label: {
+          $0 == .active ? "学习中" : "已归档"
+        },
+        tint: {
+          $0 == .archived ? .red : .accentColor
+        }
+      )
+      .frame(width: 160)
     }
   }
 
