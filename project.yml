@@ -25,6 +25,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: TranStudy
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 8HC6J9LU7U
 
   TranStudyTests:
     type: bundle.unit-test
