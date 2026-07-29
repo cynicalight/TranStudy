@@ -607,6 +607,7 @@ private struct LearningItemEditorView: View {
         Button(item.kind == .word ? "删除词条" : "删除句子卡", role: .destructive) {
           isDeleteConfirmationPresented = true
         }
+        .foregroundStyle(.red)
         .disabled(isSaving)
 
         if saveFailed || deleteFailed {
