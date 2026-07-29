@@ -131,10 +131,16 @@ final class ApplicationShell {
   func translateSelection(_ snapshot: SelectionSnapshot) async {
     let sourceText = snapshot.selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard Self.isWordOrShortPhrase(sourceText) else {
+      selectionDebugLog(
+        "selection translation rejected: selectedLength=\(sourceText.count) is not a word or short phrase"
+      )
       translationStatus = .failed
       return
     }
 
+    selectionDebugLog(
+      "selection translation accepted: selectedLength=\(sourceText.count) contextLength=\(snapshot.translationContext.count)"
+    )
     translationSourceApplicationName = snapshot.sourceApplicationName
     await translate(
       TranslationRequest(
@@ -164,24 +170,31 @@ final class ApplicationShell {
       pendingLearningMerge = nil
       pendingLearningAddition = nil
       translationStatus = .ready
+      selectionDebugLog("translation succeeded: kind=\(request.kind)")
     } catch is CancellationError {
       if activeTranslationID == translationID {
         activeTranslationID = nil
         translationStatus = .idle
       }
+      selectionDebugLog("translation cancelled")
     } catch {
       if activeTranslationID == translationID {
         activeTranslationID = nil
         translationStatus = .failed
       }
+      selectionDebugLog("translation failed: errorType=\(String(reflecting: type(of: error)))")
     }
   }
 
   func addCurrentDraftToLearning() async {
     guard let translationDraft else {
+      selectionDebugLog("add to learning ignored: no translation draft")
       return
     }
 
+    selectionDebugLog(
+      "add to learning started: sourceApp=\(translationSourceApplicationName) canonicalLength=\(translationDraft.canonicalForm.count)"
+    )
     let addition = LearningAddition(
       draft: translationDraft,
       sourceApplicationName: translationSourceApplicationName,
@@ -197,11 +210,13 @@ final class ApplicationShell {
       {
         pendingLearningMerge = mergeSummary
         pendingLearningAddition = addition
+        selectionDebugLog("add to learning paused: merge confirmation required")
         return
       }
 
       try await persistLearningAddition(addition)
     } catch {
+      selectionDebugLog("add to learning failed: errorType=\(String(reflecting: type(of: error)))")
       // The translation panel keeps the draft available when persistence fails.
     }
   }
@@ -385,6 +400,7 @@ final class ApplicationShell {
 
   private func persistLearningAddition(_ addition: LearningAddition) async throws {
     try await environment.learningStore.add(addition)
+    selectionDebugLog("add to learning persisted")
     translationDraft = nil
     translationSuggestedCanonicalForm = ""
     translationSourceApplicationName = "剪贴板"

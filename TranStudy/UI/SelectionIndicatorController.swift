@@ -6,6 +6,9 @@ final class SelectionIndicatorController: NSObject, SelectionIndicatorPresenting
   private var onSelect: (() -> Void)?
 
   func present(_ candidate: SelectionCandidate, onSelect: @escaping () -> Void) {
+    selectionDebugLog(
+      "present indicator: app=\(candidate.sourceApplicationName) endpoint=\(candidate.screenPosition)"
+    )
     dismiss()
     self.onSelect = onSelect
 
@@ -57,9 +60,13 @@ final class SelectionIndicatorController: NSObject, SelectionIndicatorPresenting
     position(panel, near: candidate.screenPosition)
     self.panel = panel
     panel.orderFrontRegardless()
+    selectionDebugLog("indicator visible: frame=\(panel.frame)")
   }
 
   func dismiss() {
+    if panel != nil {
+      selectionDebugLog("indicator dismissed")
+    }
     panel?.close()
     panel = nil
     onSelect = nil
@@ -67,6 +74,7 @@ final class SelectionIndicatorController: NSObject, SelectionIndicatorPresenting
 
   @objc
   private func selectCurrentSelection() {
+    selectionDebugLog("indicator button action received")
     let action = onSelect
     dismiss()
     action?()

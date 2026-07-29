@@ -23,6 +23,7 @@ final class ApplicationCoordinator {
         translationPanel?.dismissForExternalInteraction()
       },
       onSelection: { [weak translationPanel] snapshot in
+        selectionDebugLog("coordinator forwarding snapshot to translation panel")
         translationPanel?.presentSelectionTranslation(snapshot)
       }
     )
@@ -34,6 +35,7 @@ final class ApplicationCoordinator {
     }
 
     hasStarted = true
+    selectionDebugLog("application coordinator starting selection pipeline")
     shortcutMonitor.start { [weak self] in
       self?.presentClipboardTranslation()
     }

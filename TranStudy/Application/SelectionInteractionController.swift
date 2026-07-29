@@ -1,5 +1,11 @@
 import Foundation
 
+func selectionDebugLog(_ message: @autoclosure () -> String) {
+  #if DEBUG
+    print("[SelectionDebug] \(message())")
+  #endif
+}
+
 enum SelectionInputEvent: Equatable, Sendable {
   case leftMouseDown
   case leftMouseUp(at: CGPoint)
@@ -58,40 +64,46 @@ final class SelectionInteractionController {
 
   func start() {
     guard !hasStarted else {
+      selectionDebugLog("interaction controller start ignored: already started")
       return
     }
 
     hasStarted = true
+    selectionDebugLog("interaction controller started")
     events.start { [weak self] event in
       self?.handle(event)
     }
   }
 
   private func handle(_ event: SelectionInputEvent) {
+    selectionDebugLog("interaction received \(event)")
     switch event {
     case .leftMouseDown:
-      dismissCandidate()
+      dismissCandidate(reason: "new mouse gesture")
       onExternalInteraction()
       isTrackingMouseGesture = true
       selection.beginMouseSelectionGesture()
     case .leftMouseUp(let screenPosition):
       guard isTrackingMouseGesture else {
+        selectionDebugLog("mouse up ignored: no tracked mouse down")
         return
       }
       isTrackingMouseGesture = false
+      selectionDebugLog("mouse gesture ended at \(screenPosition)")
       prepareCandidate(at: screenPosition)
     case .escape, .keyboardActivity:
       isTrackingMouseGesture = false
-      dismissCandidate()
+      dismissCandidate(reason: "escape or external keyboard activity")
       onExternalInteraction()
     case .localApplicationInteraction:
       isTrackingMouseGesture = false
-      dismissCandidate()
+      dismissCandidate(reason: "local app interaction")
     }
   }
 
   private func prepareCandidate(at screenPosition: CGPoint) {
-    dismissCandidate()
+    dismissCandidate(reason: "prepare new candidate")
+    selectionDebugLog("waiting \(candidateDelay) before reading selection")
     candidateTask = Task { [weak self] in
       guard let self else {
         return
@@ -99,15 +111,21 @@ final class SelectionInteractionController {
 
       try? await Task.sleep(for: candidateDelay)
       guard !Task.isCancelled else {
+        selectionDebugLog("candidate read cancelled during delay")
         return
       }
       guard let candidate = await selection.selectionCandidate(at: screenPosition) else {
+        selectionDebugLog("candidate rejected: provider returned no new selection")
         return
       }
       guard !Task.isCancelled else {
+        selectionDebugLog("candidate read cancelled after provider response")
         return
       }
 
+      selectionDebugLog(
+        "candidate accepted: app=\(candidate.sourceApplicationName) position=\(candidate.screenPosition)"
+      )
       indicator.present(candidate) { [weak self] in
         self?.captureSelection()
       }
@@ -117,19 +135,27 @@ final class SelectionInteractionController {
   }
 
   private func captureSelection() {
+    selectionDebugLog("indicator clicked: capturing full selection snapshot")
     candidateTask?.cancel()
     candidateValidationTask?.cancel()
     lifetimeTask?.cancel()
     indicator.dismiss()
     captureTask?.cancel()
     captureTask = Task { [weak self] in
-      guard
-        let self,
-        let snapshot = await selection.currentSelection(),
-        !Task.isCancelled
-      else {
+      guard let self else {
         return
       }
+      guard let snapshot = await selection.currentSelection() else {
+        selectionDebugLog("snapshot capture failed: provider returned nil")
+        return
+      }
+      guard !Task.isCancelled else {
+        selectionDebugLog("snapshot capture cancelled")
+        return
+      }
+      selectionDebugLog(
+        "snapshot captured: app=\(snapshot.sourceApplicationName) selectedLength=\(snapshot.selectedText.count) targetSentenceLength=\(snapshot.targetSentence.count)"
+      )
       onSelection(snapshot)
     }
   }
@@ -146,7 +172,8 @@ final class SelectionInteractionController {
           return
         }
         guard await selection.isSelectionCandidateCurrent() else {
-          dismissCandidate()
+          selectionDebugLog("candidate invalidated: selection changed or disappeared")
+          dismissCandidate(reason: "candidate validation failed")
           return
         }
       }
@@ -163,11 +190,13 @@ final class SelectionInteractionController {
       guard !Task.isCancelled else {
         return
       }
+      selectionDebugLog("indicator expired after \(indicatorLifetime)")
       indicator.dismiss()
     }
   }
 
-  private func dismissCandidate() {
+  private func dismissCandidate(reason: String) {
+    selectionDebugLog("dismiss candidate: \(reason)")
     candidateTask?.cancel()
     candidateTask = nil
     candidateValidationTask?.cancel()

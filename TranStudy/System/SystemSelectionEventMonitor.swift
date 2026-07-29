@@ -7,9 +7,11 @@ final class SystemSelectionEventMonitor: SelectionEventMonitoring {
 
   func start(handler: @escaping (SelectionInputEvent) -> Void) {
     guard globalMonitor == nil, localMonitor == nil else {
+      selectionDebugLog("event monitor start ignored: already started")
       return
     }
 
+    selectionDebugLog("installing global and local mouse/key monitors")
     let globalMonitor = NSEvent.addGlobalMonitorForEvents(
       matching: [.leftMouseDown, .leftMouseUp, .keyDown]
     ) { event in
@@ -17,6 +19,7 @@ final class SystemSelectionEventMonitor: SelectionEventMonitoring {
         return
       }
 
+      selectionDebugLog("global NSEvent \(event.type.rawValue) -> \(inputEvent)")
       Task { @MainActor in
         handler(inputEvent)
       }
@@ -35,7 +38,10 @@ final class SystemSelectionEventMonitor: SelectionEventMonitoring {
           .localApplicationInteraction
         }
       if !isIndicatorClick {
+        selectionDebugLog("local NSEvent \(event.type.rawValue) -> \(inputEvent)")
         handler(inputEvent)
+      } else {
+        selectionDebugLog("local mouse down belongs to selection indicator")
       }
       return event
     }
@@ -47,10 +53,12 @@ final class SystemSelectionEventMonitor: SelectionEventMonitoring {
       if let localMonitor {
         NSEvent.removeMonitor(localMonitor)
       }
+      selectionDebugLog("event monitor installation failed")
       return
     }
     self.globalMonitor = EventMonitorToken(globalMonitor)
     self.localMonitor = EventMonitorToken(localMonitor)
+    selectionDebugLog("event monitors installed")
   }
 
   deinit {

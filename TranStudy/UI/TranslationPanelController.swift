@@ -28,6 +28,9 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
   }
 
   func presentSelectionTranslation(_ snapshot: SelectionSnapshot) {
+    selectionDebugLog(
+      "present selection translation panel: app=\(snapshot.sourceApplicationName) selectedLength=\(snapshot.selectedText.count)"
+    )
     translationTask?.cancel()
     shell.prepareSelectionTranslationPresentation(
       sourceApplicationName: snapshot.sourceApplicationName
@@ -37,7 +40,9 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
       guard let self else {
         return
       }
+      selectionDebugLog("selection translation task started")
       await shell.translateSelection(snapshot)
+      selectionDebugLog("selection translation task returned to panel controller")
     }
   }
 
@@ -45,10 +50,12 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     guard panel != nil || translationTask != nil else {
       return
     }
+    selectionDebugLog("translation panel dismissed by external interaction")
     dismiss()
   }
 
   func dismiss() {
+    selectionDebugLog("translation panel dismiss requested")
     translationTask?.cancel()
     translationTask = nil
     shell.cancelTranslation()
@@ -56,6 +63,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
   }
 
   func windowWillClose(_ notification: Notification) {
+    selectionDebugLog("translation panel window will close")
     translationTask?.cancel()
     translationTask = nil
     shell.cancelTranslation()
@@ -71,6 +79,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     guard panelHasBeenKey else {
       return
     }
+    selectionDebugLog("translation panel resigned key after interaction")
     dismiss()
   }
 
