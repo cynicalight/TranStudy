@@ -132,45 +132,57 @@ final class ApplicationShell {
 
   func translateClipboard() async {
     guard
-      let sourceText = environment.clipboard.readText()?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-      !sourceText.isEmpty
+      let sourceText = environment.clipboard.readText()
     else {
       translationStatus = .failed
       return
     }
 
-    if Self.isWordOrShortPhrase(sourceText) {
-      await translate(
-        TranslationRequest(sourceText: sourceText)
-      )
-    } else {
-      await translateLongText(sourceText)
-    }
+    await translateInput(sourceText, selection: nil)
   }
 
   func translateSelection(_ snapshot: SelectionSnapshot) async {
-    let sourceText = snapshot.selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard Self.isWordOrShortPhrase(sourceText) else {
+    await translateInput(snapshot.selectedText, selection: snapshot)
+  }
+
+  private func translateInput(
+    _ inputText: String,
+    selection: SelectionSnapshot?
+  ) async {
+    let sourceText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !sourceText.isEmpty else {
       selectionDebugLog(
-        "selection translation rejected: selectedLength=\(sourceText.count) is not a word or short phrase"
+        "translation input rejected: source=\(selection == nil ? "clipboard" : "selection") reason=empty"
       )
       translationStatus = .failed
       return
     }
 
+    let isWordOrShortPhrase = Self.isWordOrShortPhrase(sourceText)
+    if let selection {
+      translationSourceApplicationName = selection.sourceApplicationName
+    }
     selectionDebugLog(
-      "selection translation accepted: selectedLength=\(sourceText.count) hasContext=\(snapshot.hasContext)"
+      "translation input classified: source=\(selection == nil ? "clipboard" : "selection") selectedLength=\(sourceText.count) mode=\(isWordOrShortPhrase ? "word-or-phrase" : "long-text")"
     )
-    isSelectionContextUnavailable = !snapshot.hasContext
-    translationSourceApplicationName = snapshot.sourceApplicationName
-    await translate(
-      TranslationRequest(
-        sourceText: sourceText,
-        context: snapshot.translationContext,
-        kind: .contextualSelection,
-        targetSentence: snapshot.targetSentence
-      ))
+
+    if isWordOrShortPhrase {
+      if let selection {
+        isSelectionContextUnavailable = !selection.hasContext
+        await translate(
+          TranslationRequest(
+            sourceText: sourceText,
+            context: selection.translationContext,
+            kind: .contextualSelection,
+            targetSentence: selection.targetSentence
+          ))
+      } else {
+        await translate(TranslationRequest(sourceText: sourceText))
+      }
+    } else {
+      isSelectionContextUnavailable = false
+      await translateLongText(sourceText)
+    }
   }
 
   private func translate(_ request: TranslationRequest) async {
