@@ -12,7 +12,6 @@ struct DailyReviewQueueBuilderTests {
 
   @Test("overdue days stay oldest-first while equal-day cards use a reproducible seed")
   func queueOrdersOverdueDaysAndReproducesSeededTies() {
-    let reviewDate = date(year: 2026, month: 7, day: 10)
     let oldest = item("oldest", dueAt: date(year: 2026, month: 7, day: 7))
     let newest = item("newest", dueAt: date(year: 2026, month: 7, day: 9))
     let tied = [
@@ -25,17 +24,14 @@ struct DailyReviewQueueBuilderTests {
 
     let first = builder.makeQueue(
       from: [newest] + tied + [oldest],
-      at: reviewDate,
       seed: 42
     )
     let repeated = builder.makeQueue(
       from: [newest] + tied + [oldest],
-      at: reviewDate,
       seed: 42
     )
     let anotherSeed = builder.makeQueue(
       from: [newest] + tied + [oldest],
-      at: reviewDate,
       seed: 84
     )
 
@@ -59,7 +55,6 @@ struct DailyReviewQueueBuilderTests {
     let unrelated = item("ocean", dueAt: newerDueAt)
     let queue = DailyReviewQueueBuilder(calendar: calendar).makeQueue(
       from: [word, sentence, unrelated],
-      at: date(year: 2026, month: 7, day: 10),
       seed: 7
     )
 
@@ -81,7 +76,6 @@ struct DailyReviewQueueBuilderTests {
 
     let queue = DailyReviewQueueBuilder(calendar: calendar).makeQueue(
       from: items,
-      at: date(year: 2026, month: 7, day: 10),
       seed: 12
     )
 

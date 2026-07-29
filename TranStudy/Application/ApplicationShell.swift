@@ -115,7 +115,6 @@ final class ApplicationShell {
       let dueItems = try await environment.learningStore.dueItems(at: now)
       let queue = DailyReviewQueueBuilder().makeQueue(
         from: dueItems,
-        at: now,
         seed: DailyReviewQueueBuilder.seed(for: now)
       )
       let batches = queue.batches

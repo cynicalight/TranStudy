@@ -20,15 +20,11 @@ struct DailyReviewQueueBuilder {
   }
 
   func makeQueue(
-    from items: [LearningItem],
-    at reviewDate: Date,
+    from dueItems: [LearningItem],
     seed: UInt64
   ) -> DailyReviewQueue {
-    let dueItems = items.filter {
-      !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= reviewDate
-    }
     let groups = Dictionary(grouping: dueItems) {
-      calendar.startOfDay(for: $0.nextReviewAt ?? reviewDate)
+      calendar.startOfDay(for: $0.nextReviewAt ?? .distantPast)
     }
     var generator = SeededRandomNumberGenerator(seed: seed)
     var orderedItems: [LearningItem] = []
