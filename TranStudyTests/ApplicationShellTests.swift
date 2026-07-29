@@ -45,6 +45,32 @@ struct ApplicationShellTests {
     #expect(shell.translationDraft?.contextualMeaning == "奔跑")
   }
 
+  @Test("translated examples collapse line breaks before becoming a draft")
+  func translatedExamplesCollapseLineBreaksBeforeBecomingDraft() async {
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "resilient"),
+        translation: TestTranslationProvider(
+          result: TranslationResult(
+            sourceText: "resilient",
+            canonicalForm: "resilient",
+            pronunciation: "/rɪˈzɪliənt/",
+            partOfSpeech: "adjective",
+            contextualMeaning: "有韧性的",
+            exampleSentence: "The team remained resilient\nafter the setback.",
+            sentenceTranslation: "团队在挫折后\n依然保持韧性。"
+          ))
+      ))
+
+    await shell.translateClipboard()
+
+    #expect(
+      shell.translationDraft?.exampleSentence
+        == "The team remained resilient after the setback."
+    )
+    #expect(shell.translationDraft?.sentenceTranslation == "团队在挫折后 依然保持韧性。")
+  }
+
   @Test("a captured mouse selection translates with its surrounding context")
   func capturedMouseSelectionTranslatesWithContext() async throws {
     let translator = TestTranslationProvider(

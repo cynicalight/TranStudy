@@ -33,7 +33,7 @@ struct TranslationDraft: Equatable, Sendable {
     self.pronunciation = pronunciation
     self.partOfSpeech = partOfSpeech
     self.contextualMeaning = contextualMeaning
-    self.exampleSentence = exampleSentence
-    self.sentenceTranslation = sentenceTranslation
+    self.exampleSentence = TranslationTextNormalizer.collapseWhitespace(in: exampleSentence)
+    self.sentenceTranslation = TranslationTextNormalizer.collapseWhitespace(in: sentenceTranslation)
   }
 }
