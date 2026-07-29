@@ -56,7 +56,7 @@ struct LearningLibraryView: View {
           )
         },
         onDelete: {
-          shell.stageLibraryItemDeletion(itemID: item.id)
+          await shell.stageLibraryItemDeletion(itemID: item.id)
         },
         scheduleActions: LearningReviewScheduleActions(
           setNextReviewDate: { nextReviewAt in
@@ -81,17 +81,6 @@ struct LearningLibraryView: View {
       if let pendingDeletion = shell.pendingLibraryDeletion {
         libraryDeletionBanner(pendingDeletion)
       }
-    }
-    .task(id: shell.pendingLibraryDeletion?.id) {
-      guard let itemID = shell.pendingLibraryDeletion?.id else {
-        return
-      }
-      do {
-        try await Task.sleep(for: .seconds(10))
-      } catch {
-        return
-      }
-      await shell.finalizeLibraryItemDeletion(itemID: itemID)
     }
     .alert(
       "合并到已有词条？",
@@ -123,7 +112,9 @@ struct LearningLibraryView: View {
       .lineLimit(1)
       Spacer()
       Button("撤销") {
-        shell.undoLibraryItemDeletion()
+        Task {
+          await shell.undoLibraryItemDeletion()
+        }
       }
       .buttonStyle(.borderedProminent)
       .keyboardShortcut("z", modifiers: .command)
@@ -483,7 +474,7 @@ struct LearningLibraryView: View {
 private struct LearningItemEditorView: View {
   let item: LearningItem
   let onSave: (String, LearningItemDetailsUpdate) async -> Bool
-  let onDelete: () -> Bool
+  let onDelete: () async -> Bool
   let scheduleActions: LearningReviewScheduleActions
   @Environment(\.dismiss) private var dismiss
   @State private var canonicalForm: String
@@ -502,7 +493,7 @@ private struct LearningItemEditorView: View {
   init(
     item: LearningItem,
     onSave: @escaping (String, LearningItemDetailsUpdate) async -> Bool,
-    onDelete: @escaping () -> Bool,
+    onDelete: @escaping () async -> Bool,
     scheduleActions: LearningReviewScheduleActions
   ) {
     self.item = item
@@ -670,11 +661,13 @@ private struct LearningItemEditorView: View {
     ) {
       Button("取消", role: .cancel) {}
       Button("删除", role: .destructive) {
-        deleteFailed = false
-        if onDelete() {
-          dismiss()
-        } else {
-          deleteFailed = true
+        Task {
+          deleteFailed = false
+          if await onDelete() {
+            dismiss()
+          } else {
+            deleteFailed = true
+          }
         }
       }
     } message: {

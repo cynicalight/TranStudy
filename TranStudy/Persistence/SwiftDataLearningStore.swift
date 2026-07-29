@@ -20,7 +20,9 @@ final class SwiftDataLearningStore: LearningStoring {
   }
 
   func summary(at date: Date) async throws -> LearningSummary {
-    let records = try consolidatedRecords().filter { $0.archivedAt == nil }
+    let records = try consolidatedRecords().filter {
+      $0.archivedAt == nil && $0.deletionScheduledAt == nil
+    }
     let dueCount = records.count(where: {
       !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= date
     })
@@ -372,6 +374,56 @@ final class SwiftDataLearningStore: LearningStoring {
     try context.save()
   }
 
+  func scheduleDeletion(itemID: UUID, deleteAt: Date) async throws {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+    record.deletionScheduledAt = deleteAt
+    try saveOrRollback()
+  }
+
+  func cancelDeletion(itemID: UUID) async throws {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+    record.deletionScheduledAt = nil
+    try saveOrRollback()
+  }
+
+  func pendingDeletion() async throws -> PendingLearningDeletion? {
+    let scheduledRecords = try consolidatedRecords()
+      .filter { $0.deletionScheduledAt != nil }
+      .sorted {
+        ($0.deletionScheduledAt ?? .distantFuture)
+          < ($1.deletionScheduledAt ?? .distantFuture)
+      }
+    guard
+      let record = scheduledRecords.first,
+      let deleteAt = record.deletionScheduledAt
+    else {
+      return nil
+    }
+    return PendingLearningDeletion(
+      item: learningItem(from: record),
+      deleteAt: deleteAt
+    )
+  }
+
+  func deleteExpiredItems(at date: Date) async throws {
+    let expiredRecords = try consolidatedRecords().filter {
+      ($0.deletionScheduledAt ?? .distantFuture) <= date
+    }
+    guard !expiredRecords.isEmpty else {
+      return
+    }
+    for record in expiredRecords {
+      context.delete(record)
+    }
+    try saveOrRollback()
+  }
+
   func delete(itemID: UUID) async throws {
     let records = try consolidatedRecords()
     guard let record = records.first(where: { $0.id == itemID }) else {
@@ -418,44 +470,46 @@ final class SwiftDataLearningStore: LearningStoring {
 
   private func learningItems(archived: Bool) throws -> [LearningItem] {
     try consolidatedRecords()
-      .filter { ($0.archivedAt != nil) == archived }
-      .sorted { effectiveLastEncounteredAt(for: $0) > effectiveLastEncounteredAt(for: $1) }
-      .map { record in
-        let encounters = encounterItems(for: record)
-
-        return LearningItem(
-          id: record.id,
-          kind: learningKind(for: record),
-          sourceText: record.sourceText,
-          canonicalForm: record.canonicalForm,
-          pronunciation: record.pronunciation,
-          partOfSpeech: record.partOfSpeech,
-          contextualMeaning: record.contextualMeaning,
-          exampleSentence: record.exampleSentence,
-          sentenceTranslation: record.sentenceTranslation,
-          sourceApplicationName: record.sourceApplicationName,
-          createdAt: record.createdAt,
-          encounters: encounters,
-          userNote: record.userNote,
-          customExamples: record.customExamples
-            .sorted {
-              if $0.sortOrder != $1.sortOrder {
-                return $0.sortOrder < $1.sortOrder
-              }
-              return $0.id.uuidString < $1.id.uuidString
-            }
-            .map {
-              LearningCustomExample(
-                id: $0.id,
-                englishText: $0.englishText,
-                chineseTranslation: $0.chineseTranslation
-              )
-            },
-          nextReviewAt: record.nextReviewAt,
-          isPaused: record.isPaused,
-          archivedAt: record.archivedAt
-        )
+      .filter {
+        ($0.archivedAt != nil) == archived && $0.deletionScheduledAt == nil
       }
+      .sorted { effectiveLastEncounteredAt(for: $0) > effectiveLastEncounteredAt(for: $1) }
+      .map(learningItem(from:))
+  }
+
+  private func learningItem(from record: LearningRecord) -> LearningItem {
+    LearningItem(
+      id: record.id,
+      kind: learningKind(for: record),
+      sourceText: record.sourceText,
+      canonicalForm: record.canonicalForm,
+      pronunciation: record.pronunciation,
+      partOfSpeech: record.partOfSpeech,
+      contextualMeaning: record.contextualMeaning,
+      exampleSentence: record.exampleSentence,
+      sentenceTranslation: record.sentenceTranslation,
+      sourceApplicationName: record.sourceApplicationName,
+      createdAt: record.createdAt,
+      encounters: encounterItems(for: record),
+      userNote: record.userNote,
+      customExamples: record.customExamples
+        .sorted {
+          if $0.sortOrder != $1.sortOrder {
+            return $0.sortOrder < $1.sortOrder
+          }
+          return $0.id.uuidString < $1.id.uuidString
+        }
+        .map {
+          LearningCustomExample(
+            id: $0.id,
+            englishText: $0.englishText,
+            chineseTranslation: $0.chineseTranslation
+          )
+        },
+      nextReviewAt: record.nextReviewAt,
+      isPaused: record.isPaused,
+      archivedAt: record.archivedAt
+    )
   }
 
   private func consolidatedRecords() throws -> [LearningRecord] {

@@ -75,6 +75,7 @@ final class ApplicationShell {
   private(set) var translationShortcutRegistrationStatus: TranslationShortcutRegistrationStatus =
     .unknown
   @ObservationIgnored var onTranslationShortcutChange: ((TranslationShortcutKey) -> Bool)?
+  @ObservationIgnored private var pendingLibraryDeletionTask: Task<Void, Never>?
   private var activeTranslationID: UUID?
   private var translationSuggestedCanonicalForm = ""
   private var translationSourceApplicationName = "剪贴板"
@@ -495,6 +496,21 @@ final class ApplicationShell {
 
   func refreshLibrary() async {
     do {
+      try await environment.learningStore.deleteExpiredItems(at: environment.clock.now)
+      let persistedDeletion = try await environment.learningStore.pendingDeletion()
+      if let persistedDeletion,
+        pendingLibraryDeletion?.id != persistedDeletion.item.id
+      {
+        pendingLibraryDeletion = persistedDeletion.item
+        scheduleLibraryDeletionFinalization(
+          itemID: persistedDeletion.item.id,
+          deleteAt: persistedDeletion.deleteAt
+        )
+      } else if persistedDeletion == nil {
+        pendingLibraryDeletionTask?.cancel()
+        pendingLibraryDeletionTask = nil
+        pendingLibraryDeletion = nil
+      }
       learningItems = try await environment.learningStore.items()
       archivedLearningItems = try await environment.learningStore.archivedItems()
       rebuildLibrarySearchIndex()
@@ -562,19 +578,45 @@ final class ApplicationShell {
     await setSelectedLibraryItemsArchived(at: nil)
   }
 
-  func stageLibraryItemDeletion(itemID: UUID) -> Bool {
+  func stageLibraryItemDeletion(itemID: UUID) async -> Bool {
     guard pendingLibraryDeletion == nil,
       let item = (learningItems + archivedLearningItems).first(where: { $0.id == itemID })
     else {
       return false
     }
-    pendingLibraryDeletion = item
-    selectedLearningItemIDs.remove(itemID)
-    return true
+    let deleteAt = environment.clock.now.addingTimeInterval(10)
+    do {
+      try await environment.learningStore.scheduleDeletion(
+        itemID: itemID,
+        deleteAt: deleteAt
+      )
+      pendingLibraryDeletion = item
+      selectedLearningItemIDs.remove(itemID)
+      scheduleLibraryDeletionFinalization(itemID: itemID, deleteAt: deleteAt)
+      await refreshTodayReview()
+      await refreshLibrary()
+      return true
+    } catch {
+      return false
+    }
   }
 
-  func undoLibraryItemDeletion() {
-    pendingLibraryDeletion = nil
+  @discardableResult
+  func undoLibraryItemDeletion() async -> Bool {
+    guard let itemID = pendingLibraryDeletion?.id else {
+      return false
+    }
+    do {
+      try await environment.learningStore.cancelDeletion(itemID: itemID)
+      pendingLibraryDeletionTask?.cancel()
+      pendingLibraryDeletionTask = nil
+      pendingLibraryDeletion = nil
+      await refreshTodayReview()
+      await refreshLibrary()
+      return true
+    } catch {
+      return false
+    }
   }
 
   @discardableResult
@@ -584,13 +626,34 @@ final class ApplicationShell {
     }
     do {
       try await environment.learningStore.delete(itemID: itemID)
+      pendingLibraryDeletionTask = nil
       self.pendingLibraryDeletion = nil
       await refreshTodayReview()
       await refreshLibrary()
       return true
     } catch {
+      pendingLibraryDeletionTask = nil
       self.pendingLibraryDeletion = nil
       return false
+    }
+  }
+
+  private func scheduleLibraryDeletionFinalization(
+    itemID: UUID,
+    deleteAt: Date
+  ) {
+    pendingLibraryDeletionTask?.cancel()
+    let remainingSeconds = max(0, deleteAt.timeIntervalSince(environment.clock.now))
+    pendingLibraryDeletionTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: .seconds(remainingSeconds))
+      } catch {
+        return
+      }
+      guard !Task.isCancelled else {
+        return
+      }
+      await self?.finalizeLibraryItemDeletion(itemID: itemID)
     }
   }
 

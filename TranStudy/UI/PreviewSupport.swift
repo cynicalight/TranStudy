@@ -219,6 +219,16 @@
 
     func setArchived(itemIDs: [UUID], archivedAt: Date?) async throws {}
 
+    func scheduleDeletion(itemID: UUID, deleteAt: Date) async throws {}
+
+    func cancelDeletion(itemID: UUID) async throws {}
+
+    func pendingDeletion() async throws -> PendingLearningDeletion? {
+      nil
+    }
+
+    func deleteExpiredItems(at date: Date) async throws {}
+
     func delete(itemID: UUID) async throws {}
 
     func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws {}

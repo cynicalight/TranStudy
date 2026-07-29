@@ -404,23 +404,16 @@ struct ApplicationShellTests {
 
   @Test("a pending library deletion can be undone before persistence")
   func pendingLibraryDeletionCanBeUndone() async {
-    let item = makeLearningItem(
-      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
-      canonicalForm: "run"
-    )
-    let learningStore = TestLearningStore(items: [item])
-    let shell = ApplicationShell(
-      environment: .test(learningStore: learningStore)
-    )
-    await shell.refreshLibrary()
+    let (item, learningStore, shell) = await makeLibraryDeletionContext()
 
-    let didStage = shell.stageLibraryItemDeletion(itemID: item.id)
+    let didStage = await shell.stageLibraryItemDeletion(itemID: item.id)
 
     #expect(didStage)
     #expect(shell.pendingLibraryDeletion == item)
     #expect(shell.displayedLearningItems.isEmpty)
+    #expect(shell.learningItems.isEmpty)
 
-    shell.undoLibraryItemDeletion()
+    await shell.undoLibraryItemDeletion()
 
     #expect(shell.pendingLibraryDeletion == nil)
     #expect(shell.displayedLearningItems == [item])
@@ -429,21 +422,35 @@ struct ApplicationShellTests {
 
   @Test("finalizing a pending library deletion permanently removes the card")
   func finalizingPendingLibraryDeletionPersistsRemoval() async {
-    let item = makeLearningItem(
-      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
-      canonicalForm: "run"
-    )
-    let learningStore = TestLearningStore(items: [item])
-    let shell = ApplicationShell(
-      environment: .test(learningStore: learningStore)
-    )
-    await shell.refreshLibrary()
-    #expect(shell.stageLibraryItemDeletion(itemID: item.id))
+    let (item, learningStore, shell) = await makeLibraryDeletionContext()
+    let didStage = await shell.stageLibraryItemDeletion(itemID: item.id)
+    #expect(didStage)
 
     await shell.finalizeLibraryItemDeletion(itemID: item.id)
 
     #expect(learningStore.deletedItemIDs == [item.id])
     #expect(shell.pendingLibraryDeletion == nil)
+    #expect(shell.learningItems.isEmpty)
+  }
+
+  @Test("refreshing the library resumes a persisted pending deletion")
+  func refreshingLibraryResumesPersistedDeletion() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let deletion = PendingLearningDeletion(
+      item: item,
+      deleteAt: Date(timeIntervalSince1970: 1_244)
+    )
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(pendingDeletion: deletion)
+      ))
+
+    await shell.refreshLibrary()
+
+    #expect(shell.pendingLibraryDeletion == item)
     #expect(shell.learningItems.isEmpty)
   }
 
@@ -766,6 +773,23 @@ struct ApplicationShellTests {
       createdAt: Date(timeIntervalSince1970: 1_000),
       nextReviewAt: Date(timeIntervalSince1970: 1_200)
     )
+  }
+
+  private func makeLibraryDeletionContext() async -> (
+    item: LearningItem,
+    store: TestLearningStore,
+    shell: ApplicationShell
+  ) {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let store = TestLearningStore(items: [item])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: store)
+    )
+    await shell.refreshLibrary()
+    return (item, store, shell)
   }
 
   @Test("sentence clipboard content waits for the long-text issue")
@@ -1193,6 +1217,8 @@ private final class TestLearningStore: LearningStoring {
   private var storedItems: [LearningItem]
   private var storedArchivedItems: [LearningItem]
   private var storedDueItems: [LearningItem]
+  private var storedPendingDeletion: PendingLearningDeletion?
+  private var pendingDeletionWasDue = false
   private let storedMergeSummary: LearningMergeSummary?
   private var canonicalUpdateResults: [LearningCanonicalUpdateResult]
   private let detailsUpdateError: TestLearningStoreError?
@@ -1201,6 +1227,7 @@ private final class TestLearningStore: LearningStoring {
     items: [LearningItem] = [],
     archivedItems: [LearningItem] = [],
     dueItems: [LearningItem] = [],
+    pendingDeletion: PendingLearningDeletion? = nil,
     mergeSummary: LearningMergeSummary? = nil,
     canonicalUpdateResults: [LearningCanonicalUpdateResult] = [],
     detailsUpdateError: TestLearningStoreError? = nil
@@ -1208,6 +1235,7 @@ private final class TestLearningStore: LearningStoring {
     storedItems = items
     storedArchivedItems = archivedItems
     storedDueItems = dueItems
+    storedPendingDeletion = pendingDeletion
     storedMergeSummary = mergeSummary
     self.canonicalUpdateResults = canonicalUpdateResults
     self.detailsUpdateError = detailsUpdateError
@@ -1306,11 +1334,55 @@ private final class TestLearningStore: LearningStoring {
     }
   }
 
+  func scheduleDeletion(itemID: UUID, deleteAt: Date) async throws {
+    guard
+      let item = (storedItems + storedArchivedItems).first(where: { $0.id == itemID })
+    else {
+      throw TestLearningStoreError.updateFailed
+    }
+    storedPendingDeletion = PendingLearningDeletion(item: item, deleteAt: deleteAt)
+    pendingDeletionWasDue = storedDueItems.contains(where: { $0.id == itemID })
+    storedItems.removeAll { $0.id == itemID }
+    storedArchivedItems.removeAll { $0.id == itemID }
+    storedDueItems.removeAll { $0.id == itemID }
+  }
+
+  func cancelDeletion(itemID: UUID) async throws {
+    guard let deletion = storedPendingDeletion, deletion.item.id == itemID else {
+      throw TestLearningStoreError.updateFailed
+    }
+    if deletion.item.archivedAt == nil {
+      storedItems.append(deletion.item)
+    } else {
+      storedArchivedItems.append(deletion.item)
+    }
+    if pendingDeletionWasDue {
+      storedDueItems.append(deletion.item)
+    }
+    storedPendingDeletion = nil
+    pendingDeletionWasDue = false
+  }
+
+  func pendingDeletion() async throws -> PendingLearningDeletion? {
+    storedPendingDeletion
+  }
+
+  func deleteExpiredItems(at date: Date) async throws {
+    guard let deletion = storedPendingDeletion, deletion.deleteAt <= date else {
+      return
+    }
+    try await delete(itemID: deletion.item.id)
+  }
+
   func delete(itemID: UUID) async throws {
     deletedItemIDs.append(itemID)
     storedItems.removeAll { $0.id == itemID }
     storedArchivedItems.removeAll { $0.id == itemID }
     storedDueItems.removeAll { $0.id == itemID }
+    if storedPendingDeletion?.item.id == itemID {
+      storedPendingDeletion = nil
+      pendingDeletionWasDue = false
+    }
   }
 
   func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws {

@@ -20,6 +20,7 @@ final class LearningRecord {
   var nextReviewAt: Date?
   var isPaused: Bool = false
   var archivedAt: Date?
+  var deletionScheduledAt: Date?
   var reviewIntervalDays: Double = 1
   var reviewEase: Double = 2.5
   var reviewCount: Int = 0

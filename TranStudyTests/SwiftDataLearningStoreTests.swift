@@ -158,6 +158,65 @@ struct SwiftDataLearningStoreTests {
     #expect(try verificationContext.fetch(FetchDescriptor<LearningCustomExampleRecord>()).isEmpty)
   }
 
+  @Test("scheduled deletion survives store recreation and leaves review immediately")
+  func scheduledDeletionIsDurableAndExcludedFromLearning() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    let dueAt = Date(timeIntervalSince1970: 2_000)
+    let deleteAt = Date(timeIntervalSince1970: 3_000)
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "ran",
+          canonicalForm: "run",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: Date(timeIntervalSince1970: 1_000),
+        nextReviewAt: dueAt
+      ))
+    let item = try #require(try await store.items().first)
+
+    try await store.scheduleDeletion(itemID: item.id, deleteAt: deleteAt)
+
+    #expect(try await store.items().isEmpty)
+    #expect(try await store.dueItems(at: dueAt).isEmpty)
+    #expect(
+      try await store.summary(at: dueAt)
+        == LearningSummary(dueCount: 0, wordCount: 0, sentenceCount: 0)
+    )
+
+    let recreatedStore = SwiftDataLearningStore(container: container)
+    #expect(
+      try await recreatedStore.pendingDeletion()
+        == PendingLearningDeletion(item: item, deleteAt: deleteAt)
+    )
+
+    try await recreatedStore.cancelDeletion(itemID: item.id)
+    #expect(try await recreatedStore.items().map(\.id) == [item.id])
+
+    try await recreatedStore.scheduleDeletion(itemID: item.id, deleteAt: deleteAt)
+    try await recreatedStore.deleteExpiredItems(at: deleteAt.addingTimeInterval(-1))
+    #expect(try await recreatedStore.pendingDeletion() != nil)
+
+    try await recreatedStore.deleteExpiredItems(at: deleteAt)
+    #expect(try await recreatedStore.pendingDeletion() == nil)
+    let verificationContext = ModelContext(container)
+    #expect(try verificationContext.fetch(FetchDescriptor<LearningRecord>()).isEmpty)
+    #expect(try verificationContext.fetch(FetchDescriptor<LearningEncounterRecord>()).isEmpty)
+  }
+
   @Test("editing learning details preserves encounters and survives reopening")
   func editingLearningDetailsPreservesHistory() async throws {
     let directory = FileManager.default.temporaryDirectory

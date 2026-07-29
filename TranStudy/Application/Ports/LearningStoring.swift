@@ -175,6 +175,11 @@ struct LearningItem: Equatable, Identifiable, Sendable {
   }
 }
 
+struct PendingLearningDeletion: Equatable, Sendable {
+  let item: LearningItem
+  let deleteAt: Date
+}
+
 @MainActor
 protocol LearningStoring {
   func summary(at date: Date) async throws -> LearningSummary
@@ -204,6 +209,10 @@ protocol LearningStoring {
   func items() async throws -> [LearningItem]
   func archivedItems() async throws -> [LearningItem]
   func setArchived(itemIDs: [UUID], archivedAt: Date?) async throws
+  func scheduleDeletion(itemID: UUID, deleteAt: Date) async throws
+  func cancelDeletion(itemID: UUID) async throws
+  func pendingDeletion() async throws -> PendingLearningDeletion?
+  func deleteExpiredItems(at date: Date) async throws
   func delete(itemID: UUID) async throws
   func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws
   func setReviewPaused(itemID: UUID, isPaused: Bool) async throws
