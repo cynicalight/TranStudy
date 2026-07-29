@@ -114,14 +114,16 @@ private struct SelectableLongText: NSViewRepresentable {
     }
     if textView.string != text {
       textView.string = text
-      textView.setSelectedRange(NSRange(location: 0, length: 0))
-      selectedRange = NSRange(location: 0, length: 0)
+      let emptyRange = NSRange(location: 0, length: 0)
+      textView.setSelectedRange(emptyRange)
+      context.coordinator.publishSelectedRange(emptyRange)
     }
   }
 
   @MainActor
   final class Coordinator: NSObject, NSTextViewDelegate {
     @Binding private var selectedRange: NSRange
+    private var pendingSelectedRange: NSRange?
 
     init(selectedRange: Binding<NSRange>) {
       _selectedRange = selectedRange
@@ -131,7 +133,25 @@ private struct SelectableLongText: NSViewRepresentable {
       guard let textView = notification.object as? NSTextView else {
         return
       }
-      selectedRange = textView.selectedRange()
+      publishSelectedRange(textView.selectedRange())
+    }
+
+    func publishSelectedRange(_ range: NSRange) {
+      guard selectedRange != range, pendingSelectedRange != range else {
+        return
+      }
+      pendingSelectedRange = range
+
+      DispatchQueue.main.async { [weak self] in
+        guard let self, self.pendingSelectedRange == range else {
+          return
+        }
+        self.pendingSelectedRange = nil
+        guard self.selectedRange != range else {
+          return
+        }
+        self.selectedRange = range
+      }
     }
   }
 }
