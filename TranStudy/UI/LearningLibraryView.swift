@@ -81,6 +81,9 @@ struct LearningLibraryView: View {
         ),
         label: {
           $0 == .active ? "学习中" : "已归档"
+        },
+        tint: {
+          $0 == .archived ? .red : .accentColor
         }
       )
       .frame(width: 190)
@@ -107,6 +110,7 @@ struct LearningLibraryView: View {
           }
         }
         .buttonStyle(.borderedProminent)
+        .tint(shell.libraryScope == .active ? .red : .accentColor)
         .disabled(shell.selectedLearningItemIDs.isEmpty)
 
         Button("取消") {

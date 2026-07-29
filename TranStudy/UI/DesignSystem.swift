@@ -10,9 +10,22 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
   let options: [Option]
   @Binding var selection: Option
   let label: (Option) -> String
+  let tint: (Option) -> Color
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Namespace private var selectionNamespace
+
+  init(
+    options: [Option],
+    selection: Binding<Option>,
+    label: @escaping (Option) -> String,
+    tint: @escaping (Option) -> Color = { _ in .accentColor }
+  ) {
+    self.options = options
+    _selection = selection
+    self.label = label
+    self.tint = tint
+  }
 
   var body: some View {
     HStack(spacing: 0) {
@@ -58,7 +71,7 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
         .background {
           if isSelected {
             RoundedRectangle(cornerRadius: 8)
-              .fill(Color.accentColor)
+              .fill(tint(option))
               .matchedGeometryEffect(
                 id: "selectedSegment",
                 in: selectionNamespace
