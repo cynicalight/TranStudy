@@ -126,7 +126,7 @@ struct LearningLibraryView: View {
   }
 
   private func libraryRow(_ item: LearningItem) -> some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .center, spacing: 12) {
       if shell.isLibrarySelecting {
         Image(
           systemName:
@@ -140,7 +140,6 @@ struct LearningLibraryView: View {
             ? Color.accentColor
             : Color.secondary
         )
-        .padding(.top, 2)
       }
 
       VStack(alignment: .leading, spacing: 9) {
