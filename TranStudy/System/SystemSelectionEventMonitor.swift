@@ -78,9 +78,6 @@ final class SystemSelectionEventMonitor: SelectionEventMonitoring {
       return .leftMouseUp(at: NSEvent.mouseLocation, clickCount: event.clickCount)
     case .keyDown where event.keyCode == 53:
       return .escape
-    case .keyDown
-    where event.keyCode == 8 && event.modifierFlags.contains(.command):
-      return .clipboardCopy(afterChangeCount: NSPasteboard.general.changeCount)
     case .keyDown:
       return .keyboardActivity
     default:

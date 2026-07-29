@@ -39,13 +39,11 @@ final class ApplicationShell {
   private(set) var translationProviderConfiguration: TranslationProviderConfiguration
   private(set) var selectionConfiguration: SelectionConfiguration
   private(set) var isSelectionContextUnavailable = false
-  private(set) var didApplyClipboardExample = false
   private var activeTranslationID: UUID?
   private var translationSuggestedCanonicalForm = ""
   private var translationSourceApplicationName = "剪贴板"
   private var pendingLearningAddition: LearningAddition?
   private var pendingLibraryCanonicalUpdate: (itemID: UUID, canonicalForm: String)?
-  private var pendingClipboardExample: String?
 
   var currentReviewItem: LearningItem? {
     reviewQueue.first
@@ -172,7 +170,6 @@ final class ApplicationShell {
 
       activeTranslationID = nil
       translationDraft = TranslationDraft(result: result)
-      applyPendingClipboardExampleIfPossible()
       translationSuggestedCanonicalForm = result.canonicalForm
       pendingLearningMerge = nil
       pendingLearningAddition = nil
@@ -315,14 +312,12 @@ final class ApplicationShell {
 
   func prepareSelectionTranslationPresentation(
     sourceApplicationName: String,
-    selectedText: String,
     hasContext: Bool
   ) {
     prepareTranslationPresentation(
       title: "翻译划词",
       sourceApplicationName: sourceApplicationName
     )
-    translationSourceText = selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
     isSelectionContextUnavailable = !hasContext
   }
 
@@ -337,9 +332,7 @@ final class ApplicationShell {
     translationSourceApplicationName = sourceApplicationName
     pendingLearningMerge = nil
     pendingLearningAddition = nil
-    pendingClipboardExample = nil
     isSelectionContextUnavailable = false
-    didApplyClipboardExample = false
     translationStatus = .loading
   }
 
@@ -381,67 +374,6 @@ final class ApplicationShell {
     }
     environment.selectionConfigurationStore.save(selectionConfiguration)
     selectionDebugLog("selection exclusion removed: bundle=\(bundleIdentifier)")
-  }
-
-  @discardableResult
-  func acceptClipboardExample(_ text: String) -> Bool {
-    guard isSelectionContextUnavailable else {
-      selectionDebugLog("clipboard fallback ignored: selection already has context")
-      return false
-    }
-
-    let candidate = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    let targetText = translationSourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard
-      !targetText.isEmpty,
-      !candidate.isEmpty,
-      candidate.count <= 1_000,
-      candidate.split(whereSeparator: \.isWhitespace).count
-        > targetText.split(whereSeparator: \.isWhitespace).count,
-      Self.containsStandaloneTarget(targetText, in: candidate)
-    else {
-      selectionDebugLog(
-        "clipboard fallback rejected: length=\(candidate.count) containsTarget=false-or-too-long"
-      )
-      return false
-    }
-
-    pendingClipboardExample = candidate
-    selectionDebugLog("clipboard fallback accepted: exampleLength=\(candidate.count)")
-    applyPendingClipboardExampleIfPossible()
-    return true
-  }
-
-  private static func containsStandaloneTarget(_ target: String, in candidate: String) -> Bool {
-    let foldingOptions: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-    let foldedTarget = target.folding(options: foldingOptions, locale: .current)
-    let foldedCandidate = candidate.folding(options: foldingOptions, locale: .current)
-    let escapedTarget = NSRegularExpression.escapedPattern(for: foldedTarget)
-    guard
-      let expression = try? NSRegularExpression(
-        pattern: "(?<![\\p{L}\\p{N}])\(escapedTarget)(?![\\p{L}\\p{N}])"
-      )
-    else {
-      return false
-    }
-    let range = NSRange(foldedCandidate.startIndex..., in: foldedCandidate)
-    return expression.firstMatch(in: foldedCandidate, range: range) != nil
-  }
-
-  private func applyPendingClipboardExampleIfPossible() {
-    guard
-      let pendingClipboardExample,
-      var translationDraft
-    else {
-      return
-    }
-
-    translationDraft.exampleSentence = pendingClipboardExample
-    translationDraft.sentenceTranslation = ""
-    self.translationDraft = translationDraft
-    self.pendingClipboardExample = nil
-    didApplyClipboardExample = true
-    selectionDebugLog("clipboard fallback applied to draft example")
   }
 
   func setTranslationPanelPosition(_ position: TranslationPanelPosition) {

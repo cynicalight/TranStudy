@@ -11,7 +11,6 @@ enum SelectionInputEvent: Equatable, Sendable {
   case leftMouseUp(at: CGPoint, clickCount: Int)
   case escape
   case keyboardActivity
-  case clipboardCopy(afterChangeCount: Int)
   case localApplicationInteraction
 }
 
@@ -35,9 +34,7 @@ final class SelectionInteractionController {
   private let candidateTimeout: Duration
   private let candidateValidationInterval: Duration
   private let indicatorLifetime: Duration
-  private let isClipboardFallbackActive: () -> Bool
   private let onExternalInteraction: () -> Void
-  private let onClipboardCopy: (Int) -> Void
   private let onSelection: (SelectionSnapshot) -> Void
   private var candidateTask: Task<Void, Never>?
   private var candidateValidationTask: Task<Void, Never>?
@@ -55,9 +52,7 @@ final class SelectionInteractionController {
     candidateTimeout: Duration = .milliseconds(500),
     candidateValidationInterval: Duration = .milliseconds(100),
     indicatorLifetime: Duration = .seconds(4),
-    isClipboardFallbackActive: @escaping () -> Bool = { false },
     onExternalInteraction: @escaping () -> Void = {},
-    onClipboardCopy: @escaping (Int) -> Void = { _ in },
     onSelection: @escaping (SelectionSnapshot) -> Void
   ) {
     self.selection = selection
@@ -67,9 +62,7 @@ final class SelectionInteractionController {
     self.candidateTimeout = candidateTimeout
     self.candidateValidationInterval = candidateValidationInterval
     self.indicatorLifetime = indicatorLifetime
-    self.isClipboardFallbackActive = isClipboardFallbackActive
     self.onExternalInteraction = onExternalInteraction
-    self.onClipboardCopy = onClipboardCopy
     self.onSelection = onSelection
   }
 
@@ -91,12 +84,6 @@ final class SelectionInteractionController {
     switch event {
     case .leftMouseDown(let screenPosition, let clickCount):
       dismissCandidate(reason: "new mouse gesture")
-      guard !isClipboardFallbackActive() else {
-        mouseDownPosition = nil
-        mouseDownClickCount = 0
-        selectionDebugLog("mouse gesture reserved for clipboard fallback selection")
-        return
-      }
       onExternalInteraction()
       mouseDownPosition = screenPosition
       mouseDownClickCount = clickCount
@@ -132,17 +119,7 @@ final class SelectionInteractionController {
       mouseDownPosition = nil
       mouseDownClickCount = 0
       dismissCandidate(reason: "external keyboard activity")
-      guard !isClipboardFallbackActive() else {
-        selectionDebugLog("keyboard activity reserved for clipboard fallback selection")
-        return
-      }
       onExternalInteraction()
-    case .clipboardCopy(let changeCount):
-      mouseDownPosition = nil
-      mouseDownClickCount = 0
-      dismissCandidate(reason: "clipboard copy shortcut")
-      selectionDebugLog("clipboard copy preserved an open translation panel")
-      onClipboardCopy(changeCount)
     case .localApplicationInteraction:
       mouseDownPosition = nil
       mouseDownClickCount = 0

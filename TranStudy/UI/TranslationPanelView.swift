@@ -43,22 +43,11 @@ struct TranslationPanelView: View {
 
   private var contextFallbackNotice: some View {
     HStack(alignment: .top, spacing: 10) {
-      Image(
-        systemName: shell.didApplyClipboardExample ? "checkmark.circle.fill" : "info.circle.fill"
-      )
-      .foregroundStyle(shell.didApplyClipboardExample ? .green : .orange)
+      Image(systemName: "info.circle.fill")
+        .foregroundStyle(.orange)
       VStack(alignment: .leading, spacing: 3) {
-        Text(
-          shell.didApplyClipboardExample
-            ? "已从新剪贴板内容填入英文例句"
-            : "当前应用不支持感知上下文，推荐使用浏览器阅读文本或者手动复制例句"
-        )
-        .font(.callout.weight(.medium))
-        if !shell.didApplyClipboardExample {
-          Text("保持浮窗打开，在原应用选中例句并按 Command-C；文本需包含目标词且不超过 1000 字符。")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
+        Text("当前应用无法取得完整上下文，本次仅根据目标词翻译。")
+          .font(.callout.weight(.medium))
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
