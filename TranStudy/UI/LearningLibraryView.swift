@@ -3,6 +3,7 @@ import SwiftUI
 struct LearningLibraryView: View {
   @Bindable var shell: ApplicationShell
   @State private var editingItem: LearningItem?
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     VStack(spacing: 0) {
@@ -98,36 +99,40 @@ struct LearningLibraryView: View {
     HStack {
 
       if shell.isLibrarySelecting {
-        Text("已选择 \(shell.selectedLearningItemIDs.count) 项")
-          .font(.callout)
-          .foregroundStyle(.secondary)
+        Group {
+          Text("已选择 \(shell.selectedLearningItemIDs.count) 项")
+            .font(.callout)
+            .foregroundStyle(.secondary)
 
-        Button("全选") {
-          shell.selectAllLibraryItems()
-        }
-        .disabled(shell.displayedLearningItems.isEmpty)
+          Button("全选") {
+            shell.selectAllLibraryItems()
+          }
+          .disabled(shell.displayedLearningItems.isEmpty)
 
-        Button(shell.libraryScope == .active ? "归档" : "恢复") {
-          Task {
-            if shell.libraryScope == .active {
-              await shell.archiveSelectedLibraryItems()
-            } else {
-              await shell.restoreSelectedLibraryItems()
+          Button(shell.libraryScope == .active ? "归档" : "恢复") {
+            Task {
+              if shell.libraryScope == .active {
+                await shell.archiveSelectedLibraryItems()
+              } else {
+                await shell.restoreSelectedLibraryItems()
+              }
             }
           }
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(shell.libraryScope == .active ? .red : .accentColor)
-        .disabled(shell.selectedLearningItemIDs.isEmpty)
+          .buttonStyle(.borderedProminent)
+          .tint(shell.libraryScope == .active ? .red : .accentColor)
+          .disabled(shell.selectedLearningItemIDs.isEmpty)
 
-        Button("取消") {
-          shell.cancelLibrarySelection()
+          Button("取消") {
+            shell.cancelLibrarySelection()
+          }
         }
+        .transition(.opacity.combined(with: .move(edge: .trailing)))
       } else {
         Button("选择") {
           shell.beginLibrarySelection()
         }
         .disabled(shell.displayedLearningItems.isEmpty)
+        .transition(.opacity.combined(with: .move(edge: .trailing)))
       }
 
       TranStudySegmentedControl(
@@ -145,6 +150,10 @@ struct LearningLibraryView: View {
       )
       .frame(width: 160)
     }
+    .animation(
+      reduceMotion ? nil : .easeInOut(duration: 0.2),
+      value: shell.isLibrarySelecting
+    )
   }
 
   private func libraryRow(_ item: LearningItem) -> some View {
