@@ -402,6 +402,83 @@ struct ApplicationShellTests {
     #expect(shell.archivedLearningItems.isEmpty)
   }
 
+  @Test("library search covers word forms and examples within the current scope")
+  func librarySearchFiltersCurrentScope() async {
+    let runID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
+    let pauseID = UUID(uuidString: "A60B21B0-D9FC-4DBD-B818-A1819310E5E4")!
+    let archivedID = UUID(uuidString: "FCB9085D-879A-44A5-8B23-B9B972DFC714")!
+    let runItem = LearningItem(
+      id: runID,
+      sourceText: "sprinted",
+      canonicalForm: "run",
+      pronunciation: "/rʌn/",
+      partOfSpeech: "verb",
+      contextualMeaning: "奔跑",
+      exampleSentence: "She runs every morning.",
+      sentenceTranslation: "她每天早上跑步。",
+      sourceApplicationName: "Safari",
+      createdAt: Date(timeIntervalSince1970: 1_000),
+      encounters: [
+        LearningEncounter(
+          id: UUID(),
+          sourceText: "ran",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。",
+          sourceApplicationName: "TextEdit",
+          encounteredAt: Date(timeIntervalSince1970: 900)
+        )
+      ],
+      customExamples: [
+        LearningCustomExample(
+          englishText: "They run a small café.",
+          chineseTranslation: "他们经营一家小咖啡馆。"
+        )
+      ]
+    )
+    let pauseItem = makeLearningItem(id: pauseID, canonicalForm: "pause")
+    let archivedItem = LearningItem(
+      id: archivedID,
+      sourceText: "archived",
+      canonicalForm: "archive",
+      pronunciation: "",
+      partOfSpeech: "verb",
+      contextualMeaning: "归档",
+      exampleSentence: "Archive this card.",
+      sentenceTranslation: "归档这张卡。",
+      sourceApplicationName: "Preview",
+      createdAt: Date(timeIntervalSince1970: 800),
+      archivedAt: Date(timeIntervalSince1970: 1_200)
+    )
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(
+          items: [runItem, pauseItem],
+          archivedItems: [archivedItem]
+        )
+      ))
+    await shell.refreshLibrary()
+
+    shell.librarySearchQuery = "SPRINTED"
+    #expect(shell.displayedLearningItems.map(\.id) == [runID])
+
+    shell.librarySearchQuery = "ran home"
+    #expect(shell.displayedLearningItems.map(\.id) == [runID])
+
+    shell.librarySearchQuery = "small café"
+    #expect(shell.displayedLearningItems.map(\.id) == [runID])
+
+    shell.beginLibrarySelection()
+    shell.selectAllLibraryItems()
+    #expect(shell.selectedLearningItemIDs == [runID])
+
+    shell.setLibraryScope(.archived)
+    shell.librarySearchQuery = "archive this"
+    #expect(shell.displayedLearningItems.map(\.id) == [archivedID])
+  }
+
   @Test("failed library detail save remains unsuccessful")
   func failedLibraryDetailSaveRemainsUnsuccessful() async {
     let item = makeLearningItem(

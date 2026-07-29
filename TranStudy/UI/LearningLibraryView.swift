@@ -17,8 +17,8 @@ struct LearningLibraryView: View {
         .padding(.top, 24)
         .padding(.bottom, 16)
 
+        librarySearchField
         libraryToolbar
-
       }
       Divider()
 
@@ -28,11 +28,6 @@ struct LearningLibraryView: View {
         List(shell.displayedLearningItems) { item in
           libraryRow(item)
             .contentShape(.rect)
-            .onTapGesture {
-              if shell.isLibrarySelecting {
-                shell.toggleLibrarySelection(item.id)
-              }
-            }
         }
         .listStyle(.inset)
       }
@@ -68,6 +63,33 @@ struct LearningLibraryView: View {
           + "合并后会保留双方的释义、例句和全部语境。"
       )
     }
+  }
+
+  private var librarySearchField: some View {
+    HStack(spacing: 7) {
+      Image(systemName: "magnifyingglass")
+        .foregroundStyle(.secondary)
+      TextField(
+        "搜索词形或例句",
+        text: $shell.librarySearchQuery
+      )
+      .textFieldStyle(.plain)
+      .frame(width: 180)
+
+      if !shell.librarySearchQuery.isEmpty {
+        Button {
+          shell.librarySearchQuery = ""
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help("清除搜索")
+      }
+    }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 7)
+    .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 8))
   }
 
   private var libraryToolbar: some View {
@@ -126,18 +148,20 @@ struct LearningLibraryView: View {
   private func libraryRow(_ item: LearningItem) -> some View {
     HStack(alignment: .center, spacing: 12) {
       if shell.isLibrarySelecting {
-        Image(
-          systemName:
-            shell.selectedLearningItemIDs.contains(item.id)
-            ? "checkmark.circle.fill"
-            : "circle"
+        let isSelected = shell.selectedLearningItemIDs.contains(item.id)
+        Button {
+          shell.toggleLibrarySelection(item.id)
+        } label: {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.title3)
+            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+          "\(isSelected ? "取消选择" : "选择") \(item.kind == .sentence ? item.sourceText : item.canonicalForm)"
         )
-        .font(.title3)
-        .foregroundStyle(
-          shell.selectedLearningItemIDs.contains(item.id)
-            ? Color.accentColor
-            : Color.secondary
-        )
+        .accessibilityValue(isSelected ? "已选择" : "未选择")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
       }
 
       VStack(alignment: .leading, spacing: 9) {
@@ -272,16 +296,20 @@ struct LearningLibraryView: View {
 
   private var emptyLibrary: some View {
     VStack(spacing: 15) {
-      Image(systemName: shell.libraryScope == .active ? "text.book.closed" : "archivebox")
+      Image(systemName: emptyLibraryIcon)
         .font(.system(size: 30, weight: .medium))
         .foregroundStyle(.tint)
         .frame(width: 62, height: 62)
         .background(.tint.opacity(0.1), in: .circle)
 
-      Text(shell.libraryScope == .active ? "从第一个词开始" : "还没有归档内容")
+      Text(emptyLibraryTitle)
         .font(.title3.weight(.semibold))
 
-      if shell.libraryScope == .active {
+      if !shell.librarySearchQuery.isEmpty {
+        Text("没有找到与“\(shell.librarySearchQuery)”匹配的词形或例句。")
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+      } else if shell.libraryScope == .active {
         Text(
           "复制一个英文单词或短语，按 \(shell.translationShortcut.title) 翻译，确认内容后选择“加入学习”。"
         )
@@ -298,6 +326,20 @@ struct LearningLibraryView: View {
     .contentSurface()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .padding(32)
+  }
+
+  private var emptyLibraryIcon: String {
+    if !shell.librarySearchQuery.isEmpty {
+      return "magnifyingglass"
+    }
+    return shell.libraryScope == .active ? "text.book.closed" : "archivebox"
+  }
+
+  private var emptyLibraryTitle: String {
+    if !shell.librarySearchQuery.isEmpty {
+      return "没有搜索结果"
+    }
+    return shell.libraryScope == .active ? "从第一个词开始" : "还没有归档内容"
   }
 
   private var pendingLibraryMergeBinding: Binding<Bool> {
@@ -448,6 +490,21 @@ private struct LearningItemEditorView: View {
         } footer: {
           Text("自定义例句与真实遇词历史分开保存。")
         }
+
+        if let latestEncounter = item.encounters.first {
+          Section("最近遇见") {
+            encounterDetails(latestEncounter)
+          }
+        }
+
+        let historicalEncounters = Array(item.encounters.dropFirst())
+        if !historicalEncounters.isEmpty {
+          Section("历史遇见") {
+            ForEach(historicalEncounters) { encounter in
+              encounterDetails(encounter)
+            }
+          }
+        }
       }
       .formStyle(.grouped)
 
@@ -497,6 +554,46 @@ private struct LearningItemEditorView: View {
       .padding(20)
     }
     .frame(width: 620, height: 680)
+  }
+
+  private func encounterDetails(_ encounter: LearningEncounter) -> some View {
+    VStack(alignment: .leading, spacing: 7) {
+      HStack {
+        Text(encounter.sourceText)
+          .fontWeight(.semibold)
+        if item.kind == .word, !encounter.partOfSpeech.isEmpty {
+          Text(encounter.partOfSpeech)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      if item.kind == .word, !encounter.contextualMeaning.isEmpty {
+        Text(encounter.contextualMeaning)
+      }
+
+      if !encounter.exampleSentence.isEmpty,
+        encounter.exampleSentence != encounter.sourceText
+      {
+        Text(encounter.exampleSentence)
+          .italic()
+      }
+      if !encounter.sentenceTranslation.isEmpty {
+        Text(encounter.sentenceTranslation)
+          .foregroundStyle(.secondary)
+      }
+
+      HStack(spacing: 5) {
+        Label(encounter.sourceApplicationName, systemImage: "app")
+        Text("·")
+        Text(
+          encounter.encounteredAt,
+          format: .dateTime.year().month().day().hour().minute()
+        )
+      }
+      .font(.caption)
+      .foregroundStyle(.tertiary)
+    }
+    .padding(.vertical, 4)
   }
 }
 

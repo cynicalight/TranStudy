@@ -52,6 +52,12 @@ final class ApplicationShell {
   private(set) var libraryScope: LearningLibraryScope = .active
   private(set) var isLibrarySelecting = false
   private(set) var selectedLearningItemIDs: Set<UUID> = []
+  @ObservationIgnored private var librarySearchIndex: [UUID: [String]] = [:]
+  var librarySearchQuery = "" {
+    didSet {
+      selectedLearningItemIDs.formIntersection(displayedLearningItems.map(\.id))
+    }
+  }
   private(set) var reviewQueue: [LearningItem] = []
   private(set) var isReviewAnswerVisible = false
   private(set) var isReviewRating = false
@@ -490,13 +496,27 @@ final class ApplicationShell {
     do {
       learningItems = try await environment.learningStore.items()
       archivedLearningItems = try await environment.learningStore.archivedItems()
+      rebuildLibrarySearchIndex()
+      selectedLearningItemIDs.formIntersection(displayedLearningItems.map(\.id))
     } catch {
       // A later ticket exposes recoverable library loading failures.
     }
   }
 
   var displayedLearningItems: [LearningItem] {
-    libraryScope == .active ? learningItems : archivedLearningItems
+    let scopedItems =
+      libraryScope == .active
+      ? learningItems
+      : archivedLearningItems
+    let query = normalizedLibrarySearchText(librarySearchQuery)
+    guard !query.isEmpty else {
+      return scopedItems
+    }
+    return scopedItems.filter { item in
+      librarySearchIndex[item.id, default: []].contains {
+        $0.contains(query)
+      }
+    }
   }
 
   func setLibraryScope(_ scope: LearningLibraryScope) {
@@ -556,6 +576,39 @@ final class ApplicationShell {
     } catch {
       // Keep the selection so the user can retry.
     }
+  }
+
+  private func rebuildLibrarySearchIndex() {
+    librarySearchIndex = Dictionary(
+      uniqueKeysWithValues: (learningItems + archivedLearningItems).map {
+        ($0.id, librarySearchFields(for: $0).map(normalizedLibrarySearchText))
+      }
+    )
+  }
+
+  private func librarySearchFields(for item: LearningItem) -> [String] {
+    let itemText = [
+      item.canonicalForm,
+      item.sourceText,
+      item.contextualMeaning,
+      item.exampleSentence,
+      item.sentenceTranslation,
+    ]
+    let encounterText = item.encounters.flatMap {
+      [$0.sourceText, $0.contextualMeaning, $0.exampleSentence, $0.sentenceTranslation]
+    }
+    let customExampleText = item.customExamples.flatMap {
+      [$0.englishText, $0.chineseTranslation]
+    }
+    return itemText + encounterText + customExampleText
+  }
+
+  private func normalizedLibrarySearchText(_ text: String) -> String {
+    TranslationTextNormalizer.collapseWhitespace(in: text)
+      .folding(
+        options: [.caseInsensitive, .diacriticInsensitive],
+        locale: .current
+      )
   }
 
   func saveLearningItem(
