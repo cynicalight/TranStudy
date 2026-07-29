@@ -4,11 +4,6 @@ import Foundation
 
 @MainActor
 final class AccessibilitySelectionProvider: SelectionProviding {
-  private static let supportedBundleIdentifiers: Set<String> = [
-    "com.apple.Safari",
-    "com.apple.TextEdit",
-  ]
-
   private var candidatePosition: CGPoint?
   private var gestureStartFingerprint: SelectionFingerprint?
   private var candidateFingerprint: SelectionFingerprint?
@@ -142,7 +137,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       }
       return nil
     }
-    guard let application = supportedFrontmostApplication(logFailures: logFailures) else {
+    guard let application = frontmostApplication(logFailures: logFailures) else {
       return nil
     }
     guard let element = selectedElement(in: application, logFailures: logFailures) else {
@@ -194,28 +189,16 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     application.localizedName ?? "未知应用"
   }
 
-  private func supportedFrontmostApplication(logFailures: Bool) -> NSRunningApplication? {
+  private func frontmostApplication(logFailures: Bool) -> NSRunningApplication? {
     guard let application = NSWorkspace.shared.frontmostApplication else {
       if logFailures {
         selectionDebugLog("AX selection unavailable: no frontmost application")
       }
       return nil
     }
-    guard let bundleIdentifier = application.bundleIdentifier else {
-      if logFailures {
-        selectionDebugLog("AX selection unavailable: frontmost app has no bundle identifier")
-      }
-      return nil
-    }
-    guard Self.supportedBundleIdentifiers.contains(bundleIdentifier) else {
-      if logFailures {
-        selectionDebugLog("AX selection unavailable: unsupported frontmost app=\(bundleIdentifier)")
-      }
-      return nil
-    }
     if logFailures {
       selectionDebugLog(
-        "frontmost app accepted: name=\(sourceApplicationName(for: application)) bundle=\(bundleIdentifier) pid=\(application.processIdentifier)"
+        "frontmost app accepted: name=\(sourceApplicationName(for: application)) bundle=\(application.bundleIdentifier ?? "unknown") pid=\(application.processIdentifier)"
       )
     }
     return application
@@ -278,7 +261,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
 
   private func selectionContext(in element: AXUIElement) -> SelectionSentenceContext? {
     if let context = webSelectionContext(in: element) {
-      selectionDebugLog("selection context captured with Safari text-marker attributes")
+      selectionDebugLog("selection context captured with AX text-marker attributes")
       return context
     }
 
@@ -298,7 +281,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     selectionDebugLog(
       context == nil
         ? "selection context failed: sentence extraction returned nil"
-        : "selection context captured with TextEdit range attributes"
+        : "selection context captured with AX range attributes"
     )
     return context
   }
