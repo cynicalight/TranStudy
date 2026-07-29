@@ -307,7 +307,7 @@ final class ApplicationShell {
     let selectedText = source.substring(with: selectedRange)
       .trimmingCharacters(in: .whitespacesAndNewlines)
     guard
-      Self.isWordOrShortPhrase(selectedText),
+      Self.isValidLongTextSelection(selectedText),
       let context = SelectionSentenceContext.extract(
         from: longTextTranslation.sourceText,
         selectedRange: CFRange(
@@ -325,6 +325,22 @@ final class ApplicationShell {
       kind: .contextualSelection,
       targetSentence: context.targetSentence
     )
+  }
+
+  private static func isValidLongTextSelection(_ sourceText: String) -> Bool {
+    Self.isWithinShortPhraseLimits(sourceText)
+  }
+
+  private static func isWithinShortPhraseLimits(_ sourceText: String) -> Bool {
+    guard
+      !sourceText.isEmpty,
+      sourceText.count <= 160,
+      !sourceText.contains(where: \.isNewline)
+    else {
+      return false
+    }
+
+    return (1...8).contains(sourceText.split(whereSeparator: \.isWhitespace).count)
   }
 
   func addCurrentDraftToLearning() async {
@@ -603,16 +619,7 @@ final class ApplicationShell {
   }
 
   private static func isWordOrShortPhrase(_ sourceText: String) -> Bool {
-    guard
-      !sourceText.isEmpty,
-      sourceText.count <= 160,
-      !sourceText.contains(where: \.isNewline)
-    else {
-      return false
-    }
-
-    let words = sourceText.split(whereSeparator: \.isWhitespace)
-    guard (1...8).contains(words.count) else {
+    guard Self.isWithinShortPhraseLimits(sourceText) else {
       return false
     }
 
