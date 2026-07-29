@@ -48,14 +48,15 @@ struct DailyReviewQueueBuilderTests {
 
   @Test("related word and sentence cards are separated when another card is available")
   func queueSeparatesRelatedCards() {
-    let dueAt = date(year: 2026, month: 7, day: 8)
-    let word = item("run", dueAt: dueAt)
+    let olderDueAt = date(year: 2026, month: 7, day: 7)
+    let newerDueAt = date(year: 2026, month: 7, day: 8)
+    let word = item("run", dueAt: olderDueAt)
     let sentence = item(
       "I run every morning.",
       kind: .sentence,
-      dueAt: dueAt
+      dueAt: newerDueAt
     )
-    let unrelated = item("ocean", dueAt: dueAt)
+    let unrelated = item("ocean", dueAt: newerDueAt)
     let queue = DailyReviewQueueBuilder(calendar: calendar).makeQueue(
       from: [word, sentence, unrelated],
       at: date(year: 2026, month: 7, day: 10),

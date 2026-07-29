@@ -59,7 +59,7 @@ final class ApplicationShell {
     }
   }
   private(set) var reviewQueue: [LearningItem] = []
-  private(set) var remainingReviewItems: [LearningItem] = []
+  private(set) var remainingReviewBatches: [[LearningItem]] = []
   private(set) var isReviewAnswerVisible = false
   private(set) var isReviewRating = false
   private(set) var selectedReviewRating: ReviewRating?
@@ -88,11 +88,11 @@ final class ApplicationShell {
   }
 
   var remainingReviewCount: Int {
-    remainingReviewItems.count
+    remainingReviewBatches.reduce(0) { $0 + $1.count }
   }
 
   var hasMoreReviewBatches: Bool {
-    !remainingReviewItems.isEmpty
+    !remainingReviewBatches.isEmpty
   }
 
   var isLongTextTranslationPresentation: Bool {
@@ -118,9 +118,10 @@ final class ApplicationShell {
         at: now,
         seed: DailyReviewQueueBuilder.seed(for: now)
       )
+      let batches = queue.batches
       learningSummary = summary
-      reviewQueue = Array(queue.items.prefix(DailyReviewQueue.batchSize))
-      remainingReviewItems = Array(queue.items.dropFirst(DailyReviewQueue.batchSize))
+      reviewQueue = batches.first ?? []
+      remainingReviewBatches = Array(batches.dropFirst())
       isReviewAnswerVisible = false
       selectedReviewRating = nil
       lastReviewRefreshDate = now
@@ -175,11 +176,10 @@ final class ApplicationShell {
   }
 
   func startNextReviewBatch() {
-    guard reviewQueue.isEmpty, !remainingReviewItems.isEmpty else {
+    guard reviewQueue.isEmpty, !remainingReviewBatches.isEmpty else {
       return
     }
-    reviewQueue = Array(remainingReviewItems.prefix(DailyReviewQueue.batchSize))
-    remainingReviewItems.removeFirst(min(DailyReviewQueue.batchSize, remainingReviewItems.count))
+    reviewQueue = remainingReviewBatches.removeFirst()
     isReviewAnswerVisible = false
     selectedReviewRating = nil
   }

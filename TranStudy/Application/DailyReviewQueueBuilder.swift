@@ -31,10 +31,15 @@ struct DailyReviewQueueBuilder {
       calendar.startOfDay(for: $0.nextReviewAt ?? reviewDate)
     }
     var generator = SeededRandomNumberGenerator(seed: seed)
-    let orderedItems = groups.keys.sorted().flatMap { dueDay in
+    var orderedItems: [LearningItem] = []
+    for dueDay in groups.keys.sorted() {
       var shuffledItems = groups[dueDay, default: []]
       shuffledItems.shuffle(using: &generator)
-      return spaceRelatedItems(shuffledItems)
+      orderedItems.append(
+        contentsOf: spaceRelatedItems(
+          shuffledItems,
+          after: orderedItems.last
+        ))
     }
     return DailyReviewQueue(items: orderedItems)
   }
@@ -48,12 +53,15 @@ struct DailyReviewQueueBuilder {
     return (era << 48) ^ (year << 16) ^ (month << 8) ^ day
   }
 
-  private func spaceRelatedItems(_ shuffledItems: [LearningItem]) -> [LearningItem] {
+  private func spaceRelatedItems(
+    _ shuffledItems: [LearningItem],
+    after precedingItem: LearningItem?
+  ) -> [LearningItem] {
     var remainingItems = shuffledItems
     var orderedItems: [LearningItem] = []
+    var previousTokens = precedingItem.map(relatedTokens(for:)) ?? []
 
     while !remainingItems.isEmpty {
-      let previousTokens = orderedItems.last.map(relatedTokens(for:)) ?? []
       let separatedCandidates = remainingItems.indices.filter {
         previousTokens.isDisjoint(with: relatedTokens(for: remainingItems[$0]))
       }
@@ -66,7 +74,9 @@ struct DailyReviewQueueBuilder {
           relationCount(for: remainingItems[$0], among: remainingItems)
             < relationCount(for: remainingItems[$1], among: remainingItems)
         } ?? remainingItems.startIndex
-      orderedItems.append(remainingItems.remove(at: selectedIndex))
+      let selectedItem = remainingItems.remove(at: selectedIndex)
+      orderedItems.append(selectedItem)
+      previousTokens = relatedTokens(for: selectedItem)
     }
     return orderedItems
   }
