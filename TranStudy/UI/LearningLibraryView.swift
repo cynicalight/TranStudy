@@ -17,7 +17,9 @@ struct LearningLibraryView: View {
         .padding(.top, 24)
         .padding(.bottom, 16)
 
-        librarySearchField
+        if !shell.isLibrarySelecting {
+          librarySearchField
+        }
         libraryToolbar
       }
       Divider()
