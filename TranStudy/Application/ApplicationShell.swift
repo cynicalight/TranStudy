@@ -62,6 +62,10 @@ final class ApplicationShell {
     reviewQueue.first
   }
 
+  var isLongTextTranslationPresentation: Bool {
+    translationPresentationTitle == "翻译长文本"
+  }
+
   init(environment: ApplicationEnvironment) {
     self.environment = environment
     translationPanelPosition = environment.panelPositionStore.load()
@@ -131,9 +135,11 @@ final class ApplicationShell {
   }
 
   func translateClipboard() async {
-    guard
-      let sourceText = environment.clipboard.readText()
-    else {
+    await translateClipboard(environment.clipboard.readText())
+  }
+
+  func translateClipboard(_ sourceText: String?) async {
+    guard let sourceText else {
       translationStatus = .failed
       return
     }
@@ -439,6 +445,26 @@ final class ApplicationShell {
       title: "翻译剪贴板",
       sourceApplicationName: sourceApplicationName
     )
+  }
+
+  func prepareClipboardTranslationPresentation(
+    sourceApplicationName: String = "剪贴板"
+  ) -> String? {
+    let clipboardText = environment.clipboard.readText()
+    let sourceText =
+      clipboardText.map {
+        TranslationTextNormalizer.collapseWhitespace(in: $0)
+      } ?? ""
+    let isLongText = !sourceText.isEmpty && !Self.isWordOrShortPhrase(sourceText)
+
+    prepareTranslationPresentation(
+      title: isLongText ? "翻译长文本" : "翻译剪贴板",
+      sourceApplicationName: sourceApplicationName
+    )
+    if isLongText {
+      translationSourceText = sourceText
+    }
+    return clipboardText
   }
 
   func prepareSelectionTranslationPresentation(

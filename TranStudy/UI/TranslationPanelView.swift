@@ -1,9 +1,16 @@
 import SwiftUI
 
+enum TranslationPanelMetrics {
+  static let width: CGFloat = 500
+  static let defaultHeight: CGFloat = 470
+}
+
 struct TranslationPanelView: View {
   @Bindable var shell: ApplicationShell
   let onDismiss: () -> Void
   let onTranslateLongTextSelection: (NSRange) -> Void
+  var onContentSizeChange: (CGSize, Bool) -> Void = { _, _ in }
+  @State private var longTextLoadingContentHeight: CGFloat = 24
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -16,7 +23,13 @@ struct TranslationPanelView: View {
       content
     }
     .padding(14)
-    .frame(width: 500)
+    .frame(width: TranslationPanelMetrics.width)
+    .modifier(ContentFittingHeight(enabled: fitsPanelHeightToContent))
+    .onGeometryChange(for: CGSize.self) { proxy in
+      proxy.size
+    } action: { size in
+      onContentSizeChange(size, fitsPanelHeightToContent)
+    }
     .onExitCommand(perform: onDismiss)
     .alert(
       "合并到已有词条？",
@@ -147,8 +160,13 @@ struct TranslationPanelView: View {
         Text(shell.translationSourceText)
           .textSelection(.enabled)
           .frame(maxWidth: .infinity, alignment: .leading)
+          .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+          } action: { height in
+            longTextLoadingContentHeight = height
+          }
       }
-      .frame(height: 150)
+      .frame(height: longTextBlockHeight(for: longTextLoadingContentHeight))
 
       HStack(spacing: 10) {
         ProgressView()
@@ -158,7 +176,15 @@ struct TranslationPanelView: View {
           .foregroundStyle(.secondary)
       }
     }
-    .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+  }
+
+  private var fitsPanelHeightToContent: Bool {
+    shell.isLongTextTranslationPresentation
+  }
+
+  private func longTextBlockHeight(for contentHeight: CGFloat) -> CGFloat {
+    min(max(contentHeight, 1), 180)
   }
 
   private var draftForm: some View {
@@ -260,6 +286,19 @@ struct TranslationPanelView: View {
       get: { shell.pendingLearningMerge != nil },
       set: { _ in }
     )
+  }
+}
+
+private struct ContentFittingHeight: ViewModifier {
+  let enabled: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if enabled {
+      content.fixedSize(horizontal: false, vertical: true)
+    } else {
+      content
+    }
   }
 }
 

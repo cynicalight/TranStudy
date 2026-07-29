@@ -17,13 +17,15 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     translationTask?.cancel()
     let sourceApplicationName =
       NSWorkspace.shared.frontmostApplication?.localizedName ?? "剪贴板"
-    shell.prepareTranslationPresentation(sourceApplicationName: sourceApplicationName)
+    let sourceText = shell.prepareClipboardTranslationPresentation(
+      sourceApplicationName: sourceApplicationName
+    )
     showPanel()
     translationTask = Task { [weak self] in
       guard let self else {
         return
       }
-      await shell.translateClipboard()
+      await shell.translateClipboard(sourceText)
     }
   }
 
@@ -86,13 +88,18 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
 
   private func showPanel() {
     if let panel {
-      position(panel)
+      applyCurrentSizing(to: panel)
       panel.orderFrontRegardless()
       return
     }
 
     let panel = DismissibleTranslationPanel(
-      contentRect: NSRect(x: 0, y: 0, width: 500, height: 470),
+      contentRect: NSRect(
+        x: 0,
+        y: 0,
+        width: TranslationPanelMetrics.width,
+        height: TranslationPanelMetrics.defaultHeight
+      ),
       styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
       backing: .buffered,
       defer: false
@@ -111,7 +118,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     panel.onCancel = { [weak self] in
       self?.dismiss()
     }
-    panel.contentView = NSHostingView(
+    let hostingView = NSHostingView(
       rootView: TranslationPanelView(
         shell: shell,
         onDismiss: { [weak self] in
@@ -119,9 +126,24 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         },
         onTranslateLongTextSelection: { [weak self] selectedRange in
           self?.translateLongTextSelection(selectedRange)
+        },
+        onContentSizeChange: { [weak self, weak panel] size, fitsContent in
+          guard let self, let panel else {
+            return
+          }
+          resize(
+            panel,
+            toFit: fitsContent
+              ? size
+              : NSSize(
+                width: TranslationPanelMetrics.width,
+                height: TranslationPanelMetrics.defaultHeight
+              )
+          )
         }
       ))
-    position(panel)
+    panel.contentView = hostingView
+    applyCurrentSizing(to: panel)
 
     self.panel = panel
     panel.orderFrontRegardless()
@@ -147,6 +169,45 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         panelSize: panel.frame.size,
         visibleFrame: screen.visibleFrame
       ))
+  }
+
+  private func applyCurrentSizing(to panel: NSPanel) {
+    if shell.isLongTextTranslationPresentation, let contentView = panel.contentView {
+      contentView.layoutSubtreeIfNeeded()
+      resize(panel, toFit: contentView.fittingSize)
+    } else {
+      resize(
+        panel,
+        toFit: NSSize(
+          width: TranslationPanelMetrics.width,
+          height: TranslationPanelMetrics.defaultHeight
+        )
+      )
+    }
+    position(panel)
+  }
+
+  private func resize(_ panel: NSPanel, toFit contentSize: NSSize) {
+    guard
+      contentSize.width.isFinite,
+      contentSize.height.isFinite,
+      let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first
+    else {
+      return
+    }
+
+    let maximumHeight = max(220, screen.visibleFrame.height - 48)
+    let targetSize = NSSize(
+      width: TranslationPanelMetrics.width,
+      height: min(max(ceil(contentSize.height), 1), maximumHeight)
+    )
+    let currentContentSize = panel.contentView?.bounds.size ?? panel.contentLayoutRect.size
+    guard abs(currentContentSize.height - targetSize.height) > 0.5 else {
+      return
+    }
+
+    panel.setContentSize(targetSize)
+    position(panel)
   }
 }
 

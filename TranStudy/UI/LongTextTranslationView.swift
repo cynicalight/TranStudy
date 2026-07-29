@@ -8,6 +8,8 @@ struct LongTextTranslationView: View {
   let onTranslateSelection: (NSRange) -> Void
   private let tokens: [LongTextWordToken]
   @State private var selectedTokenRange: ClosedRange<Int>?
+  @State private var sourceContentHeight: CGFloat = 32
+  @State private var translatedContentHeight: CGFloat = 24
 
   init(
     shell: ApplicationShell,
@@ -57,17 +59,19 @@ struct LongTextTranslationView: View {
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
+          .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+          } action: { height in
+            sourceContentHeight = height
+          }
         }
-        .frame(height: 115)
+        .frame(height: blockHeight(for: sourceContentHeight))
         .background(.background.opacity(0.45))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        CopyTextButton(text: result.sourceText, accessibilityLabel: "复制原文")
       }
 
       HStack {
-        Text(selectionHint)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        CopyTextButton(text: result.sourceText, accessibilityLabel: "复制原文")
         Spacer()
         Button {
           onTranslateSelection(selectedRange)
@@ -85,8 +89,13 @@ struct LongTextTranslationView: View {
           Text(result.translatedText)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+              proxy.size.height
+            } action: { height in
+              translatedContentHeight = height
+            }
         }
-        .frame(height: 115)
+        .frame(height: blockHeight(for: translatedContentHeight))
         HStack {
           CopyTextButton(text: result.translatedText, accessibilityLabel: "复制译文")
           Spacer()
@@ -102,12 +111,8 @@ struct LongTextTranslationView: View {
     }
   }
 
-  private var selectionHint: String {
-    guard let selectedTokenRange else {
-      return "点击单词；继续点击可组成不超过 8 个词的词组"
-    }
-    let count = selectedTokenRange.count
-    return count == 1 ? "已选择 1 个单词" : "已选择 \(count) 个单词"
+  private func blockHeight(for contentHeight: CGFloat) -> CGFloat {
+    min(max(contentHeight, 1), 180)
   }
 
   private var selectedRange: NSRange {
@@ -310,6 +315,6 @@ private struct WordCapsuleFlowLayout: Layout {
       onTranslateSelection: { _ in }
     )
     .padding()
-    .frame(width: 500, height: 430)
+    .frame(width: 500)
   }
 #endif
