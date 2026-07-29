@@ -7,13 +7,20 @@ struct SelectionCandidate: Equatable, Sendable {
 
 struct SelectionSnapshot: Equatable, Sendable {
   let selectedText: String
-  let targetSentence: String
+  let targetSentence: String?
   let previousSentence: String?
   let nextSentence: String?
   let screenPosition: CGPoint
   let sourceApplicationName: String
 
-  var translationContext: String {
+  var hasContext: Bool {
+    targetSentence?.isEmpty == false
+  }
+
+  var translationContext: String? {
+    guard let targetSentence, !targetSentence.isEmpty else {
+      return nil
+    }
     var sections: [String] = []
     if let previousSentence, !previousSentence.isEmpty {
       sections.append("Previous sentence:\n\(previousSentence)")

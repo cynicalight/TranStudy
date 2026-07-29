@@ -1,9 +1,11 @@
 import AppKit
 import ApplicationServices
+import Carbon
 import Foundation
 
 @MainActor
 final class AccessibilitySelectionProvider: SelectionProviding {
+  private let configurationStore: any SelectionConfigurationStoring
   private var candidatePosition: CGPoint?
   private var candidateFingerprint: SelectionFingerprint?
 
@@ -24,7 +26,12 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     }
   }
 
-  init(requestAccess: Bool = true) {
+  init(
+    configurationStore: any SelectionConfigurationStoring =
+      UserDefaultsSelectionConfigurationStore(),
+    requestAccess: Bool = true
+  ) {
+    self.configurationStore = configurationStore
     guard requestAccess else {
       selectionDebugLog("AX provider initialized without requesting access")
       return
@@ -74,20 +81,19 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       return nil
     }
 
-    guard
-      let context = selectionContext(in: activeSelection.element)
-    else {
-      selectionDebugLog("snapshot failed: target sentence context unavailable")
-      return nil
+    let context = selectionContext(in: activeSelection.element)
+    if let context {
+      selectionDebugLog(
+        "snapshot context captured: targetLength=\(context.targetSentence.count) previous=\(context.previousSentence != nil) next=\(context.nextSentence != nil)"
+      )
+    } else {
+      selectionDebugLog("snapshot captured without sentence context; fallback translation allowed")
     }
-    selectionDebugLog(
-      "snapshot context captured: targetLength=\(context.targetSentence.count) previous=\(context.previousSentence != nil) next=\(context.nextSentence != nil)"
-    )
     return SelectionSnapshot(
       selectedText: activeSelection.selectedText,
-      targetSentence: context.targetSentence,
-      previousSentence: context.previousSentence,
-      nextSentence: context.nextSentence,
+      targetSentence: context?.targetSentence,
+      previousSentence: context?.previousSentence,
+      nextSentence: context?.nextSentence,
       screenPosition: candidatePosition,
       sourceApplicationName: sourceApplicationName(for: activeSelection.application)
     )
@@ -111,6 +117,13 @@ final class AccessibilitySelectionProvider: SelectionProviding {
   }
 
   private func activeSelection(logFailures: Bool) -> ActiveSelection? {
+    let configuration = configurationStore.load()
+    guard configuration.isEnabled else {
+      if logFailures {
+        selectionDebugLog("AX selection unavailable: global selection is paused")
+      }
+      return nil
+    }
     guard AXIsProcessTrusted() else {
       if logFailures {
         selectionDebugLog("AX selection unavailable: Accessibility permission is not trusted")
@@ -118,6 +131,22 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       return nil
     }
     guard let application = frontmostApplication(logFailures: logFailures) else {
+      return nil
+    }
+    if let bundleIdentifier = application.bundleIdentifier,
+      configuration.excludes(bundleIdentifier: bundleIdentifier)
+    {
+      if logFailures {
+        selectionDebugLog(
+          "AX selection unavailable: application excluded bundle=\(bundleIdentifier)"
+        )
+      }
+      return nil
+    }
+    guard !IsSecureEventInputEnabled() else {
+      if logFailures {
+        selectionDebugLog("AX selection unavailable: secure event input is enabled")
+      }
       return nil
     }
     guard let element = selectedElement(in: application, logFailures: logFailures) else {
@@ -178,7 +207,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     }
     if logFailures {
       selectionDebugLog(
-        "frontmost app accepted: name=\(sourceApplicationName(for: application)) bundle=\(application.bundleIdentifier ?? "unknown") pid=\(application.processIdentifier)"
+        "frontmost app resolved: name=\(sourceApplicationName(for: application)) bundle=\(application.bundleIdentifier ?? "unknown") pid=\(application.processIdentifier)"
       )
     }
     return application
@@ -209,23 +238,74 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     }
     let focusedElement = unsafeDowncast(focusedValue, to: AXUIElement.self)
 
+    var ancestry: [AXUIElement] = []
     var currentElement: AXUIElement? = focusedElement
-    for depth in 0..<8 {
+    for _ in 0..<8 {
       guard let element = currentElement else {
         break
       }
+      ancestry.append(element)
+      currentElement = copyUIElementAttribute(kAXParentAttribute as CFString, from: element)
+    }
+
+    for (depth, element) in ancestry.enumerated() {
+      if let rejectionReason = sensitiveControlRejectionReason(for: element) {
+        if logFailures {
+          selectionDebugLog(
+            "AX selection unavailable: sensitive control rejected at ancestorDepth=\(depth) reason=\(rejectionReason)"
+          )
+        }
+        return nil
+      }
+    }
+
+    for (depth, element) in ancestry.enumerated() {
       if selectedText(in: element) != nil {
         if logFailures {
-          selectionDebugLog("AX element containing selected text found at ancestorDepth=\(depth)")
+          let role = stringAttribute(kAXRoleAttribute as CFString, from: element) ?? "unknown"
+          let subrole =
+            stringAttribute(kAXSubroleAttribute as CFString, from: element) ?? "none"
+          selectionDebugLog(
+            "AX element containing selected text found at ancestorDepth=\(depth) role=\(role) subrole=\(subrole)"
+          )
         }
         return element
       }
-      currentElement = copyUIElementAttribute(kAXParentAttribute as CFString, from: element)
     }
     if logFailures {
       selectionDebugLog("AX selection unavailable: no selected text in focused element ancestry")
     }
     return nil
+  }
+
+  private func sensitiveControlRejectionReason(for element: AXUIElement) -> String? {
+    let subrole = stringAttribute(kAXSubroleAttribute as CFString, from: element)
+    if subrole == kAXSecureTextFieldSubrole as String {
+      return "secure-text-field"
+    }
+
+    if let protectedContent =
+      copyAttribute("AXContainsProtectedContent" as CFString, from: element) as? NSNumber,
+      protectedContent.boolValue
+    {
+      return "protected-content"
+    }
+
+    let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
+    if role == kAXTextFieldRole as String,
+      subrole == nil || subrole == kAXUnknownSubrole as String
+    {
+      return "unconfirmed-text-field-subrole"
+    }
+
+    return nil
+  }
+
+  private func stringAttribute(
+    _ attribute: CFString,
+    from element: AXUIElement
+  ) -> String? {
+    copyAttribute(attribute, from: element) as? String
   }
 
   private func selectedText(in element: AXUIElement) -> String? {

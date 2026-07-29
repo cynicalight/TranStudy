@@ -13,6 +13,7 @@ struct ApplicationEnvironment {
   let speech: any SpeechPlaying
   let panelPositionStore: any TranslationPanelPositionStoring
   let providerConfigurationStore: any TranslationProviderConfigurationStoring
+  let selectionConfigurationStore: any SelectionConfigurationStoring
 }
 
 extension ApplicationEnvironment {
@@ -24,8 +25,11 @@ extension ApplicationEnvironment {
     connectionTester: any TranslationConnectionTesting,
     providerConfigurationStore: any TranslationProviderConfigurationStoring
   ) -> ApplicationEnvironment {
-    ApplicationEnvironment(
-      selection: AccessibilitySelectionProvider(),
+    let selectionConfigurationStore = UserDefaultsSelectionConfigurationStore()
+    return ApplicationEnvironment(
+      selection: AccessibilitySelectionProvider(
+        configurationStore: selectionConfigurationStore
+      ),
       clipboard: SystemClipboardReader(),
       translation: translation,
       learningStore: learningStore,
@@ -35,7 +39,8 @@ extension ApplicationEnvironment {
       notifications: DisabledReviewNotifier(),
       speech: DisabledSpeechPlayer(),
       panelPositionStore: UserDefaultsTranslationPanelPositionStore(),
-      providerConfigurationStore: providerConfigurationStore
+      providerConfigurationStore: providerConfigurationStore,
+      selectionConfigurationStore: selectionConfigurationStore
     )
   }
 }

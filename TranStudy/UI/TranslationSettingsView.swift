@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct TranslationSettingsView: View {
@@ -18,6 +19,71 @@ struct TranslationSettingsView: View {
       Divider()
 
       Form {
+        Section {
+          Toggle(
+            "启用全局划词",
+            isOn: Binding(
+              get: { shell.selectionConfiguration.isEnabled },
+              set: { shell.setSelectionEnabled($0) }
+            )
+          )
+
+          CenteredLabeledContent("排除应用") {
+            Menu {
+              ForEach(availableApplications, id: \.bundleIdentifier) { application in
+                Button(application.localizedName ?? application.bundleIdentifier ?? "未知应用") {
+                  guard let bundleIdentifier = application.bundleIdentifier else {
+                    return
+                  }
+                  shell.excludeApplication(
+                    bundleIdentifier: bundleIdentifier,
+                    displayName: application.localizedName ?? bundleIdentifier
+                  )
+                }
+              }
+            } label: {
+              Label("添加运行中的应用", systemImage: "plus")
+            }
+            .disabled(availableApplications.isEmpty)
+          }
+
+          ForEach(shell.selectionConfiguration.excludedApplications) { application in
+            HStack {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(application.displayName)
+                Text(application.bundleIdentifier)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              Spacer()
+              Button {
+                shell.includeApplication(bundleIdentifier: application.bundleIdentifier)
+              } label: {
+                Image(systemName: "minus.circle")
+              }
+              .buttonStyle(.plain)
+              .foregroundStyle(.secondary)
+              .help("从排除列表移除")
+              .accessibilityLabel("允许在 \(application.displayName) 中划词")
+            }
+          }
+        } header: {
+          Label("划词与隐私", systemImage: "hand.point.up.left.fill")
+        } footer: {
+          Text("密码框、受保护内容和无法确认安全属性的输入框始终不会显示翻译图标。")
+        }
+
+        Section {
+          compatibilityRow("Safari", detail: "网页文字与上下文")
+          compatibilityRow("Google Chrome", detail: "网页文字与上下文")
+          compatibilityRow("TextEdit", detail: "纯文本与上下文")
+          compatibilityRow("Preview", detail: "带文字层的 PDF；上下文尽力获取")
+        } header: {
+          Label("兼容性", systemImage: "checkmark.seal")
+        } footer: {
+          Text("图片、扫描 PDF 和其他不可访问文本不会尝试 OCR。其他应用按辅助功能信息尽力支持。")
+        }
+
         Section {
           CenteredLabeledContent("位置") {
             TranStudySegmentedControl(
@@ -102,6 +168,36 @@ struct TranslationSettingsView: View {
       .padding(.horizontal, 16)
     }
     .navigationTitle("设置")
+  }
+
+  private var availableApplications: [NSRunningApplication] {
+    NSWorkspace.shared.runningApplications
+      .filter { application in
+        guard
+          application.activationPolicy == .regular,
+          let bundleIdentifier = application.bundleIdentifier,
+          bundleIdentifier != Bundle.main.bundleIdentifier
+        else {
+          return false
+        }
+        return !shell.selectionConfiguration.excludes(bundleIdentifier: bundleIdentifier)
+      }
+      .sorted {
+        ($0.localizedName ?? $0.bundleIdentifier ?? "")
+          .localizedCaseInsensitiveCompare(
+            $1.localizedName ?? $1.bundleIdentifier ?? ""
+          ) == .orderedAscending
+      }
+  }
+
+  private func compatibilityRow(_ application: String, detail: String) -> some View {
+    HStack {
+      Text(application)
+      Spacer()
+      Label(detail, systemImage: "checkmark.circle.fill")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
   }
 
   @ViewBuilder

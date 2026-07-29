@@ -537,7 +537,9 @@ extension ApplicationEnvironment {
     notifier: TestReviewNotifier = TestReviewNotifier(),
     panelPositionStore: TestTranslationPanelPositionStore = TestTranslationPanelPositionStore(),
     providerConfigurationStore: TestTranslationProviderConfigurationStore =
-      TestTranslationProviderConfigurationStore()
+      TestTranslationProviderConfigurationStore(),
+    selectionConfigurationStore: TestSelectionConfigurationStore =
+      TestSelectionConfigurationStore()
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: TestSelectionProvider(),
@@ -550,7 +552,8 @@ extension ApplicationEnvironment {
       notifications: notifier,
       speech: TestSpeechPlayer(),
       panelPositionStore: panelPositionStore,
-      providerConfigurationStore: providerConfigurationStore
+      providerConfigurationStore: providerConfigurationStore,
+      selectionConfigurationStore: selectionConfigurationStore
     )
   }
 }
@@ -781,6 +784,22 @@ private final class TestTranslationProviderConfigurationStore:
   }
 
   func save(_ configuration: TranslationProviderConfiguration) {
+    savedConfiguration = configuration
+  }
+}
+
+private final class TestSelectionConfigurationStore: SelectionConfigurationStoring {
+  private(set) var savedConfiguration: SelectionConfiguration
+
+  init(configuration: SelectionConfiguration = .default) {
+    savedConfiguration = configuration
+  }
+
+  func load() -> SelectionConfiguration {
+    savedConfiguration
+  }
+
+  func save(_ configuration: SelectionConfiguration) {
     savedConfiguration = configuration
   }
 }

@@ -24,7 +24,8 @@
           panelPositionStore: PreviewPanelPositionStore(),
           providerConfigurationStore: PreviewProviderConfigurationStore(
             configuration: providerConfiguration
-          )
+          ),
+          selectionConfigurationStore: PreviewSelectionConfigurationStore()
         ))
     }
 
@@ -241,6 +242,18 @@
     }
 
     func save(_ configuration: TranslationProviderConfiguration) {
+      self.configuration = configuration
+    }
+  }
+
+  private final class PreviewSelectionConfigurationStore: SelectionConfigurationStoring {
+    private var configuration = SelectionConfiguration.default
+
+    func load() -> SelectionConfiguration {
+      configuration
+    }
+
+    func save(_ configuration: SelectionConfiguration) {
       self.configuration = configuration
     }
   }

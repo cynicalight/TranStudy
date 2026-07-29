@@ -19,8 +19,14 @@ final class ApplicationCoordinator {
       selection: shell.environment.selection,
       events: selectionEvents,
       indicator: selectionIndicator,
+      isClipboardFallbackActive: { [weak translationPanel] in
+        translationPanel?.isAwaitingClipboardExample == true
+      },
       onExternalInteraction: { [weak translationPanel] in
         translationPanel?.dismissForExternalInteraction()
+      },
+      onClipboardCopy: { [weak translationPanel] changeCount in
+        translationPanel?.authorizeNextClipboardChange(after: changeCount)
       },
       onSelection: { [weak translationPanel] snapshot in
         selectionDebugLog("coordinator forwarding snapshot to translation panel")

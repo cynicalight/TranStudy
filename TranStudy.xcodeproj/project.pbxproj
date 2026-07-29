@@ -43,6 +43,7 @@
 		8156F0FBB03325CB554344A3 /* ReviewNotifying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85F0ABB45046E453F49E09F0 /* ReviewNotifying.swift */; };
 		88821573FEF25770D94B02B0 /* TranslationProviderConfigurationStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8BE5C0264C96192636A7296 /* TranslationProviderConfigurationStoring.swift */; };
 		8B6979F4F5A3A20BA36794BA /* DeepSeekTranslationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B090391F21377B9C6570B1 /* DeepSeekTranslationProvider.swift */; };
+		8CF8A45D3CD198BACDAFBF50 /* SelectionConfigurationStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83124F4711414F1ACE428F16 /* SelectionConfigurationStoring.swift */; };
 		8F59F4365F9465CD580EB45E /* ApplicationShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3DF5A919583DACB3C3F2C6 /* ApplicationShellTests.swift */; };
 		93C0518F888C7F59DC03D74B /* PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D9430F5290004481CBD408 /* PreviewSupport.swift */; };
 		94CE3905FC4A00F9545A9621 /* DateProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = E73251EDC99994FB0D3DA3EA /* DateProviding.swift */; };
@@ -55,6 +56,7 @@
 		A76D820347D2D2AFEC2890B9 /* LearningRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E8389C189D488477B36DB5 /* LearningRecord.swift */; };
 		AE362D87A755D987E198302D /* LearningEncounterRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0107B42BEC4FF8B96FE60E43 /* LearningEncounterRecord.swift */; };
 		B285870C915EA43E0DF6CFD6 /* TranStudyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571B54B2E6D38AF604F0A9CF /* TranStudyApp.swift */; };
+		B673B7C619B55B391532CE34 /* UserDefaultsSelectionConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750FA4507656C9EEDC4A7999 /* UserDefaultsSelectionConfigurationStore.swift */; };
 		B9248E258528A907B24A2AB0 /* DeepSeekTranslationProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0024E9DFCF4F67D5F18251B6 /* DeepSeekTranslationProviderTests.swift */; };
 		BFCDA145C5497BCFD1064143 /* AccessibilitySelectionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9192A6C8D05ED156124578C3 /* AccessibilitySelectionProvider.swift */; };
 		C48521A41BA4DB895E89B06C /* SelectionIndicatorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8632578C1137A2F169CC074F /* SelectionIndicatorController.swift */; };
@@ -110,8 +112,10 @@
 		5B52673DF7E3FC2AA53FED9A /* TranslationProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviding.swift; sourceTree = "<group>"; };
 		6E0ABAFDFDC4B32274AB24A0 /* TodayReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayReviewView.swift; sourceTree = "<group>"; };
 		7182470FA15D1C73F5FD1C5B /* TranStudy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TranStudy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		750FA4507656C9EEDC4A7999 /* UserDefaultsSelectionConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsSelectionConfigurationStore.swift; sourceTree = "<group>"; };
 		7BE84DC09C1B9852BA4B7B22 /* SelectionSentenceContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSentenceContext.swift; sourceTree = "<group>"; };
 		813136C4D5EE2C9238A3B45C /* LearningLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningLibraryView.swift; sourceTree = "<group>"; };
+		83124F4711414F1ACE428F16 /* SelectionConfigurationStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionConfigurationStoring.swift; sourceTree = "<group>"; };
 		840AC99294DED14888CA4322 /* ConfiguredTranslationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfiguredTranslationServiceTests.swift; sourceTree = "<group>"; };
 		84E8389C189D488477B36DB5 /* LearningRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningRecord.swift; sourceTree = "<group>"; };
 		85F0ABB45046E453F49E09F0 /* ReviewNotifying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewNotifying.swift; sourceTree = "<group>"; };
@@ -177,6 +181,7 @@
 				F045DE99B91697C02E17E20B /* HTTPDataLoading.swift */,
 				FDF1A6468F5A38FB8643441B /* LearningStoring.swift */,
 				85F0ABB45046E453F49E09F0 /* ReviewNotifying.swift */,
+				83124F4711414F1ACE428F16 /* SelectionConfigurationStoring.swift */,
 				C8804912B880D366482CEF64 /* SelectionProviding.swift */,
 				8E1BCBA5EB2560D666584CA7 /* SpeechPlaying.swift */,
 				9E4265F13B01628E06FE8DF1 /* TranslationCacheStoring.swift */,
@@ -279,6 +284,7 @@
 				84E8389C189D488477B36DB5 /* LearningRecord.swift */,
 				29D89020FC50C5D7B244ADBA /* ReviewEventRecord.swift */,
 				3B9AD4FA6759148ACAC9F430 /* SwiftDataLearningStore.swift */,
+				750FA4507656C9EEDC4A7999 /* UserDefaultsSelectionConfigurationStore.swift */,
 				54220E6249BBBCCD2010ADBB /* UserDefaultsTranslationPanelPositionStore.swift */,
 				E421369785FC34DFCFA96402 /* UserDefaultsTranslationProviderConfigurationStore.swift */,
 			);
@@ -418,6 +424,7 @@
 				D9203CDCF3BE600884219E67 /* ReviewEventRecord.swift in Sources */,
 				8156F0FBB03325CB554344A3 /* ReviewNotifying.swift in Sources */,
 				9F330A62B857FB643842E05C /* RootView.swift in Sources */,
+				8CF8A45D3CD198BACDAFBF50 /* SelectionConfigurationStoring.swift in Sources */,
 				C48521A41BA4DB895E89B06C /* SelectionIndicatorController.swift in Sources */,
 				3CE192DE6D4F7A6BE28E0C70 /* SelectionInteractionController.swift in Sources */,
 				677D4E83E1506EBD0C39E17C /* SelectionProviding.swift in Sources */,
@@ -440,6 +447,7 @@
 				C7462FE9E4B8B84101F2DF43 /* TranslationProviding.swift in Sources */,
 				EB10F6E6BCA7DC87A3867ED2 /* TranslationSettingsView.swift in Sources */,
 				CC4CFB5B0FD46AA01BB62F7D /* URLSessionHTTPClient.swift in Sources */,
+				B673B7C619B55B391532CE34 /* UserDefaultsSelectionConfigurationStore.swift in Sources */,
 				5A0059377093C5088B0B2E35 /* UserDefaultsTranslationPanelPositionStore.swift in Sources */,
 				D55EAEF2B2036470C899AB9B /* UserDefaultsTranslationProviderConfigurationStore.swift in Sources */,
 			);
