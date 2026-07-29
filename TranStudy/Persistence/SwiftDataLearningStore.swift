@@ -375,19 +375,13 @@ final class SwiftDataLearningStore: LearningStoring {
   }
 
   func scheduleDeletion(itemID: UUID, deleteAt: Date) async throws {
-    let records = try consolidatedRecords()
-    guard let record = records.first(where: { $0.id == itemID }) else {
-      throw LearningStoreError.missingLearningItem
-    }
+    let record = try learningRecord(itemID: itemID)
     record.deletionScheduledAt = deleteAt
     try saveOrRollback()
   }
 
   func cancelDeletion(itemID: UUID) async throws {
-    let records = try consolidatedRecords()
-    guard let record = records.first(where: { $0.id == itemID }) else {
-      throw LearningStoreError.missingLearningItem
-    }
+    let record = try learningRecord(itemID: itemID)
     record.deletionScheduledAt = nil
     try saveOrRollback()
   }
@@ -425,10 +419,7 @@ final class SwiftDataLearningStore: LearningStoring {
   }
 
   func delete(itemID: UUID) async throws {
-    let records = try consolidatedRecords()
-    guard let record = records.first(where: { $0.id == itemID }) else {
-      throw LearningStoreError.missingLearningItem
-    }
+    let record = try learningRecord(itemID: itemID)
     context.delete(record)
     try saveOrRollback()
   }
@@ -475,6 +466,14 @@ final class SwiftDataLearningStore: LearningStoring {
       }
       .sorted { effectiveLastEncounteredAt(for: $0) > effectiveLastEncounteredAt(for: $1) }
       .map(learningItem(from:))
+  }
+
+  private func learningRecord(itemID: UUID) throws -> LearningRecord {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+    return record
   }
 
   private func learningItem(from record: LearningRecord) -> LearningItem {
