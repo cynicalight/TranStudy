@@ -14,7 +14,7 @@ struct LearningLibraryView: View {
           systemImage: "books.vertical.fill"
         )
         .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
-        .padding(.horizontal, 32)
+        .padding(.horizontal, 12)
         .padding(.top, 24)
         .padding(.bottom, 16)
 
@@ -28,6 +28,8 @@ struct LearningLibraryView: View {
         reduceMotion ? nil : .easeInOut(duration: 0.2),
         value: shell.isLibrarySelecting
       )
+      .padding(.horizontal, 12)
+
       Divider()
 
       if shell.displayedLearningItems.isEmpty {
