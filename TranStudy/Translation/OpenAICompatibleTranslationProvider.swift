@@ -37,6 +37,24 @@ final class OpenAICompatibleTranslationProvider:
     ).translate(request)
   }
 
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    guard
+      configuration.provider == .openAICompatible,
+      let baseURL = Self.validBaseURL(configuration.customBaseURL),
+      !configuration.customModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      throw TranslationError.notConfigured
+    }
+    return try await OpenAIChatTranslationClient(
+      provider: .openAICompatible,
+      endpoint: baseURL.appending(path: "chat/completions"),
+      model: configuration.customModel,
+      addsDisabledThinking: false,
+      apiKeyStore: apiKeyStore,
+      httpClient: httpClient
+    ).translateLongText(sourceText)
+  }
+
   func testConnection(
     configuration: TranslationProviderConfiguration,
     apiKey: String

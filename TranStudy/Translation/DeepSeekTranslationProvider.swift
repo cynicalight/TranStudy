@@ -46,6 +46,17 @@ final class DeepSeekTranslationProvider: TranslationConnectionTesting, Translati
     ).translate(request)
   }
 
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    try await OpenAIChatTranslationClient(
+      provider: .deepSeek,
+      endpoint: endpoint,
+      model: model.rawValue,
+      addsDisabledThinking: true,
+      apiKeyStore: apiKeyStore,
+      httpClient: httpClient
+    ).translateLongText(sourceText)
+  }
+
   func testConnection(
     configuration: TranslationProviderConfiguration,
     apiKey: String

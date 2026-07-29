@@ -26,38 +26,13 @@ final class OpenAIChatTranslationClient {
   }
 
   func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+    let content = try await completionContent(
+      systemPrompt: Self.systemPrompt,
+      userContent: request.promptContent,
+      maxTokens: 800,
+      timeoutInterval: 30
+    )
     guard
-      let apiKey = try apiKeyStore.loadAPIKey(for: provider)?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-      !apiKey.isEmpty
-    else {
-      throw TranslationError.notConfigured
-    }
-
-    var urlRequest = URLRequest(url: endpoint)
-    urlRequest.httpMethod = "POST"
-    urlRequest.timeoutInterval = 30
-    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-    urlRequest.httpBody = try JSONEncoder().encode(
-      OpenAIChatRequest(
-        model: model,
-        messages: [
-          OpenAIMessage(role: "system", content: Self.systemPrompt),
-          OpenAIMessage(role: "user", content: request.promptContent),
-        ],
-        responseFormat: OpenAIResponseFormat(type: "json_object"),
-        thinking: addsDisabledThinking ? OpenAIThinking(type: "disabled") : nil,
-        maxTokens: 800
-      ))
-
-    let (data, response) = try await httpClient.data(for: urlRequest)
-    guard (200..<300).contains(response.statusCode) else {
-      throw TranslationError.serviceUnavailable
-    }
-    guard
-      let completion = try? JSONDecoder().decode(OpenAIChatResponse.self, from: data),
-      let content = completion.choices.first?.message.content,
       let contentData = content.data(using: .utf8),
       let payload = try? JSONDecoder().decode(OpenAITranslationPayload.self, from: contentData),
       payload.inputKind == .wordOrPhrase,
@@ -115,6 +90,75 @@ final class OpenAIChatTranslationClient {
     )
   }
 
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    let content = try await completionContent(
+      systemPrompt: Self.longTextSystemPrompt,
+      userContent: sourceText,
+      maxTokens: 6_000,
+      timeoutInterval: 60
+    )
+    guard
+      let contentData = content.data(using: .utf8),
+      let payload = try? JSONDecoder().decode(OpenAILongTextPayload.self, from: contentData),
+      payload.inputKind == .longText,
+      payload.sourceText == sourceText,
+      !payload.translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      Self.containsHanCharacter(payload.translation)
+    else {
+      throw TranslationError.invalidResponse
+    }
+
+    return LongTextTranslationResult(
+      sourceText: sourceText,
+      translatedText: payload.translation
+    )
+  }
+
+  private func completionContent(
+    systemPrompt: String,
+    userContent: String,
+    maxTokens: Int,
+    timeoutInterval: TimeInterval
+  ) async throws -> String {
+    guard
+      let apiKey = try apiKeyStore.loadAPIKey(for: provider)?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !apiKey.isEmpty
+    else {
+      throw TranslationError.notConfigured
+    }
+
+    var urlRequest = URLRequest(url: endpoint)
+    urlRequest.httpMethod = "POST"
+    urlRequest.timeoutInterval = timeoutInterval
+    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    urlRequest.httpBody = try JSONEncoder().encode(
+      OpenAIChatRequest(
+        model: model,
+        messages: [
+          OpenAIMessage(role: "system", content: systemPrompt),
+          OpenAIMessage(role: "user", content: userContent),
+        ],
+        responseFormat: OpenAIResponseFormat(type: "json_object"),
+        thinking: addsDisabledThinking ? OpenAIThinking(type: "disabled") : nil,
+        maxTokens: maxTokens
+      ))
+
+    let (data, response) = try await httpClient.data(for: urlRequest)
+    guard (200..<300).contains(response.statusCode) else {
+      throw TranslationError.serviceUnavailable
+    }
+    guard
+      let completion = try? JSONDecoder().decode(OpenAIChatResponse.self, from: data),
+      let content = completion.choices.first?.message.content,
+      !content.isEmpty
+    else {
+      throw TranslationError.invalidResponse
+    }
+    return content
+  }
+
   private static func containsHanCharacter(_ text: String) -> Bool {
     text.unicodeScalars.contains { scalar in
       (0x3400...0x4DBF).contains(scalar.value)
@@ -162,6 +206,15 @@ final class OpenAIChatTranslationClient {
     Use an empty pronunciation only when it is genuinely unavailable. Never reverse English
     source fields and Chinese translation fields. Do not include markdown or explanations
     outside the JSON object.
+    """
+
+  private static let longTextSystemPrompt = """
+    Translate the supplied English sentence or paragraph into natural Chinese.
+    Preserve paragraph breaks and meaning. Return one JSON object only with exactly these
+    string fields: input_kind, source_text, translation.
+    Set input_kind to "long_text". Set source_text to the exact supplied English text,
+    unchanged. Set translation to the complete Chinese translation. Do not summarize,
+    omit content, add commentary, or include markdown outside the JSON object.
     """
 }
 
@@ -225,6 +278,18 @@ private struct OpenAITranslationPayload: Decodable {
     case contextualMeaning = "contextual_meaning"
     case exampleSentence = "example_sentence"
     case sentenceTranslation = "sentence_translation"
+  }
+}
+
+private struct OpenAILongTextPayload: Decodable {
+  let inputKind: OpenAITranslationInputKind
+  let sourceText: String
+  let translation: String
+
+  enum CodingKeys: String, CodingKey {
+    case inputKind = "input_kind"
+    case sourceText = "source_text"
+    case translation
   }
 }
 

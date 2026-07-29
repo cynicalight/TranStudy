@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 import Observation
 
 enum TranslationConnectionStatus: Equatable {
@@ -26,8 +27,10 @@ final class ApplicationShell {
   var translationDraft: TranslationDraft?
   private(set) var connectionStatus: TranslationConnectionStatus = .idle
   private(set) var translationStatus: TranslationStatus = .idle
+  private(set) var translationError: TranslationError?
   private(set) var translationSourceText = ""
   private(set) var translationPresentationTitle = "翻译剪贴板"
+  private(set) var longTextTranslation: LongTextTranslationResult?
   private(set) var learningItems: [LearningItem] = []
   private(set) var reviewQueue: [LearningItem] = []
   private(set) var isReviewAnswerVisible = false
@@ -120,15 +123,19 @@ final class ApplicationShell {
     guard
       let sourceText = environment.clipboard.readText()?
         .trimmingCharacters(in: .whitespacesAndNewlines),
-      Self.isWordOrShortPhrase(sourceText)
+      !sourceText.isEmpty
     else {
       translationStatus = .failed
       return
     }
 
-    await translate(
-      TranslationRequest(sourceText: sourceText)
-    )
+    if Self.isWordOrShortPhrase(sourceText) {
+      await translate(
+        TranslationRequest(sourceText: sourceText)
+      )
+    } else {
+      await translateLongText(sourceText)
+    }
   }
 
   func translateSelection(_ snapshot: SelectionSnapshot) async {
@@ -159,6 +166,8 @@ final class ApplicationShell {
     let translationID = UUID()
     activeTranslationID = translationID
     translationSourceText = request.sourceText
+    translationError = nil
+    longTextTranslation = nil
     translationStatus = .loading
 
     do {
@@ -184,10 +193,104 @@ final class ApplicationShell {
     } catch {
       if activeTranslationID == translationID {
         activeTranslationID = nil
+        translationError = error as? TranslationError
         translationStatus = .failed
       }
       selectionDebugLog("translation failed: errorType=\(String(reflecting: type(of: error)))")
     }
+  }
+
+  private func translateLongText(_ sourceText: String) async {
+    let translationID = UUID()
+    activeTranslationID = translationID
+    translationSourceText = sourceText
+    translationPresentationTitle = "翻译长文本"
+    translationDraft = nil
+    longTextTranslation = nil
+    translationError = nil
+    translationStatus = .loading
+
+    do {
+      let result = try await environment.translation.translateLongText(sourceText)
+      try Task.checkCancellation()
+      guard activeTranslationID == translationID else {
+        return
+      }
+
+      activeTranslationID = nil
+      longTextTranslation = result
+      translationStatus = .ready
+      selectionDebugLog(
+        "long text translation succeeded: sourceLength=\(sourceText.count) translatedLength=\(result.translatedText.count)"
+      )
+    } catch is CancellationError {
+      if activeTranslationID == translationID {
+        activeTranslationID = nil
+        translationStatus = .idle
+      }
+      selectionDebugLog("long text translation cancelled")
+    } catch {
+      if activeTranslationID == translationID {
+        activeTranslationID = nil
+        translationError = error as? TranslationError
+        translationStatus = .failed
+      }
+      selectionDebugLog(
+        "long text translation failed: errorType=\(String(reflecting: type(of: error)))"
+      )
+    }
+  }
+
+  func translateLongTextSelection(_ selectedRange: NSRange) async {
+    guard let request = longTextSelectionRequest(for: selectedRange) else {
+      selectionDebugLog("long text selection ignored: selection is not a word or short phrase")
+      return
+    }
+
+    translationPresentationTitle = "学习长文本选词"
+    isSelectionContextUnavailable = false
+    await translate(request)
+  }
+
+  func canTranslateLongTextSelection(_ selectedRange: NSRange) -> Bool {
+    longTextSelectionRequest(for: selectedRange) != nil
+  }
+
+  private func longTextSelectionRequest(for selectedRange: NSRange) -> TranslationRequest? {
+    guard let longTextTranslation else {
+      return nil
+    }
+    let source = longTextTranslation.sourceText as NSString
+    guard
+      selectedRange.location >= 0,
+      selectedRange.length > 0,
+      selectedRange.location <= source.length,
+      selectedRange.length <= source.length - selectedRange.location
+    else {
+      return nil
+    }
+
+    let selectedText = source.substring(with: selectedRange)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      Self.isWordOrShortPhrase(selectedText),
+      let context = SelectionSentenceContext.extract(
+        from: longTextTranslation.sourceText,
+        selectedRange: CFRange(
+          location: selectedRange.location,
+          length: selectedRange.length
+        )
+      )
+    else {
+      return nil
+    }
+
+    return TranslationRequest(
+      sourceText: selectedText,
+      context: "Target sentence:\n\(context.targetSentence)",
+      kind: .contextualSelection,
+      targetSentence: context.targetSentence
+    )
   }
 
   func addCurrentDraftToLearning() async {
@@ -327,6 +430,8 @@ final class ApplicationShell {
   ) {
     translationSourceText = ""
     translationDraft = nil
+    longTextTranslation = nil
+    translationError = nil
     translationPresentationTitle = title
     translationSuggestedCanonicalForm = ""
     translationSourceApplicationName = sourceApplicationName
@@ -438,14 +543,41 @@ final class ApplicationShell {
       return false
     }
 
-    let sentenceTerminators = CharacterSet(charactersIn: ".!?。！？")
-    if words.count > 1,
-      sourceText.unicodeScalars.contains(where: sentenceTerminators.contains)
-    {
+    if Self.looksLikeSentence(sourceText) {
       return false
     }
 
     return true
+  }
+
+  private static func looksLikeSentence(_ sourceText: String) -> Bool {
+    let sentenceTerminators = CharacterSet(charactersIn: ".!?。！？")
+    if sourceText.unicodeScalars.contains(where: sentenceTerminators.contains) {
+      return true
+    }
+
+    let tagger = NLTagger(tagSchemes: [.lexicalClass])
+    tagger.string = sourceText
+    tagger.setLanguage(.english, range: sourceText.startIndex..<sourceText.endIndex)
+
+    var hasSubjectCandidate = false
+    var hasSubjectBeforeVerb = false
+    tagger.enumerateTags(
+      in: sourceText.startIndex..<sourceText.endIndex,
+      unit: .word,
+      scheme: .lexicalClass,
+      options: [.omitWhitespace, .omitPunctuation]
+    ) { tag, _ in
+      if tag == .verb, hasSubjectCandidate {
+        hasSubjectBeforeVerb = true
+        return false
+      }
+      if tag == .noun || tag == .pronoun {
+        hasSubjectCandidate = true
+      }
+      return true
+    }
+    return hasSubjectBeforeVerb
   }
 
   private func persistLearningAddition(_ addition: LearningAddition) async throws {

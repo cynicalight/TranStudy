@@ -70,7 +70,7 @@ struct TranStudyApp: App {
           coordinator.presentClipboardTranslation()
         }
         .keyboardShortcut(
-          KeyEquivalent(Character(UnicodeScalar(NSF5FunctionKey)!)),
+          KeyEquivalent(Character(UnicodeScalar(NSF4FunctionKey)!)),
           modifiers: []
         )
       }

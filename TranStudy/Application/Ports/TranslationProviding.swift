@@ -58,6 +58,11 @@ struct TranslationResult: Codable, Equatable, Sendable {
   let sentenceTranslation: String
 }
 
+struct LongTextTranslationResult: Equatable, Sendable {
+  let sourceText: String
+  let translatedText: String
+}
+
 enum TranslationError: Error, Equatable, Sendable {
   case notConfigured
   case inputTooLong
@@ -70,4 +75,11 @@ enum TranslationError: Error, Equatable, Sendable {
 @MainActor
 protocol TranslationProviding {
   func translate(_ request: TranslationRequest) async throws -> TranslationResult
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult
+}
+
+extension TranslationProviding {
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    throw TranslationError.invalidResponse
+  }
 }

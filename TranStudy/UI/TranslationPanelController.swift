@@ -116,12 +116,25 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         shell: shell,
         onDismiss: { [weak self] in
           self?.dismiss()
+        },
+        onTranslateLongTextSelection: { [weak self] selectedRange in
+          self?.translateLongTextSelection(selectedRange)
         }
       ))
     position(panel)
 
     self.panel = panel
     panel.orderFrontRegardless()
+  }
+
+  private func translateLongTextSelection(_ selectedRange: NSRange) {
+    translationTask?.cancel()
+    translationTask = Task { [weak self] in
+      guard let self else {
+        return
+      }
+      await shell.translateLongTextSelection(selectedRange)
+    }
   }
 
   private func position(_ panel: NSPanel) {

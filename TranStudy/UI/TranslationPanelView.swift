@@ -3,6 +3,7 @@ import SwiftUI
 struct TranslationPanelView: View {
   @Bindable var shell: ApplicationShell
   let onDismiss: () -> Void
+  let onTranslateLongTextSelection: (NSRange) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -93,18 +94,22 @@ struct TranslationPanelView: View {
   private var content: some View {
     switch shell.translationStatus {
     case .idle, .loading:
-      HStack(spacing: 10) {
-        ProgressView()
-          .controlSize(.small)
-        VStack(alignment: .leading, spacing: 3) {
-          Text("正在翻译")
-            .font(.headline)
-          Text("正在理解剪贴板中的语境…")
-            .font(.callout)
-            .foregroundStyle(.secondary)
+      if shell.translationPresentationTitle == "翻译长文本" {
+        longTextLoadingView
+      } else {
+        HStack(spacing: 10) {
+          ProgressView()
+            .controlSize(.small)
+          VStack(alignment: .leading, spacing: 3) {
+            Text("正在翻译")
+              .font(.headline)
+            Text("正在理解剪贴板中的语境…")
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
         }
+        .frame(maxWidth: .infinity, minHeight: 220)
       }
-      .frame(maxWidth: .infinity, minHeight: 220)
     case .failed:
       VStack(spacing: 12) {
         Image(systemName: "exclamationmark.triangle.fill")
@@ -112,15 +117,48 @@ struct TranslationPanelView: View {
           .foregroundStyle(.orange)
         Text("翻译失败")
           .font(.title3.weight(.semibold))
-        Text("请检查翻译服务设置和网络，然后重试。")
-          .foregroundStyle(.secondary)
+        Text(
+          shell.translationError == .inputTooLong
+            ? "内容超过约 12000 字符或 token 预算，请缩短后重试。"
+            : "请检查翻译服务设置和网络，然后重试。"
+        )
+        .foregroundStyle(.secondary)
       }
       .frame(maxWidth: .infinity, minHeight: 220)
     case .ready:
-      if shell.translationDraft != nil {
+      if let longTextTranslation = shell.longTextTranslation {
+        LongTextTranslationView(
+          shell: shell,
+          result: longTextTranslation,
+          onTranslateSelection: onTranslateLongTextSelection
+        )
+      } else if shell.translationDraft != nil {
         draftForm
       }
     }
+  }
+
+  private var longTextLoadingView: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text("英文原文")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      ScrollView {
+        Text(shell.translationSourceText)
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .frame(height: 150)
+
+      HStack(spacing: 10) {
+        ProgressView()
+          .controlSize(.small)
+        Text("正在翻译完整内容…")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
   }
 
   private var draftForm: some View {

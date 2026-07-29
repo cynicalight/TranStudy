@@ -69,11 +69,15 @@
     static func translationPanelView() -> some View {
       let shell = makeShell()
 
-      return TranslationPanelView(shell: shell, onDismiss: {})
-        .frame(height: 470)
-        .task {
-          await shell.translateClipboard()
-        }
+      return TranslationPanelView(
+        shell: shell,
+        onDismiss: {},
+        onTranslateLongTextSelection: { _ in }
+      )
+      .frame(height: 470)
+      .task {
+        await shell.translateClipboard()
+      }
     }
   }
 

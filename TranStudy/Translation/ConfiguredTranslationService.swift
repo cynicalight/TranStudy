@@ -51,6 +51,29 @@ final class ConfiguredTranslationService:
     return result
   }
 
+  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    let request = TranslationRequest(sourceText: sourceText, kind: .longText)
+    try validate(request)
+    let configuration = configurationStore.load()
+
+    return try await sanitizeErrors {
+      switch configuration.provider {
+      case .deepSeek:
+        return try await DeepSeekTranslationProvider(
+          apiKeyStore: apiKeyStore,
+          httpClient: httpClient,
+          model: configuration.deepSeekModel
+        ).translateLongText(sourceText)
+      case .openAICompatible:
+        return try await OpenAICompatibleTranslationProvider(
+          configuration: configuration,
+          apiKeyStore: apiKeyStore,
+          httpClient: httpClient
+        ).translateLongText(sourceText)
+      }
+    }
+  }
+
   private func validate(_ request: TranslationRequest) throws {
     if let context = request.context,
       context.count > 4_000 || Self.estimatedTokenCount(context) > 1_200
