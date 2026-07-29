@@ -1103,6 +1103,93 @@ struct SwiftDataLearningStoreTests {
     }
   }
 
+  @Test("summary reports today's reviews and a consecutive-day learning streak")
+  func summaryReportsDailyReviewStatistics() async throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container, calendar: calendar)
+    let july8 = date(year: 2026, month: 7, day: 8, calendar: calendar)
+    let july9 = date(year: 2026, month: 7, day: 9, calendar: calendar)
+    let july10 = date(year: 2026, month: 7, day: 10, calendar: calendar)
+
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "run",
+          canonicalForm: "run",
+          pronunciation: "",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "I run.",
+          sentenceTranslation: "我跑步。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: july8.addingTimeInterval(-86_400),
+        nextReviewAt: july8
+      ))
+    let reviewedWord = try #require(try await store.items().first)
+    for reviewDate in [july8, july9, july10] {
+      _ = try await store.recordReview(
+        itemID: reviewedWord.id,
+        rating: .remembered,
+        reviewedAt: reviewDate
+      )
+    }
+    try await store.add(
+      LearningAddition(
+        kind: .sentence,
+        draft: TranslationDraft(
+          sourceText: "Keep moving.",
+          canonicalForm: "Keep moving.",
+          pronunciation: "",
+          partOfSpeech: "",
+          contextualMeaning: "",
+          exampleSentence: "Keep moving.",
+          sentenceTranslation: "继续前进。"
+        ),
+        sourceApplicationName: "TextEdit",
+        createdAt: july8,
+        nextReviewAt: july10
+      ))
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "paused",
+          canonicalForm: "pause",
+          pronunciation: "",
+          partOfSpeech: "verb",
+          contextualMeaning: "暂停",
+          exampleSentence: "Pause here.",
+          sentenceTranslation: "在这里暂停。"
+        ),
+        sourceApplicationName: "Preview",
+        createdAt: july8,
+        nextReviewAt: july10,
+        isPaused: true
+      ))
+
+    let today = try await store.summary(at: july10.addingTimeInterval(43_200))
+    let nextDay = try await store.summary(at: july10.addingTimeInterval(86_400 + 43_200))
+    let missedDay = try await store.summary(at: july10.addingTimeInterval(172_800 + 43_200))
+
+    #expect(today.dueCount == 1)
+    #expect(today.reviewedTodayCount == 1)
+    #expect(today.streakDayCount == 3)
+    #expect(today.wordCount == 2)
+    #expect(today.sentenceCount == 1)
+    #expect(nextDay.reviewedTodayCount == 0)
+    #expect(nextDay.streakDayCount == 3)
+    #expect(missedDay.streakDayCount == 0)
+  }
+
   @Test("review history records the previous actual review time")
   func reviewHistoryRecordsPreviousActualReviewTime() async throws {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -1260,6 +1347,15 @@ struct SwiftDataLearningStoreTests {
       LearningCustomExampleRecord.self,
       configurations: configuration
     )
+  }
+
+  private func date(
+    year: Int,
+    month: Int,
+    day: Int,
+    calendar: Calendar
+  ) -> Date {
+    calendar.date(from: DateComponents(year: year, month: month, day: day))!
   }
 
   private func makeInMemoryStore() throws -> SwiftDataLearningStore {

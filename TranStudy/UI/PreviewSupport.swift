@@ -97,6 +97,8 @@
   enum PreviewFixtures {
     static let learningSummary = LearningSummary(
       dueCount: 4,
+      reviewedTodayCount: 7,
+      streakDayCount: 5,
       wordCount: 28,
       sentenceCount: 6
     )

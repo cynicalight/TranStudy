@@ -14,23 +14,35 @@ final class SwiftDataLearningStore: LearningStoring {
   }
 
   private let context: ModelContext
+  private let calendar: Calendar
 
-  init(container: ModelContainer) {
+  init(
+    container: ModelContainer,
+    calendar: Calendar = .autoupdatingCurrent
+  ) {
     context = ModelContext(container)
+    self.calendar = calendar
   }
 
   func summary(at date: Date) async throws -> LearningSummary {
     let records = try consolidatedRecords().filter {
-      $0.archivedAt == nil && $0.deletionScheduledAt == nil
+      $0.deletionScheduledAt == nil
     }
-    let dueCount = records.count(where: {
+    let activeRecords = records.filter { $0.archivedAt == nil }
+    let dueCount = activeRecords.count(where: {
       !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= date
     })
+    let reviewDays = records.flatMap(\.reviewEvents).map {
+      calendar.startOfDay(for: $0.reviewedAt)
+    }
+    let today = calendar.startOfDay(for: date)
 
     return LearningSummary(
       dueCount: dueCount,
-      wordCount: records.count(where: { learningKind(for: $0) == .word }),
-      sentenceCount: records.count(where: { learningKind(for: $0) == .sentence })
+      reviewedTodayCount: reviewDays.count(where: { $0 == today }),
+      streakDayCount: streakDayCount(reviewDays: Set(reviewDays), today: today),
+      wordCount: activeRecords.count(where: { learningKind(for: $0) == .word }),
+      sentenceCount: activeRecords.count(where: { learningKind(for: $0) == .sentence })
     )
   }
 
@@ -545,6 +557,22 @@ final class SwiftDataLearningStore: LearningStoring {
 
   private func effectiveLastEncounteredAt(for record: LearningRecord) -> Date {
     record.encounters.map(\.encounteredAt).max() ?? record.createdAt
+  }
+
+  private func streakDayCount(reviewDays: Set<Date>, today: Date) -> Int {
+    var cursor = today
+    if !reviewDays.contains(cursor) {
+      cursor = calendar.date(byAdding: .day, value: -1, to: cursor) ?? cursor
+    }
+    var count = 0
+    while reviewDays.contains(cursor) {
+      count += 1
+      guard let previousDay = calendar.date(byAdding: .day, value: -1, to: cursor) else {
+        break
+      }
+      cursor = previousDay
+    }
+    return count
   }
 
   private func date(byAddingDays days: Int, to date: Date) -> Date {

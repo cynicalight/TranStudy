@@ -689,7 +689,8 @@ struct ApplicationShellTests {
   func ratingDueCardRevealsAnswerThenAdvances() async throws {
     let firstItem = makeLearningItem(
       id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
-      canonicalForm: "run"
+      canonicalForm: "run",
+      nextReviewAt: Date(timeIntervalSince1970: -100)
     )
     let secondItem = makeLearningItem(
       id: UUID(uuidString: "A60B21B0-D9FC-4DBD-B818-A1819310E5E4")!,
@@ -728,6 +729,51 @@ struct ApplicationShellTests {
     #expect(shell.selectedReviewRating == nil)
   }
 
+  @Test("daily review advances through complete twenty-card batches")
+  func dailyReviewUsesTwentyCardBatches() async {
+    let dueItems = (0..<45).map { index in
+      makeLearningItem(
+        id: UUID(),
+        canonicalForm: "word-\(index)",
+        nextReviewAt: Date(timeIntervalSince1970: 1_200)
+      )
+    }
+    let learningStore = TestLearningStore(
+      summary: LearningSummary(
+        dueCount: 45,
+        wordCount: 45,
+        sentenceCount: 0
+      ),
+      dueItems: dueItems
+    )
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    await shell.refreshTodayReview()
+
+    #expect(shell.reviewQueue.count == 20)
+    #expect(shell.remainingReviewCount == 25)
+    #expect(shell.hasMoreReviewBatches)
+
+    while shell.currentReviewItem != nil {
+      await shell.rateCurrentReview(.remembered)
+      shell.advanceToNextReview()
+    }
+
+    #expect(learningStore.reviewInvocations.count == 20)
+    #expect(shell.hasMoreReviewBatches)
+
+    shell.startNextReviewBatch()
+
+    #expect(shell.reviewQueue.count == 20)
+    #expect(shell.remainingReviewCount == 5)
+    #expect(
+      Set(shell.reviewQueue.map(\.id))
+        .isDisjoint(with: Set(learningStore.reviewInvocations.map(\.itemID)))
+    )
+  }
+
   @Test("a cancelled translation cannot publish a late result")
   func cancelledTranslationCannotPublishLateResult() async {
     let translator = ControlledTranslationProvider()
@@ -759,7 +805,11 @@ struct ApplicationShellTests {
     #expect(shell.translationStatus == .idle)
   }
 
-  private func makeLearningItem(id: UUID, canonicalForm: String) -> LearningItem {
+  private func makeLearningItem(
+    id: UUID,
+    canonicalForm: String,
+    nextReviewAt: Date = Date(timeIntervalSince1970: 1_200)
+  ) -> LearningItem {
     LearningItem(
       id: id,
       sourceText: canonicalForm,
@@ -771,7 +821,7 @@ struct ApplicationShellTests {
       sentenceTranslation: "\(canonicalForm) 翻译",
       sourceApplicationName: "Safari",
       createdAt: Date(timeIntervalSince1970: 1_000),
-      nextReviewAt: Date(timeIntervalSince1970: 1_200)
+      nextReviewAt: nextReviewAt
     )
   }
 
@@ -1217,6 +1267,7 @@ private final class TestLearningStore: LearningStoring {
   private var storedItems: [LearningItem]
   private var storedArchivedItems: [LearningItem]
   private var storedDueItems: [LearningItem]
+  private var storedSummary: LearningSummary
   private var storedPendingDeletion: PendingLearningDeletion?
   private var pendingDeletionWasDue = false
   private let storedMergeSummary: LearningMergeSummary?
@@ -1224,6 +1275,11 @@ private final class TestLearningStore: LearningStoring {
   private let detailsUpdateError: TestLearningStoreError?
 
   init(
+    summary: LearningSummary = LearningSummary(
+      dueCount: 3,
+      wordCount: 12,
+      sentenceCount: 4
+    ),
     items: [LearningItem] = [],
     archivedItems: [LearningItem] = [],
     dueItems: [LearningItem] = [],
@@ -1232,6 +1288,7 @@ private final class TestLearningStore: LearningStoring {
     canonicalUpdateResults: [LearningCanonicalUpdateResult] = [],
     detailsUpdateError: TestLearningStoreError? = nil
   ) {
+    storedSummary = summary
     storedItems = items
     storedArchivedItems = archivedItems
     storedDueItems = dueItems
@@ -1242,11 +1299,7 @@ private final class TestLearningStore: LearningStoring {
   }
 
   func summary(at date: Date) async throws -> LearningSummary {
-    LearningSummary(
-      dueCount: 3,
-      wordCount: 12,
-      sentenceCount: 4
-    )
+    storedSummary
   }
 
   func add(_ addition: LearningAddition) async throws {

@@ -59,6 +59,7 @@ final class ApplicationShell {
     }
   }
   private(set) var reviewQueue: [LearningItem] = []
+  private(set) var remainingReviewItems: [LearningItem] = []
   private(set) var isReviewAnswerVisible = false
   private(set) var isReviewRating = false
   private(set) var selectedReviewRating: ReviewRating?
@@ -86,6 +87,14 @@ final class ApplicationShell {
     reviewQueue.first
   }
 
+  var remainingReviewCount: Int {
+    remainingReviewItems.count
+  }
+
+  var hasMoreReviewBatches: Bool {
+    !remainingReviewItems.isEmpty
+  }
+
   var isLongTextTranslationPresentation: Bool {
     translationPresentationTitle == "翻译长文本"
   }
@@ -104,8 +113,14 @@ final class ApplicationShell {
       let now = environment.clock.now
       let summary = try await environment.learningStore.summary(at: now)
       let dueItems = try await environment.learningStore.dueItems(at: now)
+      let queue = DailyReviewQueueBuilder().makeQueue(
+        from: dueItems,
+        at: now,
+        seed: DailyReviewQueueBuilder.seed(for: now)
+      )
       learningSummary = summary
-      reviewQueue = dueItems
+      reviewQueue = Array(queue.items.prefix(DailyReviewQueue.batchSize))
+      remainingReviewItems = Array(queue.items.dropFirst(DailyReviewQueue.batchSize))
       isReviewAnswerVisible = false
       selectedReviewRating = nil
       lastReviewRefreshDate = now
@@ -155,6 +170,16 @@ final class ApplicationShell {
       return
     }
     reviewQueue.removeFirst()
+    isReviewAnswerVisible = false
+    selectedReviewRating = nil
+  }
+
+  func startNextReviewBatch() {
+    guard reviewQueue.isEmpty, !remainingReviewItems.isEmpty else {
+      return
+    }
+    reviewQueue = Array(remainingReviewItems.prefix(DailyReviewQueue.batchSize))
+    remainingReviewItems.removeFirst(min(DailyReviewQueue.batchSize, remainingReviewItems.count))
     isReviewAnswerVisible = false
     selectedReviewRating = nil
   }

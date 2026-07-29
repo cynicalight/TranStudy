@@ -7,8 +7,24 @@ enum LearningContentKind: String, Codable, Equatable, Hashable, Sendable {
 
 struct LearningSummary: Equatable, Sendable {
   let dueCount: Int
+  let reviewedTodayCount: Int
+  let streakDayCount: Int
   let wordCount: Int
   let sentenceCount: Int
+
+  init(
+    dueCount: Int,
+    reviewedTodayCount: Int = 0,
+    streakDayCount: Int = 0,
+    wordCount: Int,
+    sentenceCount: Int
+  ) {
+    self.dueCount = dueCount
+    self.reviewedTodayCount = reviewedTodayCount
+    self.streakDayCount = streakDayCount
+    self.wordCount = wordCount
+    self.sentenceCount = sentenceCount
+  }
 
   static let empty = LearningSummary(
     dueCount: 0,

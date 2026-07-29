@@ -15,19 +15,34 @@ struct TodayReviewView: View {
 
           HStack(spacing: 14) {
             SummaryCard(
-              title: "待复习",
+              title: "今日待复习",
               value: shell.learningSummary.dueCount,
               systemImage: "clock",
               tint: .orange
             )
             SummaryCard(
-              title: "单词",
+              title: "今日已复习",
+              value: shell.learningSummary.reviewedTodayCount,
+              systemImage: "checkmark.circle",
+              tint: .green
+            )
+            SummaryCard(
+              title: "连续学习天数",
+              value: shell.learningSummary.streakDayCount,
+              systemImage: "flame",
+              tint: .pink
+            )
+          }
+
+          HStack(spacing: 14) {
+            SummaryCard(
+              title: "学习中单词",
               value: shell.learningSummary.wordCount,
               systemImage: "textformat.abc",
               tint: .blue
             )
             SummaryCard(
-              title: "句子",
+              title: "学习中句子",
               value: shell.learningSummary.sentenceCount,
               systemImage: "text.quote",
               tint: .purple
@@ -36,13 +51,16 @@ struct TodayReviewView: View {
 
           NavigationLink {
             ReviewSessionView(shell: shell)
+              .onAppear {
+                shell.startNextReviewBatch()
+              }
           } label: {
             Label("开始复习", systemImage: "play.fill")
               .frame(maxWidth: .infinity)
           }
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
-          .disabled(shell.currentReviewItem == nil)
+          .disabled(shell.currentReviewItem == nil && !shell.hasMoreReviewBatches)
         }
         .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
         .padding(32)
@@ -53,6 +71,7 @@ struct TodayReviewView: View {
 }
 
 private struct ReviewSessionView: View {
+  @Environment(\.dismiss) private var dismiss
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
   @State private var hasCompletedReviewFlip = false
 
@@ -69,6 +88,8 @@ private struct ReviewSessionView: View {
 
         if let item = shell.currentReviewItem {
           reviewSession(item)
+        } else if shell.hasMoreReviewBatches {
+          completedBatchStatus
         } else {
           reviewStatus
         }
@@ -78,6 +99,32 @@ private struct ReviewSessionView: View {
       .frame(maxWidth: .infinity, alignment: .top)
     }
     .navigationTitle("卡片复习")
+  }
+
+  private var completedBatchStatus: some View {
+    VStack(alignment: .leading, spacing: 18) {
+      Label("本组复习完成", systemImage: "checkmark.circle.fill")
+        .font(.title2.weight(.semibold))
+        .foregroundStyle(.green)
+      Text("还有 \(shell.remainingReviewCount) 张到期卡片。你可以继续下一组，或稍后再回来。")
+        .foregroundStyle(.secondary)
+
+      HStack {
+        Button {
+          shell.startNextReviewBatch()
+        } label: {
+          Label("继续下一组", systemImage: "arrow.right")
+        }
+        .buttonStyle(.borderedProminent)
+
+        Button("稍后继续") {
+          dismiss()
+        }
+      }
+    }
+    .padding(22)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentSurface()
   }
 
   private func reviewSession(_ item: LearningItem) -> some View {
@@ -250,6 +297,14 @@ private struct ReviewSessionView: View {
         }
         .font(.callout)
         .foregroundStyle(.secondary)
+
+        if shell.learningSummary.dueCount == 0 {
+          Button("返回今日复习") {
+            dismiss()
+          }
+          .buttonStyle(.borderedProminent)
+          .padding(.top, 4)
+        }
       }
 
       Spacer(minLength: 0)
@@ -260,7 +315,7 @@ private struct ReviewSessionView: View {
 
   private var reviewStatusTitle: String {
     if shell.learningSummary.dueCount == 0 {
-      return "今天没有待复习"
+      return "今天的复习已完成"
     }
     return "还有 \(shell.learningSummary.dueCount) 项等待复习"
   }
