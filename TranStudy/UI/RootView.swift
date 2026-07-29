@@ -23,7 +23,7 @@ struct RootView: View {
         Button(action: onTranslateClipboard) {
           Label("翻译剪贴板", systemImage: "character.bubble")
         }
-        .help("翻译剪贴板（F5）")
+        .help("翻译剪贴板（\(shell.translationShortcut.title)）")
       }
     }
   }

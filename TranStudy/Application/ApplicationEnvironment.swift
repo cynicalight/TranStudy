@@ -14,6 +14,7 @@ struct ApplicationEnvironment {
   let panelPositionStore: any TranslationPanelPositionStoring
   let providerConfigurationStore: any TranslationProviderConfigurationStoring
   let selectionConfigurationStore: any SelectionConfigurationStoring
+  let shortcutStore: any TranslationShortcutStoring
 }
 
 extension ApplicationEnvironment {
@@ -40,7 +41,8 @@ extension ApplicationEnvironment {
       speech: DisabledSpeechPlayer(),
       panelPositionStore: UserDefaultsTranslationPanelPositionStore(),
       providerConfigurationStore: providerConfigurationStore,
-      selectionConfigurationStore: selectionConfigurationStore
+      selectionConfigurationStore: selectionConfigurationStore,
+      shortcutStore: UserDefaultsTranslationShortcutStore()
     )
   }
 }

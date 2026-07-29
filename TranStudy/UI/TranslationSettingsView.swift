@@ -20,6 +20,38 @@ struct TranslationSettingsView: View {
 
       Form {
         Section {
+          CenteredLabeledContent("翻译剪贴板") {
+            Picker(
+              "翻译剪贴板快捷键",
+              selection: Binding(
+                get: { shell.translationShortcut },
+                set: { shell.setTranslationShortcut($0) }
+              )
+            ) {
+              ForEach(TranslationShortcutKey.allCases) { shortcut in
+                Text(shortcut.title)
+                  .tag(shortcut)
+              }
+            }
+            .labelsHidden()
+            .frame(width: 140)
+          }
+
+          if case .failed(let shortcut) = shell.translationShortcutRegistrationStatus {
+            Label(
+              "无法注册 \(shortcut.title)，可能已被其他应用占用。",
+              systemImage: "exclamationmark.triangle.fill"
+            )
+            .font(.callout)
+            .foregroundStyle(.orange)
+          }
+        } header: {
+          Label("快捷键", systemImage: "keyboard")
+        } footer: {
+          Text("默认使用 F5。修改后会立即更新全局快捷键。")
+        }
+
+        Section {
           Toggle(
             "启用全局划词",
             isOn: Binding(

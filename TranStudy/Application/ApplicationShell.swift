@@ -16,6 +16,12 @@ enum TranslationStatus: Equatable {
   case failed
 }
 
+enum TranslationShortcutRegistrationStatus: Equatable {
+  case unknown
+  case registered
+  case failed(TranslationShortcutKey)
+}
+
 @MainActor
 @Observable
 final class ApplicationShell {
@@ -41,7 +47,11 @@ final class ApplicationShell {
   private(set) var translationPanelPosition: TranslationPanelPosition
   private(set) var translationProviderConfiguration: TranslationProviderConfiguration
   private(set) var selectionConfiguration: SelectionConfiguration
+  private(set) var translationShortcut: TranslationShortcutKey
+  private(set) var translationShortcutRegistrationStatus: TranslationShortcutRegistrationStatus =
+    .unknown
   private(set) var isSelectionContextUnavailable = false
+  @ObservationIgnored var onTranslationShortcutChange: ((TranslationShortcutKey) -> Bool)?
   private var activeTranslationID: UUID?
   private var translationSuggestedCanonicalForm = ""
   private var translationSourceApplicationName = "剪贴板"
@@ -57,6 +67,7 @@ final class ApplicationShell {
     translationPanelPosition = environment.panelPositionStore.load()
     translationProviderConfiguration = environment.providerConfigurationStore.load()
     selectionConfiguration = environment.selectionConfigurationStore.load()
+    translationShortcut = environment.shortcutStore.load()
   }
 
   func refreshTodayReview() async {
@@ -445,6 +456,25 @@ final class ApplicationShell {
     selectionConfiguration.isEnabled = isEnabled
     environment.selectionConfigurationStore.save(selectionConfiguration)
     selectionDebugLog("selection setting changed: enabled=\(isEnabled)")
+  }
+
+  func setTranslationShortcut(_ shortcut: TranslationShortcutKey) {
+    guard translationShortcut != shortcut else {
+      return
+    }
+    guard onTranslationShortcutChange?(shortcut) ?? true else {
+      translationShortcutRegistrationStatus = .failed(shortcut)
+      selectionDebugLog("translation shortcut change rejected: key=\(shortcut.title)")
+      return
+    }
+    translationShortcut = shortcut
+    translationShortcutRegistrationStatus = .registered
+    environment.shortcutStore.save(shortcut)
+  }
+
+  func setTranslationShortcutRegistrationSucceeded(_ succeeded: Bool) {
+    translationShortcutRegistrationStatus =
+      succeeded ? .registered : .failed(translationShortcut)
   }
 
   func excludeApplication(bundleIdentifier: String, displayName: String) {

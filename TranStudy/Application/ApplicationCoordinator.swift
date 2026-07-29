@@ -1,5 +1,6 @@
 @MainActor
 final class ApplicationCoordinator {
+  private let shell: ApplicationShell
   private let shortcutMonitor = GlobalShortcutMonitor()
   private let translationPanel: TranslationPanelController
   private let selectionEvents: SystemSelectionEventMonitor
@@ -12,6 +13,7 @@ final class ApplicationCoordinator {
     let selectionEvents = SystemSelectionEventMonitor()
     let selectionIndicator = SelectionIndicatorController()
 
+    self.shell = shell
     self.translationPanel = translationPanel
     self.selectionEvents = selectionEvents
     self.selectionIndicator = selectionIndicator
@@ -27,6 +29,9 @@ final class ApplicationCoordinator {
         translationPanel?.presentSelectionTranslation(snapshot)
       }
     )
+    shell.onTranslationShortcutChange = { [weak shortcutMonitor] shortcut in
+      shortcutMonitor?.updateShortcut(shortcut) ?? false
+    }
   }
 
   func start() {
@@ -36,9 +41,13 @@ final class ApplicationCoordinator {
 
     hasStarted = true
     selectionDebugLog("application coordinator starting selection pipeline")
-    shortcutMonitor.start { [weak self] in
-      self?.presentClipboardTranslation()
-    }
+    let shortcutRegistered = shortcutMonitor.start(
+      shortcut: shell.translationShortcut,
+      handler: { [weak self] in
+        self?.presentClipboardTranslation()
+      }
+    )
+    shell.setTranslationShortcutRegistrationSucceeded(shortcutRegistered)
     selectionInteraction.start()
   }
 

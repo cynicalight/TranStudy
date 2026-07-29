@@ -204,7 +204,7 @@ struct TodayReviewView: View {
 
         Label {
           Text("在任意应用复制单词或短语，然后按下 ")
-            + Text("F5").fontWeight(.semibold)
+            + Text(shell.translationShortcut.title).fontWeight(.semibold)
             + Text(" 开始积累。")
         } icon: {
           Image(systemName: "character.bubble")

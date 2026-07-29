@@ -25,7 +25,8 @@
           providerConfigurationStore: PreviewProviderConfigurationStore(
             configuration: providerConfiguration
           ),
-          selectionConfigurationStore: PreviewSelectionConfigurationStore()
+          selectionConfigurationStore: PreviewSelectionConfigurationStore(),
+          shortcutStore: PreviewTranslationShortcutStore()
         ))
     }
 
@@ -259,6 +260,18 @@
 
     func save(_ configuration: SelectionConfiguration) {
       self.configuration = configuration
+    }
+  }
+
+  private final class PreviewTranslationShortcutStore: TranslationShortcutStoring {
+    private var shortcut = TranslationShortcutKey.default
+
+    func load() -> TranslationShortcutKey {
+      shortcut
+    }
+
+    func save(_ shortcut: TranslationShortcutKey) {
+      self.shortcut = shortcut
     }
   }
 #endif

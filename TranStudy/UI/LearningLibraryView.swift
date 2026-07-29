@@ -168,12 +168,14 @@ struct LearningLibraryView: View {
       Text("从第一个词开始")
         .font(.title3.weight(.semibold))
 
-      Text("复制一个英文单词或短语，按 F5 翻译，确认内容后选择“加入学习”。")
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: 380)
+      Text(
+        "复制一个英文单词或短语，按 \(shell.translationShortcut.title) 翻译，确认内容后选择“加入学习”。"
+      )
+      .foregroundStyle(.secondary)
+      .multilineTextAlignment(.center)
+      .frame(maxWidth: 380)
 
-      Label("快速翻译  F5", systemImage: "keyboard")
+      Label("快速翻译  \(shell.translationShortcut.title)", systemImage: "keyboard")
         .font(.callout.weight(.medium))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12)

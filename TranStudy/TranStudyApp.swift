@@ -70,10 +70,31 @@ struct TranStudyApp: App {
           coordinator.presentClipboardTranslation()
         }
         .keyboardShortcut(
-          KeyEquivalent(Character(UnicodeScalar(NSF4FunctionKey)!)),
+          shell.translationShortcut.keyEquivalent,
           modifiers: []
         )
       }
     }
+  }
+}
+
+extension TranslationShortcutKey {
+  fileprivate var keyEquivalent: KeyEquivalent {
+    let functionKey: Int
+    switch self {
+    case .f1: functionKey = NSF1FunctionKey
+    case .f2: functionKey = NSF2FunctionKey
+    case .f3: functionKey = NSF3FunctionKey
+    case .f4: functionKey = NSF4FunctionKey
+    case .f5: functionKey = NSF5FunctionKey
+    case .f6: functionKey = NSF6FunctionKey
+    case .f7: functionKey = NSF7FunctionKey
+    case .f8: functionKey = NSF8FunctionKey
+    case .f9: functionKey = NSF9FunctionKey
+    case .f10: functionKey = NSF10FunctionKey
+    case .f11: functionKey = NSF11FunctionKey
+    case .f12: functionKey = NSF12FunctionKey
+    }
+    return KeyEquivalent(Character(UnicodeScalar(functionKey)!))
   }
 }

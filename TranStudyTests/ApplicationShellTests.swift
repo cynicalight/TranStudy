@@ -539,7 +539,8 @@ extension ApplicationEnvironment {
     providerConfigurationStore: TestTranslationProviderConfigurationStore =
       TestTranslationProviderConfigurationStore(),
     selectionConfigurationStore: TestSelectionConfigurationStore =
-      TestSelectionConfigurationStore()
+      TestSelectionConfigurationStore(),
+    shortcutStore: TestTranslationShortcutStore = TestTranslationShortcutStore()
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: TestSelectionProvider(),
@@ -553,7 +554,8 @@ extension ApplicationEnvironment {
       speech: TestSpeechPlayer(),
       panelPositionStore: panelPositionStore,
       providerConfigurationStore: providerConfigurationStore,
-      selectionConfigurationStore: selectionConfigurationStore
+      selectionConfigurationStore: selectionConfigurationStore,
+      shortcutStore: shortcutStore
     )
   }
 }
@@ -801,5 +803,21 @@ private final class TestSelectionConfigurationStore: SelectionConfigurationStori
 
   func save(_ configuration: SelectionConfiguration) {
     savedConfiguration = configuration
+  }
+}
+
+private final class TestTranslationShortcutStore: TranslationShortcutStoring {
+  private(set) var savedShortcut: TranslationShortcutKey
+
+  init(shortcut: TranslationShortcutKey = .default) {
+    savedShortcut = shortcut
+  }
+
+  func load() -> TranslationShortcutKey {
+    savedShortcut
+  }
+
+  func save(_ shortcut: TranslationShortcutKey) {
+    savedShortcut = shortcut
   }
 }
