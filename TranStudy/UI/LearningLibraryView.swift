@@ -55,6 +55,9 @@ struct LearningLibraryView: View {
             details: details
           )
         },
+        onDelete: {
+          shell.stageLibraryItemDeletion(itemID: item.id)
+        },
         scheduleActions: LearningReviewScheduleActions(
           setNextReviewDate: { nextReviewAt in
             await shell.setLearningItemNextReviewDate(
@@ -74,6 +77,22 @@ struct LearningLibraryView: View {
         )
       )
     }
+    .safeAreaInset(edge: .bottom) {
+      if let pendingDeletion = shell.pendingLibraryDeletion {
+        libraryDeletionBanner(pendingDeletion)
+      }
+    }
+    .task(id: shell.pendingLibraryDeletion?.id) {
+      guard let itemID = shell.pendingLibraryDeletion?.id else {
+        return
+      }
+      do {
+        try await Task.sleep(for: .seconds(10))
+      } catch {
+        return
+      }
+      await shell.finalizeLibraryItemDeletion(itemID: itemID)
+    }
     .alert(
       "合并到已有词条？",
       isPresented: pendingLibraryMergeBinding,
@@ -92,6 +111,28 @@ struct LearningLibraryView: View {
         "“\(summary.incomingSourceText)”将合并到“\(summary.canonicalForm)”。"
           + "合并后会保留双方的释义、例句和全部语境。"
       )
+    }
+  }
+
+  private func libraryDeletionBanner(_ item: LearningItem) -> some View {
+    HStack(spacing: 12) {
+      Label(
+        "已删除“\(item.kind == .sentence ? item.sourceText : item.canonicalForm)”",
+        systemImage: "trash"
+      )
+      .lineLimit(1)
+      Spacer()
+      Button("撤销") {
+        shell.undoLibraryItemDeletion()
+      }
+      .buttonStyle(.borderedProminent)
+      .keyboardShortcut("z", modifiers: .command)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .background(.regularMaterial)
+    .overlay(alignment: .top) {
+      Divider()
     }
   }
 
@@ -230,6 +271,7 @@ struct LearningLibraryView: View {
             .buttonStyle(.borderless)
             .help("编辑学习内容")
             .accessibilityLabel("编辑 \(item.canonicalForm)")
+            .disabled(shell.pendingLibraryDeletion != nil)
           }
 
           if item.kind == .sentence {
@@ -441,6 +483,7 @@ struct LearningLibraryView: View {
 private struct LearningItemEditorView: View {
   let item: LearningItem
   let onSave: (String, LearningItemDetailsUpdate) async -> Bool
+  let onDelete: () -> Bool
   let scheduleActions: LearningReviewScheduleActions
   @Environment(\.dismiss) private var dismiss
   @State private var canonicalForm: String
@@ -453,14 +496,18 @@ private struct LearningItemEditorView: View {
   @State private var customExamples: [EditableCustomExample]
   @State private var isSaving = false
   @State private var saveFailed = false
+  @State private var deleteFailed = false
+  @State private var isDeleteConfirmationPresented = false
 
   init(
     item: LearningItem,
     onSave: @escaping (String, LearningItemDetailsUpdate) async -> Bool,
+    onDelete: @escaping () -> Bool,
     scheduleActions: LearningReviewScheduleActions
   ) {
     self.item = item
     self.onSave = onSave
+    self.onDelete = onDelete
     self.scheduleActions = scheduleActions
     _canonicalForm = State(initialValue: item.canonicalForm)
     _pronunciation = State(initialValue: item.pronunciation)
@@ -566,10 +613,18 @@ private struct LearningItemEditorView: View {
       Divider()
 
       HStack {
-        if saveFailed {
-          Label("保存失败，请检查后重试", systemImage: "exclamationmark.circle")
-            .font(.callout)
-            .foregroundStyle(.red)
+        Button(item.kind == .word ? "删除词条" : "删除句子卡", role: .destructive) {
+          isDeleteConfirmationPresented = true
+        }
+        .disabled(isSaving)
+
+        if saveFailed || deleteFailed {
+          Label(
+            saveFailed ? "保存失败，请检查后重试" : "删除失败，请重试",
+            systemImage: "exclamationmark.circle"
+          )
+          .font(.callout)
+          .foregroundStyle(.red)
         }
         Spacer()
         Button("取消", role: .cancel) {
@@ -609,6 +664,22 @@ private struct LearningItemEditorView: View {
       .padding(20)
     }
     .frame(width: 620, height: 680)
+    .alert(
+      item.kind == .word ? "删除这个词条？" : "删除这张句子卡？",
+      isPresented: $isDeleteConfirmationPresented
+    ) {
+      Button("取消", role: .cancel) {}
+      Button("删除", role: .destructive) {
+        deleteFailed = false
+        if onDelete() {
+          dismiss()
+        } else {
+          deleteFailed = true
+        }
+      }
+    } message: {
+      Text("删除后可在约十秒内撤销；随后会永久删除相关释义、例句、遇见记录和复习记录。")
+    }
   }
 
   private func encounterDetails(_ encounter: LearningEncounter) -> some View {

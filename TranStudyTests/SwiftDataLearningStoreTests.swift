@@ -97,6 +97,67 @@ struct SwiftDataLearningStoreTests {
     #expect(try await store.dueItems(at: dueAt).map(\.id) == [wordID])
   }
 
+  @Test("deleting a card permanently removes all related learning data")
+  func deletingCardCascadesRelatedLearningData() async throws {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
+      configurations: configuration
+    )
+    let store = SwiftDataLearningStore(container: container)
+    let reviewDate = Date(timeIntervalSince1970: 10_000)
+
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "ran",
+          canonicalForm: "run",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: Date(timeIntervalSince1970: 1_000),
+        nextReviewAt: reviewDate
+      ))
+    let item = try #require(try await store.items().first)
+    try await store.updateDetails(
+      itemID: item.id,
+      details: LearningItemDetailsUpdate(
+        pronunciation: "/rʌn/",
+        partOfSpeech: "verb",
+        contextualMeaning: "奔跑",
+        exampleSentence: "I run daily.",
+        sentenceTranslation: "我每天跑步。",
+        userNote: "",
+        customExamples: [
+          LearningCustomExample(
+            englishText: "Run for your life.",
+            chineseTranslation: "快逃。"
+          )
+        ]
+      )
+    )
+    _ = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: reviewDate
+    )
+
+    try await store.delete(itemID: item.id)
+
+    let verificationContext = ModelContext(container)
+    #expect(try verificationContext.fetch(FetchDescriptor<LearningRecord>()).isEmpty)
+    #expect(try verificationContext.fetch(FetchDescriptor<LearningEncounterRecord>()).isEmpty)
+    #expect(try verificationContext.fetch(FetchDescriptor<ReviewEventRecord>()).isEmpty)
+    #expect(try verificationContext.fetch(FetchDescriptor<LearningCustomExampleRecord>()).isEmpty)
+  }
+
   @Test("editing learning details preserves encounters and survives reopening")
   func editingLearningDetailsPreservesHistory() async throws {
     let directory = FileManager.default.temporaryDirectory

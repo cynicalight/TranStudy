@@ -64,6 +64,7 @@ final class ApplicationShell {
   private(set) var selectedReviewRating: ReviewRating?
   private(set) var pendingLearningMerge: LearningMergeSummary?
   private(set) var pendingLibraryMerge: LearningMergeSummary?
+  private(set) var pendingLibraryDeletion: LearningItem?
   private(set) var translationPanelPosition: TranslationPanelPosition
   private(set) var translationProviderConfiguration: TranslationProviderConfiguration
   private(set) var selectionConfiguration: SelectionConfiguration
@@ -508,11 +509,12 @@ final class ApplicationShell {
       libraryScope == .active
       ? learningItems
       : archivedLearningItems
+    let visibleItems = scopedItems.filter { $0.id != pendingLibraryDeletion?.id }
     let query = normalizedLibrarySearchText(librarySearchQuery)
     guard !query.isEmpty else {
-      return scopedItems
+      return visibleItems
     }
-    return scopedItems.filter { item in
+    return visibleItems.filter { item in
       librarySearchIndex[item.id, default: []].contains {
         $0.contains(query)
       }
@@ -558,6 +560,38 @@ final class ApplicationShell {
 
   func restoreSelectedLibraryItems() async {
     await setSelectedLibraryItemsArchived(at: nil)
+  }
+
+  func stageLibraryItemDeletion(itemID: UUID) -> Bool {
+    guard pendingLibraryDeletion == nil,
+      let item = (learningItems + archivedLearningItems).first(where: { $0.id == itemID })
+    else {
+      return false
+    }
+    pendingLibraryDeletion = item
+    selectedLearningItemIDs.remove(itemID)
+    return true
+  }
+
+  func undoLibraryItemDeletion() {
+    pendingLibraryDeletion = nil
+  }
+
+  @discardableResult
+  func finalizeLibraryItemDeletion(itemID: UUID) async -> Bool {
+    guard let pendingLibraryDeletion, pendingLibraryDeletion.id == itemID else {
+      return false
+    }
+    do {
+      try await environment.learningStore.delete(itemID: itemID)
+      self.pendingLibraryDeletion = nil
+      await refreshTodayReview()
+      await refreshLibrary()
+      return true
+    } catch {
+      self.pendingLibraryDeletion = nil
+      return false
+    }
   }
 
   private func setSelectedLibraryItemsArchived(at archivedAt: Date?) async {

@@ -372,6 +372,15 @@ final class SwiftDataLearningStore: LearningStoring {
     try context.save()
   }
 
+  func delete(itemID: UUID) async throws {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+    context.delete(record)
+    try saveOrRollback()
+  }
+
   func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws {
     let records = try consolidatedRecords()
     guard let record = records.first(where: { $0.id == itemID }) else {

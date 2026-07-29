@@ -402,6 +402,51 @@ struct ApplicationShellTests {
     #expect(shell.archivedLearningItems.isEmpty)
   }
 
+  @Test("a pending library deletion can be undone before persistence")
+  func pendingLibraryDeletionCanBeUndone() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let learningStore = TestLearningStore(items: [item])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+    await shell.refreshLibrary()
+
+    let didStage = shell.stageLibraryItemDeletion(itemID: item.id)
+
+    #expect(didStage)
+    #expect(shell.pendingLibraryDeletion == item)
+    #expect(shell.displayedLearningItems.isEmpty)
+
+    shell.undoLibraryItemDeletion()
+
+    #expect(shell.pendingLibraryDeletion == nil)
+    #expect(shell.displayedLearningItems == [item])
+    #expect(learningStore.deletedItemIDs.isEmpty)
+  }
+
+  @Test("finalizing a pending library deletion permanently removes the card")
+  func finalizingPendingLibraryDeletionPersistsRemoval() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let learningStore = TestLearningStore(items: [item])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+    await shell.refreshLibrary()
+    #expect(shell.stageLibraryItemDeletion(itemID: item.id))
+
+    await shell.finalizeLibraryItemDeletion(itemID: item.id)
+
+    #expect(learningStore.deletedItemIDs == [item.id])
+    #expect(shell.pendingLibraryDeletion == nil)
+    #expect(shell.learningItems.isEmpty)
+  }
+
   @Test("library search covers word forms and examples within the current scope")
   func librarySearchFiltersCurrentScope() async {
     let runID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
@@ -1139,6 +1184,7 @@ private final class ControlledTranslationProvider: TranslationProviding {
 @MainActor
 private final class TestLearningStore: LearningStoring {
   private(set) var lastAddition: LearningAddition?
+  private(set) var deletedItemIDs: [UUID] = []
   private(set) var canonicalUpdateInvocations: [CanonicalUpdateInvocation] = []
   private(set) var reviewInvocations: [ReviewInvocation] = []
   private(set) var nextReviewDateInvocations: [NextReviewDateInvocation] = []
@@ -1258,6 +1304,13 @@ private final class TestLearningStore: LearningStoring {
       storedItems.removeAll { selectedIDs.contains($0.id) }
       storedArchivedItems.append(contentsOf: archived)
     }
+  }
+
+  func delete(itemID: UUID) async throws {
+    deletedItemIDs.append(itemID)
+    storedItems.removeAll { $0.id == itemID }
+    storedArchivedItems.removeAll { $0.id == itemID }
+    storedDueItems.removeAll { $0.id == itemID }
   }
 
   func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws {
