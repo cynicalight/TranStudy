@@ -20,9 +20,14 @@ struct LearningLibraryView: View {
 
         if !shell.isLibrarySelecting {
           librarySearchField
+            .transition(.move(edge: .leading).combined(with: .opacity))
         }
         libraryToolbar
       }
+      .animation(
+        reduceMotion ? nil : .easeInOut(duration: 0.2),
+        value: shell.isLibrarySelecting
+      )
       Divider()
 
       if shell.displayedLearningItems.isEmpty {
