@@ -73,18 +73,16 @@ struct LearningLibraryView: View {
 
   private var libraryToolbar: some View {
     HStack(spacing: 12) {
-      Picker(
-        "内容范围",
+      TranStudySegmentedControl(
+        options: [LearningLibraryScope.active, .archived],
         selection: Binding(
           get: { shell.libraryScope },
           set: { shell.setLibraryScope($0) }
-        )
-      ) {
-        Text("学习中").tag(LearningLibraryScope.active)
-        Text("已归档").tag(LearningLibraryScope.archived)
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
+        ),
+        label: {
+          $0 == .active ? "学习中" : "已归档"
+        }
+      )
       .frame(width: 190)
 
       Spacer()

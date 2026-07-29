@@ -27,7 +27,7 @@ enum SentenceCardAdditionStatus: Equatable {
   case failed
 }
 
-enum LearningLibraryScope: Equatable {
+enum LearningLibraryScope: Hashable {
   case active
   case archived
 }
