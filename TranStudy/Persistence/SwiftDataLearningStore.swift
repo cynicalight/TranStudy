@@ -372,6 +372,41 @@ final class SwiftDataLearningStore: LearningStoring {
     try context.save()
   }
 
+  func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+    record.nextReviewAt = nextReviewAt
+    try saveOrRollback()
+  }
+
+  func setReviewPaused(itemID: UUID, isPaused: Bool) async throws {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+    record.isPaused = isPaused
+    try saveOrRollback()
+  }
+
+  func resetReviewProgress(itemID: UUID, resetAt: Date) async throws {
+    let records = try consolidatedRecords()
+    guard let record = records.first(where: { $0.id == itemID }) else {
+      throw LearningStoreError.missingLearningItem
+    }
+    for event in record.reviewEvents {
+      context.delete(event)
+    }
+    record.reviewEvents = []
+    record.nextReviewAt = resetAt
+    record.reviewIntervalDays = 1
+    record.reviewEase = 2.5
+    record.reviewCount = 0
+    record.lapseCount = 0
+    try saveOrRollback()
+  }
+
   private func learningItems(archived: Bool) throws -> [LearningItem] {
     try consolidatedRecords()
       .filter { ($0.archivedAt != nil) == archived }

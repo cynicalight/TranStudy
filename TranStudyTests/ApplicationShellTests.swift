@@ -510,6 +510,75 @@ struct ApplicationShellTests {
     #expect(!didSave)
   }
 
+  @Test("setting a library item's next review date persists the selected date")
+  func settingLibraryItemNextReviewDatePersistsSelectedDate() async {
+    let itemID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
+    let nextReviewAt = Date(timeIntervalSince1970: 20_000)
+    let learningStore = TestLearningStore()
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    let didUpdate = await shell.setLearningItemNextReviewDate(
+      itemID: itemID,
+      nextReviewAt: nextReviewAt
+    )
+
+    #expect(didUpdate)
+    #expect(
+      learningStore.nextReviewDateInvocations
+        == [NextReviewDateInvocation(itemID: itemID, nextReviewAt: nextReviewAt)]
+    )
+  }
+
+  @Test("pausing and resuming a library item persist the requested state")
+  func pausingAndResumingLibraryItemPersistRequestedState() async {
+    let itemID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
+    let learningStore = TestLearningStore()
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    let didPause = await shell.setLearningItemReviewPaused(
+      itemID: itemID,
+      isPaused: true
+    )
+    let didResume = await shell.setLearningItemReviewPaused(
+      itemID: itemID,
+      isPaused: false
+    )
+
+    #expect(didPause)
+    #expect(didResume)
+    #expect(
+      learningStore.reviewPausedInvocations
+        == [
+          ReviewPausedInvocation(itemID: itemID, isPaused: true),
+          ReviewPausedInvocation(itemID: itemID, isPaused: false),
+        ])
+  }
+
+  @Test("resetting a library item uses the controlled current time")
+  func resettingLibraryItemUsesControlledCurrentTime() async {
+    let itemID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
+    let learningStore = TestLearningStore()
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    let resetAt = await shell.resetLearningItemReviewProgress(itemID: itemID)
+
+    #expect(resetAt == Date(timeIntervalSince1970: 1_234))
+    #expect(
+      learningStore.reviewResetInvocations
+        == [
+          ReviewResetInvocation(
+            itemID: itemID,
+            resetAt: Date(timeIntervalSince1970: 1_234)
+          )
+        ])
+  }
+
   @Test("renaming a library item to an existing word requires merge confirmation")
   func libraryCanonicalCorrectionRequiresMergeConfirmation() async {
     let itemID = UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!
@@ -1072,6 +1141,9 @@ private final class TestLearningStore: LearningStoring {
   private(set) var lastAddition: LearningAddition?
   private(set) var canonicalUpdateInvocations: [CanonicalUpdateInvocation] = []
   private(set) var reviewInvocations: [ReviewInvocation] = []
+  private(set) var nextReviewDateInvocations: [NextReviewDateInvocation] = []
+  private(set) var reviewPausedInvocations: [ReviewPausedInvocation] = []
+  private(set) var reviewResetInvocations: [ReviewResetInvocation] = []
   private var storedItems: [LearningItem]
   private var storedArchivedItems: [LearningItem]
   private var storedDueItems: [LearningItem]
@@ -1187,6 +1259,24 @@ private final class TestLearningStore: LearningStoring {
       storedArchivedItems.append(contentsOf: archived)
     }
   }
+
+  func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws {
+    nextReviewDateInvocations.append(
+      NextReviewDateInvocation(itemID: itemID, nextReviewAt: nextReviewAt)
+    )
+  }
+
+  func setReviewPaused(itemID: UUID, isPaused: Bool) async throws {
+    reviewPausedInvocations.append(
+      ReviewPausedInvocation(itemID: itemID, isPaused: isPaused)
+    )
+  }
+
+  func resetReviewProgress(itemID: UUID, resetAt: Date) async throws {
+    reviewResetInvocations.append(
+      ReviewResetInvocation(itemID: itemID, resetAt: resetAt)
+    )
+  }
 }
 
 private enum TestLearningStoreError: Error {
@@ -1203,6 +1293,21 @@ private struct ReviewInvocation: Equatable {
   let itemID: UUID
   let rating: ReviewRating
   let reviewedAt: Date
+}
+
+private struct NextReviewDateInvocation: Equatable {
+  let itemID: UUID
+  let nextReviewAt: Date
+}
+
+private struct ReviewPausedInvocation: Equatable {
+  let itemID: UUID
+  let isPaused: Bool
+}
+
+private struct ReviewResetInvocation: Equatable {
+  let itemID: UUID
+  let resetAt: Date
 }
 
 @MainActor

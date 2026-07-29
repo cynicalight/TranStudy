@@ -637,6 +637,55 @@ final class ApplicationShell {
     }
   }
 
+  func setLearningItemNextReviewDate(
+    itemID: UUID,
+    nextReviewAt: Date
+  ) async -> Bool {
+    do {
+      try await environment.learningStore.setNextReviewDate(
+        itemID: itemID,
+        nextReviewAt: nextReviewAt
+      )
+      await refreshTodayReview()
+      await refreshLibrary()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  func setLearningItemReviewPaused(
+    itemID: UUID,
+    isPaused: Bool
+  ) async -> Bool {
+    do {
+      try await environment.learningStore.setReviewPaused(
+        itemID: itemID,
+        isPaused: isPaused
+      )
+      await refreshTodayReview()
+      await refreshLibrary()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  func resetLearningItemReviewProgress(itemID: UUID) async -> Date? {
+    let resetAt = environment.clock.now
+    do {
+      try await environment.learningStore.resetReviewProgress(
+        itemID: itemID,
+        resetAt: resetAt
+      )
+      await refreshTodayReview()
+      await refreshLibrary()
+      return resetAt
+    } catch {
+      return nil
+    }
+  }
+
   func updateLearningItemCanonicalForm(itemID: UUID, canonicalForm: String) async {
     do {
       let result = try await environment.learningStore.updateCanonicalForm(

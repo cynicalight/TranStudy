@@ -44,13 +44,33 @@ struct LearningLibraryView: View {
       await shell.refreshLibrary()
     }
     .sheet(item: $editingItem) { item in
-      LearningItemEditorView(item: item) { canonicalForm, details in
-        await shell.saveLearningItem(
-          itemID: item.id,
-          canonicalForm: canonicalForm,
-          details: details
+      LearningItemEditorView(
+        item: item,
+        onSave: { canonicalForm, details in
+          await shell.saveLearningItem(
+            itemID: item.id,
+            canonicalForm: canonicalForm,
+            details: details
+          )
+        },
+        scheduleActions: LearningReviewScheduleActions(
+          setNextReviewDate: { nextReviewAt in
+            await shell.setLearningItemNextReviewDate(
+              itemID: item.id,
+              nextReviewAt: nextReviewAt
+            )
+          },
+          setPaused: { isPaused in
+            await shell.setLearningItemReviewPaused(
+              itemID: item.id,
+              isPaused: isPaused
+            )
+          },
+          reset: {
+            await shell.resetLearningItemReviewProgress(itemID: item.id)
+          }
         )
-      }
+      )
     }
     .alert(
       "合并到已有词条？",
@@ -410,6 +430,7 @@ struct LearningLibraryView: View {
 private struct LearningItemEditorView: View {
   let item: LearningItem
   let onSave: (String, LearningItemDetailsUpdate) async -> Bool
+  let scheduleActions: LearningReviewScheduleActions
   @Environment(\.dismiss) private var dismiss
   @State private var canonicalForm: String
   @State private var pronunciation: String
@@ -424,10 +445,12 @@ private struct LearningItemEditorView: View {
 
   init(
     item: LearningItem,
-    onSave: @escaping (String, LearningItemDetailsUpdate) async -> Bool
+    onSave: @escaping (String, LearningItemDetailsUpdate) async -> Bool,
+    scheduleActions: LearningReviewScheduleActions
   ) {
     self.item = item
     self.onSave = onSave
+    self.scheduleActions = scheduleActions
     _canonicalForm = State(initialValue: item.canonicalForm)
     _pronunciation = State(initialValue: item.pronunciation)
     _partOfSpeech = State(initialValue: item.partOfSpeech)
@@ -476,6 +499,11 @@ private struct LearningItemEditorView: View {
           TextEditor(text: $userNote)
             .frame(minHeight: 80)
         }
+
+        LearningReviewScheduleEditor(
+          item: item,
+          actions: scheduleActions
+        )
 
         Section {
           ForEach($customExamples) { $example in
@@ -610,6 +638,128 @@ private struct LearningItemEditorView: View {
       .foregroundStyle(.tertiary)
     }
     .padding(.vertical, 4)
+  }
+}
+
+private struct LearningReviewScheduleActions {
+  let setNextReviewDate: (Date) async -> Bool
+  let setPaused: (Bool) async -> Bool
+  let reset: () async -> Date?
+}
+
+private struct LearningReviewScheduleEditor: View {
+  let item: LearningItem
+  let actions: LearningReviewScheduleActions
+  @State private var nextReviewAt: Date
+  @State private var isPaused: Bool
+  @State private var isUpdating = false
+  @State private var updateFailed = false
+  @State private var isResetConfirmationPresented = false
+
+  init(
+    item: LearningItem,
+    actions: LearningReviewScheduleActions
+  ) {
+    self.item = item
+    self.actions = actions
+    _nextReviewAt = State(initialValue: item.nextReviewAt ?? item.createdAt)
+    _isPaused = State(initialValue: item.isPaused)
+  }
+
+  var body: some View {
+    Section {
+      HStack {
+        Text("当前状态")
+        Spacer()
+        Label(reviewStatus.label, systemImage: reviewStatus.systemImage)
+          .foregroundStyle(reviewStatus.color)
+      }
+
+      DatePicker(
+        "下次复习日期",
+        selection: $nextReviewAt,
+        displayedComponents: .date
+      )
+
+      HStack {
+        Button("更新日期") {
+          Task {
+            isUpdating = true
+            updateFailed = false
+            let didUpdate = await actions.setNextReviewDate(nextReviewAt)
+            isUpdating = false
+            updateFailed = !didUpdate
+          }
+        }
+
+        Button(isPaused ? "恢复复习" : "暂停复习") {
+          Task {
+            isUpdating = true
+            updateFailed = false
+            let updatedPauseState = !isPaused
+            let didUpdate = await actions.setPaused(updatedPauseState)
+            isUpdating = false
+            if didUpdate {
+              isPaused = updatedPauseState
+            } else {
+              updateFailed = true
+            }
+          }
+        }
+
+        Spacer()
+
+        Button("重置学习进度", role: .destructive) {
+          isResetConfirmationPresented = true
+        }
+      }
+      .disabled(isUpdating)
+
+      if updateFailed {
+        Label("排程更新失败，请重试", systemImage: "exclamationmark.circle")
+          .font(.callout)
+          .foregroundStyle(.red)
+      }
+    } header: {
+      Text("复习排程")
+    } footer: {
+      Text(scheduleExplanation)
+    }
+    .alert("重置学习进度？", isPresented: $isResetConfirmationPresented) {
+      Button("取消", role: .cancel) {}
+      Button("确认重置", role: .destructive) {
+        Task {
+          isUpdating = true
+          updateFailed = false
+          let persistedResetAt = await actions.reset()
+          isUpdating = false
+          if let persistedResetAt {
+            nextReviewAt = persistedResetAt
+          } else {
+            updateFailed = true
+          }
+        }
+      }
+    } message: {
+      Text("复习历史和当前学习进度将被清除，词条内容与遇见记录不会改变。")
+    }
+  }
+
+  private var reviewStatus: (label: String, systemImage: String, color: Color) {
+    if item.archivedAt != nil {
+      return ("已归档", "archivebox.fill", .red)
+    }
+    if isPaused {
+      return ("已暂停", "pause.circle.fill", .orange)
+    }
+    return ("学习中", "checkmark.circle.fill", .green)
+  }
+
+  private var scheduleExplanation: String {
+    if item.archivedAt != nil {
+      return "归档期间不会进入复习队列；排程调整会在恢复后生效。重置仍会清除复习历史。"
+    }
+    return "重置会清除复习历史并让卡片从今天重新开始；暂停状态会保持不变。"
   }
 }
 

@@ -218,6 +218,12 @@
     }
 
     func setArchived(itemIDs: [UUID], archivedAt: Date?) async throws {}
+
+    func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws {}
+
+    func setReviewPaused(itemID: UUID, isPaused: Bool) async throws {}
+
+    func resetReviewProgress(itemID: UUID, resetAt: Date) async throws {}
   }
 
   @MainActor

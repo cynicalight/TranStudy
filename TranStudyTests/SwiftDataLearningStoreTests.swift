@@ -781,6 +781,99 @@ struct SwiftDataLearningStoreTests {
     #expect(dueItems.first?.nextReviewAt == joinedAt)
   }
 
+  @Test("setting the next review date preserves learned progress")
+  func settingNextReviewDatePreservesLearnedProgress() async throws {
+    let store = try makeInMemoryStore()
+    let firstReviewAt = Date(timeIntervalSince1970: 10_000)
+    let item = try await addRun(to: store, createdAt: firstReviewAt)
+    _ = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstReviewAt
+    )
+    let correctedReviewAt = Date(timeIntervalSince1970: 20_000)
+
+    try await store.setNextReviewDate(
+      itemID: item.id,
+      nextReviewAt: correctedReviewAt
+    )
+
+    let updatedItem = try #require(try await store.items().first)
+    #expect(updatedItem.nextReviewAt == correctedReviewAt)
+    #expect(try await store.reviewHistory(itemID: item.id).count == 1)
+  }
+
+  @Test("pausing and resuming review preserves the due date")
+  func pausingAndResumingReviewPreservesDueDate() async throws {
+    let store = try makeInMemoryStore()
+    let dueAt = Date(timeIntervalSince1970: 10_000)
+    let item = try await addRun(to: store, createdAt: dueAt)
+
+    try await store.setReviewPaused(itemID: item.id, isPaused: true)
+
+    let pausedItem = try #require(try await store.items().first)
+    #expect(pausedItem.isPaused)
+    #expect(pausedItem.nextReviewAt == dueAt)
+    #expect(try await store.dueItems(at: dueAt).isEmpty)
+
+    try await store.setReviewPaused(itemID: item.id, isPaused: false)
+
+    let resumedItem = try #require(try await store.items().first)
+    #expect(!resumedItem.isPaused)
+    #expect(resumedItem.nextReviewAt == dueAt)
+    #expect(try await store.dueItems(at: dueAt).map(\.id) == [item.id])
+  }
+
+  @Test("resetting review progress clears history and restores the initial schedule")
+  func resettingReviewProgressClearsHistoryAndRestoresInitialSchedule() async throws {
+    let store = try makeInMemoryStore()
+    let firstReviewAt = Date(timeIntervalSince1970: 10_000)
+    let item = try await addRun(to: store, createdAt: firstReviewAt)
+    _ = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstReviewAt
+    )
+    try await store.setReviewPaused(itemID: item.id, isPaused: true)
+    let resetAt = Date(timeIntervalSince1970: 20_000)
+
+    try await store.resetReviewProgress(itemID: item.id, resetAt: resetAt)
+
+    let resetItem = try #require(try await store.items().first)
+    #expect(resetItem.nextReviewAt == resetAt)
+    #expect(resetItem.isPaused)
+    #expect(try await store.reviewHistory(itemID: item.id).isEmpty)
+
+    try await store.setReviewPaused(itemID: item.id, isPaused: false)
+    let result = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: resetAt
+    )
+    #expect(result.intervalDays == 3)
+  }
+
+  private func addRun(
+    to store: SwiftDataLearningStore,
+    createdAt: Date
+  ) async throws -> LearningItem {
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "ran",
+          canonicalForm: "run",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: createdAt
+      ))
+    return try #require(try await store.items().first)
+  }
+
   @Test("legacy words without a schedule become due from their joined time")
   func legacyWordsWithoutScheduleBecomeDueFromJoinedTime() async throws {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -1047,5 +1140,17 @@ struct SwiftDataLearningStoreTests {
       LearningCustomExampleRecord.self,
       configurations: configuration
     )
+  }
+
+  private func makeInMemoryStore() throws -> SwiftDataLearningStore {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+      for: LearningRecord.self,
+      LearningEncounterRecord.self,
+      ReviewEventRecord.self,
+      LearningCustomExampleRecord.self,
+      configurations: configuration
+    )
+    return SwiftDataLearningStore(container: container)
   }
 }
