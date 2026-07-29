@@ -28,13 +28,14 @@ struct SelectionInteractionControllerTests {
       selection: selection,
       events: events,
       indicator: indicator,
-      candidateDelay: .zero,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
       indicatorLifetime: .seconds(30)
     ) { capturedSnapshots.append($0) }
 
     controller.start()
-    events.send(.leftMouseDown)
-    events.send(.leftMouseUp(at: point))
+    events.send(.leftMouseDown(at: CGPoint(x: point.x - 10, y: point.y), clickCount: 1))
+    events.send(.leftMouseUp(at: point, clickCount: 1))
     try? await Task.sleep(for: .milliseconds(5))
 
     #expect(selection.candidateRequestCount == 1)
@@ -47,7 +48,7 @@ struct SelectionInteractionControllerTests {
     #expect(selection.snapshotRequestCount == 1)
     #expect(capturedSnapshots == [snapshot])
 
-    events.send(.leftMouseDown)
+    events.send(.leftMouseDown(at: point, clickCount: 1))
     #expect(indicator.dismissCount > 0)
   }
 
@@ -59,7 +60,8 @@ struct SelectionInteractionControllerTests {
       selection: TestSelectionProvider(),
       events: events,
       indicator: indicator,
-      candidateDelay: .zero,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
       indicatorLifetime: .seconds(30)
     ) { _ in }
 
@@ -79,7 +81,8 @@ struct SelectionInteractionControllerTests {
       selection: selection,
       events: events,
       indicator: indicator,
-      candidateDelay: .zero,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
       indicatorLifetime: .seconds(30),
       onExternalInteraction: { externalInteractionCount += 1 },
       onSelection: { _ in }
@@ -102,7 +105,8 @@ struct SelectionInteractionControllerTests {
       selection: TestSelectionProvider(),
       events: events,
       indicator: indicator,
-      candidateDelay: .zero,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
       indicatorLifetime: .seconds(30),
       onExternalInteraction: { externalInteractionCount += 1 },
       onSelection: { _ in }
@@ -128,13 +132,14 @@ struct SelectionInteractionControllerTests {
       selection: TestSelectionProvider(candidate: candidate),
       events: events,
       indicator: indicator,
-      candidateDelay: .zero,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
       indicatorLifetime: .milliseconds(5)
     ) { _ in }
 
     controller.start()
-    events.send(.leftMouseDown)
-    events.send(.leftMouseUp(at: point))
+    events.send(.leftMouseDown(at: CGPoint(x: point.x - 10, y: point.y), clickCount: 1))
+    events.send(.leftMouseUp(at: point, clickCount: 1))
     try? await Task.sleep(for: .milliseconds(2))
     #expect(indicator.presentedCandidate == candidate)
 
@@ -156,12 +161,13 @@ struct SelectionInteractionControllerTests {
       selection: selection,
       events: events,
       indicator: indicator,
-      candidateDelay: .zero,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
       indicatorLifetime: .seconds(30)
     ) { _ in }
 
     controller.start()
-    events.send(.leftMouseUp(at: point))
+    events.send(.leftMouseUp(at: point, clickCount: 1))
     try? await Task.sleep(for: .milliseconds(5))
 
     #expect(selection.gestureStartCount == 0)
@@ -183,14 +189,15 @@ struct SelectionInteractionControllerTests {
       selection: selection,
       events: events,
       indicator: indicator,
-      candidateDelay: .zero,
+      candidatePollInterval: .zero,
+      candidateTimeout: .seconds(1),
       candidateValidationInterval: .milliseconds(1),
       indicatorLifetime: .seconds(30)
     ) { _ in }
 
     controller.start()
-    events.send(.leftMouseDown)
-    events.send(.leftMouseUp(at: point))
+    events.send(.leftMouseDown(at: CGPoint(x: point.x - 10, y: point.y), clickCount: 1))
+    events.send(.leftMouseUp(at: point, clickCount: 1))
     try? await Task.sleep(for: .milliseconds(5))
     #expect(indicator.presentedCandidate == candidate)
 

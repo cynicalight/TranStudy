@@ -5,7 +5,6 @@ import Foundation
 @MainActor
 final class AccessibilitySelectionProvider: SelectionProviding {
   private var candidatePosition: CGPoint?
-  private var gestureStartFingerprint: SelectionFingerprint?
   private var candidateFingerprint: SelectionFingerprint?
 
   private struct ActiveSelection {
@@ -38,32 +37,19 @@ final class AccessibilitySelectionProvider: SelectionProviding {
   }
 
   func beginMouseSelectionGesture() {
-    gestureStartFingerprint = activeSelection(logFailures: true)?.fingerprint
     candidateFingerprint = nil
     candidatePosition = nil
-    selectionDebugLog(
-      "gesture baseline: \(gestureStartFingerprint?.debugSummary ?? "no existing selection")"
-    )
+    selectionDebugLog("mouse gesture state reset; AX selection deferred until qualified mouse up")
   }
 
   func selectionCandidate(at screenPosition: CGPoint) async -> SelectionCandidate? {
     guard let activeSelection = activeSelection(logFailures: true) else {
       selectionDebugLog("candidate failed: active AX selection unavailable")
-      clearCandidateState()
       return nil
     }
-    guard activeSelection.fingerprint != gestureStartFingerprint else {
-      selectionDebugLog(
-        "candidate failed: selection unchanged from gesture baseline (\(activeSelection.fingerprint.debugSummary))"
-      )
-      clearCandidateState()
-      return nil
-    }
-
     selectionDebugLog(
       "candidate AX selection found: \(activeSelection.fingerprint.debugSummary) endpoint=\(screenPosition)"
     )
-    gestureStartFingerprint = nil
     candidateFingerprint = activeSelection.fingerprint
     candidatePosition = screenPosition
     return SelectionCandidate(
@@ -122,12 +108,6 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       )
     }
     return isCurrent
-  }
-
-  private func clearCandidateState() {
-    gestureStartFingerprint = nil
-    candidateFingerprint = nil
-    candidatePosition = nil
   }
 
   private func activeSelection(logFailures: Bool) -> ActiveSelection? {

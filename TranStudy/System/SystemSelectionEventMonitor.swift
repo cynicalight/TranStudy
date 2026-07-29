@@ -73,9 +73,9 @@ final class SystemSelectionEventMonitor: SelectionEventMonitoring {
   nonisolated private static func inputEvent(for event: NSEvent) -> SelectionInputEvent? {
     switch event.type {
     case .leftMouseDown:
-      return .leftMouseDown
+      return .leftMouseDown(at: NSEvent.mouseLocation, clickCount: event.clickCount)
     case .leftMouseUp:
-      return .leftMouseUp(at: NSEvent.mouseLocation)
+      return .leftMouseUp(at: NSEvent.mouseLocation, clickCount: event.clickCount)
     case .keyDown where event.keyCode == 53:
       return .escape
     case .keyDown:

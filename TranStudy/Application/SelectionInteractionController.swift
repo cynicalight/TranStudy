@@ -7,8 +7,8 @@ func selectionDebugLog(_ message: @autoclosure () -> String) {
 }
 
 enum SelectionInputEvent: Equatable, Sendable {
-  case leftMouseDown
-  case leftMouseUp(at: CGPoint)
+  case leftMouseDown(at: CGPoint, clickCount: Int)
+  case leftMouseUp(at: CGPoint, clickCount: Int)
   case escape
   case keyboardActivity
   case localApplicationInteraction
@@ -30,7 +30,8 @@ final class SelectionInteractionController {
   private let selection: any SelectionProviding
   private let events: any SelectionEventMonitoring
   private let indicator: any SelectionIndicatorPresenting
-  private let candidateDelay: Duration
+  private let candidatePollInterval: Duration
+  private let candidateTimeout: Duration
   private let candidateValidationInterval: Duration
   private let indicatorLifetime: Duration
   private let onExternalInteraction: () -> Void
@@ -40,13 +41,15 @@ final class SelectionInteractionController {
   private var lifetimeTask: Task<Void, Never>?
   private var captureTask: Task<Void, Never>?
   private var hasStarted = false
-  private var isTrackingMouseGesture = false
+  private var mouseDownPosition: CGPoint?
+  private var mouseDownClickCount = 0
 
   init(
     selection: any SelectionProviding,
     events: any SelectionEventMonitoring,
     indicator: any SelectionIndicatorPresenting,
-    candidateDelay: Duration = .milliseconds(80),
+    candidatePollInterval: Duration = .milliseconds(50),
+    candidateTimeout: Duration = .milliseconds(500),
     candidateValidationInterval: Duration = .milliseconds(100),
     indicatorLifetime: Duration = .seconds(4),
     onExternalInteraction: @escaping () -> Void = {},
@@ -55,7 +58,8 @@ final class SelectionInteractionController {
     self.selection = selection
     self.events = events
     self.indicator = indicator
-    self.candidateDelay = candidateDelay
+    self.candidatePollInterval = candidatePollInterval
+    self.candidateTimeout = candidateTimeout
     self.candidateValidationInterval = candidateValidationInterval
     self.indicatorLifetime = indicatorLifetime
     self.onExternalInteraction = onExternalInteraction
@@ -78,59 +82,95 @@ final class SelectionInteractionController {
   private func handle(_ event: SelectionInputEvent) {
     selectionDebugLog("interaction received \(event)")
     switch event {
-    case .leftMouseDown:
+    case .leftMouseDown(let screenPosition, let clickCount):
       dismissCandidate(reason: "new mouse gesture")
       onExternalInteraction()
-      isTrackingMouseGesture = true
+      mouseDownPosition = screenPosition
+      mouseDownClickCount = clickCount
       selection.beginMouseSelectionGesture()
-    case .leftMouseUp(let screenPosition):
-      guard isTrackingMouseGesture else {
+    case .leftMouseUp(let screenPosition, let clickCount):
+      guard let mouseDownPosition else {
         selectionDebugLog("mouse up ignored: no tracked mouse down")
         return
       }
-      isTrackingMouseGesture = false
-      selectionDebugLog("mouse gesture ended at \(screenPosition)")
+      let dragDistance = hypot(
+        screenPosition.x - mouseDownPosition.x,
+        screenPosition.y - mouseDownPosition.y
+      )
+      let effectiveClickCount = max(mouseDownClickCount, clickCount)
+      self.mouseDownPosition = nil
+      mouseDownClickCount = 0
+      guard dragDistance >= 3 || effectiveClickCount >= 2 else {
+        selectionDebugLog(
+          "mouse gesture ignored: distance=\(dragDistance) clickCount=\(effectiveClickCount)"
+        )
+        return
+      }
+      selectionDebugLog(
+        "selection gesture ended: position=\(screenPosition) distance=\(dragDistance) clickCount=\(effectiveClickCount)"
+      )
       prepareCandidate(at: screenPosition)
     case .escape, .keyboardActivity:
-      isTrackingMouseGesture = false
+      mouseDownPosition = nil
+      mouseDownClickCount = 0
       dismissCandidate(reason: "escape or external keyboard activity")
       onExternalInteraction()
     case .localApplicationInteraction:
-      isTrackingMouseGesture = false
+      mouseDownPosition = nil
+      mouseDownClickCount = 0
       dismissCandidate(reason: "local app interaction")
     }
   }
 
   private func prepareCandidate(at screenPosition: CGPoint) {
     dismissCandidate(reason: "prepare new candidate")
-    selectionDebugLog("waiting \(candidateDelay) before reading selection")
+    selectionDebugLog(
+      "polling AX selection every \(candidatePollInterval) for up to \(candidateTimeout)"
+    )
     candidateTask = Task { [weak self] in
       guard let self else {
         return
       }
 
-      try? await Task.sleep(for: candidateDelay)
-      guard !Task.isCancelled else {
-        selectionDebugLog("candidate read cancelled during delay")
-        return
+      let clock = ContinuousClock()
+      let deadline = clock.now.advanced(by: candidateTimeout)
+      var attempt = 0
+      while !Task.isCancelled {
+        if attempt > 0, clock.now >= deadline {
+          selectionDebugLog("candidate polling timed out after \(attempt) attempts")
+          return
+        }
+        attempt += 1
+        let candidate = await selection.selectionCandidate(at: screenPosition)
+        guard clock.now <= deadline else {
+          selectionDebugLog(
+            "candidate poll \(attempt) finished after timeout; result discarded"
+          )
+          return
+        }
+        if let candidate {
+          guard !Task.isCancelled else {
+            selectionDebugLog("candidate polling cancelled after provider response")
+            return
+          }
+          selectionDebugLog(
+            "candidate accepted on poll \(attempt): app=\(candidate.sourceApplicationName) position=\(candidate.screenPosition)"
+          )
+          indicator.present(candidate) { [weak self] in
+            self?.captureSelection()
+          }
+          monitorCandidate()
+          scheduleDismissal()
+          return
+        }
+        guard clock.now < deadline else {
+          selectionDebugLog("candidate polling timed out after \(attempt) attempts")
+          return
+        }
+        selectionDebugLog("candidate poll \(attempt) returned no selection; retrying")
+        try? await Task.sleep(for: candidatePollInterval)
       }
-      guard let candidate = await selection.selectionCandidate(at: screenPosition) else {
-        selectionDebugLog("candidate rejected: provider returned no new selection")
-        return
-      }
-      guard !Task.isCancelled else {
-        selectionDebugLog("candidate read cancelled after provider response")
-        return
-      }
-
-      selectionDebugLog(
-        "candidate accepted: app=\(candidate.sourceApplicationName) position=\(candidate.screenPosition)"
-      )
-      indicator.present(candidate) { [weak self] in
-        self?.captureSelection()
-      }
-      monitorCandidate()
-      scheduleDismissal()
+      selectionDebugLog("candidate polling cancelled")
     }
   }
 
