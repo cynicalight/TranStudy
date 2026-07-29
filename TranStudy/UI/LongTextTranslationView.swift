@@ -79,6 +79,7 @@ struct LongTextTranslationView: View {
           Label("学习选中词", systemImage: "text.badge.plus")
         }
         .buttonStyle(.borderedProminent)
+        .environment(\.controlActiveState, .active)
         .disabled(!shell.canTranslateLongTextSelection(selectedRange))
       }
 
