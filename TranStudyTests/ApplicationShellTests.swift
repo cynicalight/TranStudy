@@ -774,6 +774,182 @@ struct ApplicationShellTests {
     )
   }
 
+  @Test("the daily reminder uses the real due count at delivery time")
+  func dailyReminderUsesTheRealDueCount() async throws {
+    let dueItems = [
+      makeLearningItem(id: UUID(), canonicalForm: "run"),
+      makeLearningItem(id: UUID(), canonicalForm: "pause"),
+    ]
+    let notifier = TestReviewNotifier()
+    let reminderStore = TestReviewReminderConfigurationStore(
+      configuration: ReviewReminderConfiguration(
+        isEnabled: true,
+        hour: 9,
+        minute: 15
+      ))
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(
+          summary: LearningSummary(
+            dueCount: 2,
+            wordCount: 2,
+            sentenceCount: 0
+          ),
+          dueItems: dueItems
+        ),
+        notifier: notifier,
+        reminderConfigurationStore: reminderStore
+      ))
+
+    await shell.sendReviewReminderIfNeeded()
+
+    let reminder = try #require(notifier.lastReminder)
+    #expect(reminder.dueCount == 2)
+  }
+
+  @Test("reminders are removed when no cards are due")
+  func remindersAreRemovedWhenNoCardsAreDue() async {
+    let notifier = TestReviewNotifier()
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(
+          summary: LearningSummary(
+            dueCount: 0,
+            wordCount: 2,
+            sentenceCount: 0
+          )
+        ),
+        notifier: notifier,
+        reminderConfigurationStore: TestReviewReminderConfigurationStore(
+          configuration: ReviewReminderConfiguration(
+            isEnabled: true,
+            hour: 9,
+            minute: 15
+          ))
+      ))
+
+    await shell.sendReviewReminderIfNeeded()
+
+    #expect(notifier.receivedReminders.count == 1)
+    #expect(notifier.receivedReminders[0] == nil)
+  }
+
+  @Test("notification scheduling failure does not block today's review")
+  func notificationSchedulingFailureDoesNotBlockReview() async {
+    let dueItem = makeLearningItem(id: UUID(), canonicalForm: "run")
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(
+          summary: LearningSummary(
+            dueCount: 1,
+            wordCount: 1,
+            sentenceCount: 0
+          ),
+          dueItems: [dueItem]
+        ),
+        notifier: TestReviewNotifier(error: TestReviewNotifierError.denied),
+        reminderConfigurationStore: TestReviewReminderConfigurationStore(
+          configuration: ReviewReminderConfiguration(
+            isEnabled: true,
+            hour: 9,
+            minute: 15
+          ))
+      ))
+
+    await shell.refreshTodayReview()
+    await shell.sendReviewReminderIfNeeded()
+
+    #expect(shell.currentReviewItem == dueItem)
+    #expect(shell.learningSummary.dueCount == 1)
+  }
+
+  @Test("finishing the final due card removes its pending reminder")
+  func finishingFinalDueCardRemovesPendingReminder() async {
+    let dueItem = makeLearningItem(id: UUID(), canonicalForm: "run")
+    let notifier = TestReviewNotifier()
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(
+          summary: LearningSummary(
+            dueCount: 1,
+            wordCount: 1,
+            sentenceCount: 0
+          ),
+          dueItems: [dueItem]
+        ),
+        notifier: notifier,
+        reminderConfigurationStore: TestReviewReminderConfigurationStore(
+          configuration: ReviewReminderConfiguration(
+            isEnabled: true,
+            hour: 9,
+            minute: 15
+          ))
+      ))
+    await shell.refreshTodayReview()
+    await shell.sendReviewReminderIfNeeded()
+
+    await shell.rateCurrentReview(.remembered)
+
+    #expect(notifier.receivedReminders.count == 2)
+    #expect(notifier.receivedReminders[0]?.dueCount == 1)
+    #expect(notifier.receivedReminders[1] == nil)
+  }
+
+  @Test("reminder settings persist and restart the daily monitor")
+  func reminderSettingsPersistAndRestartMonitor() async {
+    let reminderStore = TestReviewReminderConfigurationStore()
+    let shell = ApplicationShell(
+      environment: .test(
+        reminderConfigurationStore: reminderStore
+      ))
+    var configurationChangeCount = 0
+    shell.onReviewReminderConfigurationChange = {
+      configurationChangeCount += 1
+    }
+
+    await shell.setReviewReminderEnabled(true)
+    await shell.setReviewReminderTime(hour: 18, minute: 30)
+
+    #expect(
+      reminderStore.savedConfiguration
+        == ReviewReminderConfiguration(
+          isEnabled: true,
+          hour: 18,
+          minute: 30
+        ))
+    #expect(configurationChangeCount == 2)
+  }
+
+  @Test("starting review selects today and refreshes the due cards")
+  func startingReviewSelectsTodayAndRefreshesDueCards() async {
+    let dueItem = makeLearningItem(id: UUID(), canonicalForm: "run")
+    let shell = ApplicationShell(
+      environment: .test(
+        learningStore: TestLearningStore(dueItems: [dueItem])
+      ))
+    shell.selectedDestination = .library
+
+    await shell.startTodayReview()
+
+    #expect(shell.selectedDestination == .todayReview)
+    #expect(shell.currentReviewItem == dueItem)
+  }
+
+  @Test("launch at login is opt-in and follows the system registration")
+  func launchAtLoginIsOptIn() {
+    let loginItem = TestLoginItemController()
+    let shell = ApplicationShell(
+      environment: .test(loginItem: loginItem)
+    )
+
+    #expect(!shell.isLaunchAtLoginEnabled)
+
+    shell.setLaunchAtLoginEnabled(true)
+
+    #expect(shell.isLaunchAtLoginEnabled)
+    #expect(loginItem.isEnabled)
+  }
+
   @Test("a cancelled translation cannot publish a late result")
   func cancelledTranslationCannotPublishLateResult() async {
     let translator = ControlledTranslationProvider()
@@ -1099,6 +1275,9 @@ extension ApplicationEnvironment {
     apiKeyStore: TestApplicationAPIKeyStore = TestApplicationAPIKeyStore(),
     connectionTester: TestTranslationConnectionTester = TestTranslationConnectionTester(),
     notifier: TestReviewNotifier = TestReviewNotifier(),
+    reminderConfigurationStore: TestReviewReminderConfigurationStore =
+      TestReviewReminderConfigurationStore(),
+    loginItem: TestLoginItemController = TestLoginItemController(),
     panelPositionStore: TestTranslationPanelPositionStore = TestTranslationPanelPositionStore(),
     providerConfigurationStore: TestTranslationProviderConfigurationStore =
       TestTranslationProviderConfigurationStore(),
@@ -1117,6 +1296,8 @@ extension ApplicationEnvironment {
       connectionTester: connectionTester,
       clock: TestClock(),
       notifications: notifier,
+      reviewReminderConfigurationStore: reminderConfigurationStore,
+      loginItem: loginItem,
       speech: TestSpeechPlayer(),
       panelPositionStore: panelPositionStore,
       providerConfigurationStore: providerConfigurationStore,
@@ -1321,6 +1502,13 @@ private final class TestLearningStore: LearningStoring {
         rating: rating,
         reviewedAt: reviewedAt
       ))
+    storedSummary = LearningSummary(
+      dueCount: max(0, storedSummary.dueCount - 1),
+      reviewedTodayCount: storedSummary.reviewedTodayCount + 1,
+      streakDayCount: storedSummary.streakDayCount,
+      wordCount: storedSummary.wordCount,
+      sentenceCount: storedSummary.sentenceCount
+    )
     return LearningReviewResult(
       itemID: itemID,
       rating: rating,
@@ -1523,9 +1711,49 @@ private struct TestClock: DateProviding {
 
 private final class TestReviewNotifier: ReviewNotifying {
   var lastReminder: ReviewReminder?
+  private(set) var receivedReminders: [ReviewReminder?] = []
+  private let error: TestReviewNotifierError?
 
-  func schedule(_ reminder: ReviewReminder) async throws {
+  init(error: TestReviewNotifierError? = nil) {
+    self.error = error
+  }
+
+  func replaceScheduledReminder(with reminder: ReviewReminder?) async throws {
+    receivedReminders.append(reminder)
+    if let error {
+      throw error
+    }
     lastReminder = reminder
+  }
+}
+
+private enum TestReviewNotifierError: Error {
+  case denied
+}
+
+private final class TestLoginItemController: LoginItemControlling {
+  private(set) var isEnabled = false
+
+  func setEnabled(_ isEnabled: Bool) throws {
+    self.isEnabled = isEnabled
+  }
+}
+
+private final class TestReviewReminderConfigurationStore:
+  ReviewReminderConfigurationStoring
+{
+  private(set) var savedConfiguration: ReviewReminderConfiguration
+
+  init(configuration: ReviewReminderConfiguration = .default) {
+    savedConfiguration = configuration
+  }
+
+  func load() -> ReviewReminderConfiguration {
+    savedConfiguration
+  }
+
+  func save(_ configuration: ReviewReminderConfiguration) {
+    savedConfiguration = configuration
   }
 }
 

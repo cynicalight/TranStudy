@@ -63,6 +63,8 @@ final class ApplicationShell {
   private(set) var isReviewAnswerVisible = false
   private(set) var isReviewRating = false
   private(set) var selectedReviewRating: ReviewRating?
+  private(set) var reviewReminderConfiguration: ReviewReminderConfiguration
+  private(set) var isLaunchAtLoginEnabled: Bool
   private(set) var pendingLearningMerge: LearningMergeSummary?
   private(set) var pendingLibraryMerge: LearningMergeSummary?
   private(set) var pendingLibraryDeletion: LearningItem?
@@ -76,6 +78,7 @@ final class ApplicationShell {
   private(set) var translationShortcutRegistrationStatus: TranslationShortcutRegistrationStatus =
     .unknown
   @ObservationIgnored var onTranslationShortcutChange: ((TranslationShortcutKey) -> Bool)?
+  @ObservationIgnored var onReviewReminderConfigurationChange: (() -> Void)?
   @ObservationIgnored private var pendingLibraryDeletionTask: Task<Void, Never>?
   private var activeTranslationID: UUID?
   private var translationSuggestedCanonicalForm = ""
@@ -106,6 +109,8 @@ final class ApplicationShell {
     selectionConfiguration = environment.selectionConfigurationStore.load()
     translationShortcut = environment.shortcutStore.load()
     isSentenceCardsEnabled = environment.sentenceCardConfigurationStore.load()
+    reviewReminderConfiguration = environment.reviewReminderConfigurationStore.load()
+    isLaunchAtLoginEnabled = environment.loginItem.isEnabled
   }
 
   func refreshTodayReview() async {
@@ -126,6 +131,23 @@ final class ApplicationShell {
       lastReviewRefreshDate = now
     } catch {
       // A later ticket will expose recoverable loading errors in the review UI.
+    }
+  }
+
+  func sendReviewReminderIfNeeded() async {
+    do {
+      let now = environment.clock.now
+      let dueItems = try await environment.learningStore.dueItems(at: now)
+      let reminder =
+        reviewReminderConfiguration.isEnabled && !dueItems.isEmpty
+        ? ReviewReminder(
+          date: now.addingTimeInterval(1),
+          dueCount: dueItems.count
+        )
+        : nil
+      try await environment.notifications.replaceScheduledReminder(with: reminder)
+    } catch {
+      // Notification permission and scheduling failures never block learning.
     }
   }
 
@@ -160,6 +182,9 @@ final class ApplicationShell {
       isReviewAnswerVisible = true
       learningSummary = try await environment.learningStore.summary(at: now)
       lastReviewRefreshDate = now
+      if learningSummary.dueCount == 0 {
+        try? await environment.notifications.replaceScheduledReminder(with: nil)
+      }
     } catch {
       // Keep the current card rateable when persistence fails.
     }
@@ -181,6 +206,36 @@ final class ApplicationShell {
     reviewQueue = remainingReviewBatches.removeFirst()
     isReviewAnswerVisible = false
     selectedReviewRating = nil
+  }
+
+  func startTodayReview() async {
+    selectedDestination = .todayReview
+    await refreshTodayReview()
+  }
+
+  func setReviewReminderEnabled(_ isEnabled: Bool) async {
+    reviewReminderConfiguration.isEnabled = isEnabled
+    environment.reviewReminderConfigurationStore.save(reviewReminderConfiguration)
+    onReviewReminderConfigurationChange?()
+    if !isEnabled {
+      try? await environment.notifications.replaceScheduledReminder(with: nil)
+    }
+  }
+
+  func setReviewReminderTime(hour: Int, minute: Int) async {
+    reviewReminderConfiguration.hour = min(max(hour, 0), 23)
+    reviewReminderConfiguration.minute = min(max(minute, 0), 59)
+    environment.reviewReminderConfigurationStore.save(reviewReminderConfiguration)
+    onReviewReminderConfigurationChange?()
+  }
+
+  func setLaunchAtLoginEnabled(_ isEnabled: Bool) {
+    do {
+      try environment.loginItem.setEnabled(isEnabled)
+    } catch {
+      // Keep the system-reported state when registration is rejected.
+    }
+    isLaunchAtLoginEnabled = environment.loginItem.isEnabled
   }
 
   func translateClipboard() async {

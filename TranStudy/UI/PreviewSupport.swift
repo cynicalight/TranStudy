@@ -20,6 +20,8 @@
           connectionTester: PreviewConnectionTester(),
           clock: PreviewClock(),
           notifications: PreviewReviewNotifier(),
+          reviewReminderConfigurationStore: PreviewReviewReminderConfigurationStore(),
+          loginItem: PreviewLoginItemController(),
           speech: PreviewSpeechPlayer(),
           panelPositionStore: PreviewPanelPositionStore(),
           providerConfigurationStore: PreviewProviderConfigurationStore(
@@ -92,6 +94,25 @@
     }
 
     func save(_ isEnabled: Bool) {}
+  }
+
+  private struct PreviewReviewReminderConfigurationStore:
+    ReviewReminderConfigurationStoring
+  {
+    func load() -> ReviewReminderConfiguration {
+      .default
+    }
+
+    func save(_ configuration: ReviewReminderConfiguration) {}
+  }
+
+  @MainActor
+  private struct PreviewLoginItemController: LoginItemControlling {
+    var isEnabled: Bool {
+      false
+    }
+
+    func setEnabled(_ isEnabled: Bool) throws {}
   }
 
   enum PreviewFixtures {
@@ -265,7 +286,7 @@
 
   @MainActor
   private struct PreviewReviewNotifier: ReviewNotifying {
-    func schedule(_ reminder: ReviewReminder) async throws {}
+    func replaceScheduledReminder(with reminder: ReviewReminder?) async throws {}
   }
 
   private struct PreviewSpeechPlayer: SpeechPlaying {

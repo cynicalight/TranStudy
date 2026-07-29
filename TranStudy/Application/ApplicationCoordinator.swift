@@ -6,6 +6,7 @@ final class ApplicationCoordinator {
   private let selectionEvents: SystemSelectionEventMonitor
   private let selectionIndicator: SelectionIndicatorController
   private let selectionInteraction: SelectionInteractionController
+  private let reviewReminderMonitor: ReviewReminderMonitor
   private var hasStarted = false
 
   init(shell: ApplicationShell) {
@@ -17,6 +18,11 @@ final class ApplicationCoordinator {
     self.translationPanel = translationPanel
     self.selectionEvents = selectionEvents
     self.selectionIndicator = selectionIndicator
+    reviewReminderMonitor = ReviewReminderMonitor(
+      now: { shell.environment.clock.now },
+      configuration: { shell.reviewReminderConfiguration },
+      sendReminder: { await shell.sendReviewReminderIfNeeded() }
+    )
     selectionInteraction = SelectionInteractionController(
       selection: shell.environment.selection,
       events: selectionEvents,
@@ -31,6 +37,9 @@ final class ApplicationCoordinator {
     )
     shell.onTranslationShortcutChange = { [weak shortcutMonitor] shortcut in
       shortcutMonitor?.updateShortcut(shortcut) ?? false
+    }
+    shell.onReviewReminderConfigurationChange = { [weak self] in
+      self?.reviewReminderMonitor.restart()
     }
   }
 
@@ -49,6 +58,7 @@ final class ApplicationCoordinator {
     )
     shell.setTranslationShortcutRegistrationSucceeded(shortcutRegistered)
     selectionInteraction.start()
+    reviewReminderMonitor.restart()
   }
 
   func presentClipboardTranslation() {

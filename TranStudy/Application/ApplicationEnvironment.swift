@@ -10,6 +10,8 @@ struct ApplicationEnvironment {
   let connectionTester: any TranslationConnectionTesting
   let clock: any DateProviding
   let notifications: any ReviewNotifying
+  let reviewReminderConfigurationStore: any ReviewReminderConfigurationStoring
+  let loginItem: any LoginItemControlling
   let speech: any SpeechPlaying
   let panelPositionStore: any TranslationPanelPositionStoring
   let providerConfigurationStore: any TranslationProviderConfigurationStoring
@@ -25,7 +27,8 @@ extension ApplicationEnvironment {
     translation: any TranslationProviding,
     apiKeyStore: any APIKeyStoring,
     connectionTester: any TranslationConnectionTesting,
-    providerConfigurationStore: any TranslationProviderConfigurationStoring
+    providerConfigurationStore: any TranslationProviderConfigurationStoring,
+    notifications: any ReviewNotifying
   ) -> ApplicationEnvironment {
     let selectionConfigurationStore = UserDefaultsSelectionConfigurationStore()
     return ApplicationEnvironment(
@@ -38,7 +41,9 @@ extension ApplicationEnvironment {
       apiKeyStore: apiKeyStore,
       connectionTester: connectionTester,
       clock: SystemDateProvider(),
-      notifications: DisabledReviewNotifier(),
+      notifications: notifications,
+      reviewReminderConfigurationStore: UserDefaultsReviewReminderConfigurationStore(),
+      loginItem: SystemLoginItemController(),
       speech: DisabledSpeechPlayer(),
       panelPositionStore: UserDefaultsTranslationPanelPositionStore(),
       providerConfigurationStore: providerConfigurationStore,
@@ -59,10 +64,6 @@ private struct SystemDateProvider: DateProviding {
   var now: Date {
     Date()
   }
-}
-
-private struct DisabledReviewNotifier: ReviewNotifying {
-  func schedule(_ reminder: ReviewReminder) async throws {}
 }
 
 private struct DisabledSpeechPlayer: SpeechPlaying {

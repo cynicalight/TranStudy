@@ -4,8 +4,11 @@ import SwiftUI
 
 @main
 struct TranStudyApp: App {
+  @NSApplicationDelegateAdaptor(TranStudyApplicationDelegate.self)
+  private var appDelegate
   @State private var shell: ApplicationShell
   private let coordinator: ApplicationCoordinator
+  private let reviewNotifier: SystemReviewNotifier
 
   init() {
     do {
@@ -26,6 +29,7 @@ struct TranStudyApp: App {
       #endif
       let httpClient = URLSessionHTTPClient()
       let providerConfigurationStore = UserDefaultsTranslationProviderConfigurationStore()
+      let reviewNotifier = SystemReviewNotifier()
       let translationService = ConfiguredTranslationService(
         configurationStore: providerConfigurationStore,
         apiKeyStore: apiKeyStore,
@@ -38,17 +42,19 @@ struct TranStudyApp: App {
           translation: translationService,
           apiKeyStore: apiKeyStore,
           connectionTester: translationService,
-          providerConfigurationStore: providerConfigurationStore
+          providerConfigurationStore: providerConfigurationStore,
+          notifications: reviewNotifier
         ))
       _shell = State(initialValue: shell)
       coordinator = ApplicationCoordinator(shell: shell)
+      self.reviewNotifier = reviewNotifier
     } catch {
       fatalError("Unable to initialize the learning store: \(error)")
     }
   }
 
   var body: some Scene {
-    WindowGroup {
+    WindowGroup("TranStudy", id: "main") {
       RootView(
         shell: shell,
         onTranslateClipboard: {
@@ -56,6 +62,12 @@ struct TranStudyApp: App {
         }
       )
       .frame(minWidth: 760, minHeight: 520)
+      .background(
+        NotificationRoutingBridge(
+          shell: shell,
+          notifier: reviewNotifier
+        )
+      )
       .onAppear {
         coordinator.start()
       }
@@ -76,6 +88,13 @@ struct TranStudyApp: App {
         )
       }
     }
+
+    MenuBarExtra {
+      TranStudyMenuBarView(shell: shell)
+    } label: {
+      Label("TranStudy", systemImage: "character.book.closed")
+    }
+    .menuBarExtraStyle(.menu)
   }
 }
 

@@ -20,6 +20,39 @@ struct TranslationSettingsView: View {
 
       Form {
         Section {
+          Toggle(
+            "登录时启动",
+            isOn: Binding(
+              get: { shell.isLaunchAtLoginEnabled },
+              set: { shell.setLaunchAtLoginEnabled($0) }
+            )
+          )
+
+          Toggle(
+            "每日复习提醒",
+            isOn: Binding(
+              get: { shell.reviewReminderConfiguration.isEnabled },
+              set: { isEnabled in
+                Task {
+                  await shell.setReviewReminderEnabled(isEnabled)
+                }
+              }
+            )
+          )
+
+          DatePicker(
+            "提醒时间",
+            selection: reminderTime,
+            displayedComponents: .hourAndMinute
+          )
+          .disabled(!shell.reviewReminderConfiguration.isEnabled)
+        } header: {
+          Label("启动与提醒", systemImage: "bell.badge")
+        } footer: {
+          Text("仅在存在到期卡片时提醒；通知权限被拒绝不会影响翻译与学习。")
+        }
+
+        Section {
           CenteredLabeledContent("翻译剪贴板") {
             Picker(
               "翻译剪贴板快捷键",
@@ -213,6 +246,32 @@ struct TranslationSettingsView: View {
       .frame(maxWidth: TranStudyDesign.pageWidth)
       .padding(.horizontal, 16)
     }
+  }
+
+  private var reminderTime: Binding<Date> {
+    Binding(
+      get: {
+        var components = Calendar.autoupdatingCurrent.dateComponents(
+          [.year, .month, .day],
+          from: Date()
+        )
+        components.hour = shell.reviewReminderConfiguration.hour
+        components.minute = shell.reviewReminderConfiguration.minute
+        return Calendar.autoupdatingCurrent.date(from: components) ?? Date()
+      },
+      set: { date in
+        let components = Calendar.autoupdatingCurrent.dateComponents(
+          [.hour, .minute],
+          from: date
+        )
+        Task {
+          await shell.setReviewReminderTime(
+            hour: components.hour ?? 9,
+            minute: components.minute ?? 0
+          )
+        }
+      }
+    )
   }
 
   private var availableApplications: [NSRunningApplication] {
