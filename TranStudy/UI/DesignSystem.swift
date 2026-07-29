@@ -34,14 +34,7 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
       }
     }
     .padding(3)
-    .background(
-      Color(nsColor: .controlBackgroundColor),
-      in: .rect(cornerRadius: 10)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: 10)
-        .stroke(.separator.opacity(0.35), lineWidth: 1)
-    }
+    .adaptiveGlassCapsule()
   }
 
   private func segment(for option: Option) -> some View {
@@ -67,10 +60,10 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .contentShape(.rect)
+        .contentShape(.capsule)
         .background {
           if isSelected {
-            RoundedRectangle(cornerRadius: 8)
+            Capsule()
               .fill(tint(option))
               .matchedGeometryEffect(
                 id: "selectedSegment",
@@ -116,7 +109,14 @@ extension View {
   }
 
   func adaptiveGlass(cornerRadius: CGFloat = 12) -> some View {
-    modifier(AdaptiveGlassModifier(cornerRadius: cornerRadius))
+    modifier(
+      AdaptiveGlassModifier(
+        shape: RoundedRectangle(cornerRadius: cornerRadius)
+      ))
+  }
+
+  func adaptiveGlassCapsule() -> some View {
+    modifier(AdaptiveGlassModifier(shape: Capsule()))
   }
 }
 
@@ -136,10 +136,10 @@ private struct ContentSurfaceModifier: ViewModifier {
   }
 }
 
-private struct AdaptiveGlassModifier: ViewModifier {
+private struct AdaptiveGlassModifier<GlassShape: Shape>: ViewModifier {
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-  let cornerRadius: CGFloat
+  let shape: GlassShape
 
   @ViewBuilder
   func body(content: Content) -> some View {
@@ -147,20 +147,20 @@ private struct AdaptiveGlassModifier: ViewModifier {
       content
         .background(
           Color(nsColor: .windowBackgroundColor),
-          in: .rect(cornerRadius: cornerRadius)
+          in: shape
         )
         .overlay {
-          RoundedRectangle(cornerRadius: cornerRadius)
+          shape
             .stroke(.separator, lineWidth: 1)
         }
     } else if #available(macOS 26, *) {
       content
-        .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        .glassEffect(.regular, in: shape)
     } else {
       content
-        .background(.regularMaterial, in: .rect(cornerRadius: cornerRadius))
+        .background(.regularMaterial, in: shape)
         .overlay {
-          RoundedRectangle(cornerRadius: cornerRadius)
+          shape
             .stroke(.separator.opacity(0.35), lineWidth: 1)
         }
     }
