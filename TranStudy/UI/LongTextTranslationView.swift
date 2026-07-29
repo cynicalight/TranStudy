@@ -1,11 +1,23 @@
-import AppKit
+import Foundation
 import SwiftUI
 
 struct LongTextTranslationView: View {
   let shell: ApplicationShell
   let result: LongTextTranslationResult
   let onTranslateSelection: (NSRange) -> Void
-  @State private var selectedRange = NSRange(location: 0, length: 0)
+  private let tokens: [LongTextWordToken]
+  @State private var selectedTokenRange: ClosedRange<Int>?
+
+  init(
+    shell: ApplicationShell,
+    result: LongTextTranslationResult,
+    onTranslateSelection: @escaping (NSRange) -> Void
+  ) {
+    self.shell = shell
+    self.result = result
+    self.onTranslateSelection = onTranslateSelection
+    tokens = LongTextWordToken.tokenize(result.sourceText)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -13,12 +25,49 @@ struct LongTextTranslationView: View {
         Text("英文原文")
           .font(.caption)
           .foregroundStyle(.secondary)
-        SelectableLongText(text: result.sourceText, selectedRange: $selectedRange)
-          .frame(height: 115)
-          .overlay {
-            RoundedRectangle(cornerRadius: 8)
-              .stroke(.separator.opacity(0.7))
+        ScrollView {
+          WordCapsuleFlowLayout(spacing: 7) {
+            ForEach(Array(tokens.enumerated()), id: \.element.id) { index, token in
+              HStack(spacing: 1) {
+                if !token.leadingPunctuation.isEmpty {
+                  Text(token.leadingPunctuation)
+                }
+                Button {
+                  updateSelection(with: index)
+                } label: {
+                  Text(token.word)
+                    .font(.body)
+                    .foregroundStyle(isSelected(index) ? Color.white : Color.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background {
+                      Capsule(style: .continuous)
+                        .fill(
+                          isSelected(index)
+                            ? Color.accentColor
+                            : Color.secondary.opacity(0.12)
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(token.word)
+                .accessibilityAddTraits(isSelected(index) ? .isSelected : [])
+                if !token.trailingPunctuation.isEmpty {
+                  Text(token.trailingPunctuation)
+                }
+              }
+            }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(8)
+        }
+        .frame(height: 115)
+        .background(.background.opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay {
+          RoundedRectangle(cornerRadius: 8)
+            .stroke(.separator.opacity(0.7))
+        }
       }
 
       HStack {
@@ -54,105 +103,187 @@ struct LongTextTranslationView: View {
         .foregroundStyle(.tertiary)
     }
     .padding(4)
+    .onChange(of: result.sourceText) {
+      selectedTokenRange = nil
+    }
   }
 
   private var selectionHint: String {
-    selectedRange.length == 0
-      ? "在英文原文中选择一个单词或短语"
-      : "选区需为不超过 8 个词的单词或短语"
+    guard let selectedTokenRange else {
+      return "点击单词；继续点击可组成不超过 8 个词的词组"
+    }
+    let count = selectedTokenRange.count
+    return count == 1 ? "已选择 1 个单词" : "已选择 \(count) 个单词"
+  }
+
+  private var selectedRange: NSRange {
+    guard
+      let selectedTokenRange,
+      tokens.indices.contains(selectedTokenRange.lowerBound),
+      tokens.indices.contains(selectedTokenRange.upperBound)
+    else {
+      return NSRange(location: 0, length: 0)
+    }
+    let firstRange = tokens[selectedTokenRange.lowerBound].sourceRange
+    let lastRange = tokens[selectedTokenRange.upperBound].sourceRange
+    return NSRange(
+      location: firstRange.location,
+      length: NSMaxRange(lastRange) - firstRange.location
+    )
+  }
+
+  private func isSelected(_ index: Int) -> Bool {
+    selectedTokenRange?.contains(index) == true
+  }
+
+  private func updateSelection(with index: Int) {
+    guard let currentRange = selectedTokenRange else {
+      selectedTokenRange = index...index
+      return
+    }
+
+    if currentRange.lowerBound == index {
+      selectedTokenRange =
+        currentRange.count == 1
+        ? nil
+        : (currentRange.lowerBound + 1)...currentRange.upperBound
+      return
+    }
+
+    if currentRange.upperBound == index {
+      selectedTokenRange = currentRange.lowerBound...(currentRange.upperBound - 1)
+      return
+    }
+
+    let expandedRange =
+      min(currentRange.lowerBound, index)...max(currentRange.upperBound, index)
+    if expandedRange.count <= 8 {
+      selectedTokenRange = expandedRange
+    }
   }
 }
 
-private struct SelectableLongText: NSViewRepresentable {
-  let text: String
-  @Binding var selectedRange: NSRange
+private struct LongTextWordToken: Identifiable {
+  let id: Int
+  let word: String
+  let leadingPunctuation: String
+  let trailingPunctuation: String
+  let sourceRange: NSRange
 
-  func makeCoordinator() -> Coordinator {
-    Coordinator(selectedRange: $selectedRange)
+  static func tokenize(_ text: String) -> [Self] {
+    let source = text as NSString
+    let fullRange = NSRange(location: 0, length: source.length)
+    guard
+      let expression = try? NSRegularExpression(
+        pattern: #"\p{L}[\p{L}\p{M}\p{N}]*(?:['’\-][\p{L}\p{M}\p{N}]+)*|\p{N}+"#
+      )
+    else {
+      return []
+    }
+
+    let matches = expression.matches(in: text, range: fullRange)
+    return matches.enumerated().map { index, match in
+      let previousLocation =
+        index > 0
+        ? NSMaxRange(matches[index - 1].range)
+        : 0
+      let nextLocation =
+        matches.indices.contains(index + 1)
+        ? matches[index + 1].range.location
+        : source.length
+      let leadingSeparator = source.substring(
+        with: NSRange(
+          location: previousLocation,
+          length: match.range.location - previousLocation
+        )
+      )
+      let trailingSeparator = source.substring(
+        with: NSRange(
+          location: NSMaxRange(match.range),
+          length: max(0, nextLocation - NSMaxRange(match.range))
+        )
+      )
+      let leadingPunctuation =
+        index == 0 || leadingSeparator.contains(where: \.isWhitespace)
+        ? String(
+          leadingSeparator.reversed().prefix { !$0.isWhitespace }.reversed()
+        )
+        : ""
+      let trailingPunctuation = String(
+        trailingSeparator.prefix { !$0.isWhitespace }
+      )
+      let word = source.substring(with: match.range)
+
+      return Self(
+        id: match.range.location,
+        word: word,
+        leadingPunctuation: leadingPunctuation,
+        trailingPunctuation: trailingPunctuation,
+        sourceRange: match.range
+      )
+    }
+  }
+}
+
+private struct WordCapsuleFlowLayout: Layout {
+  let spacing: CGFloat
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) -> CGSize {
+    let result = layout(subviews: subviews, width: proposal.width ?? .infinity)
+    return CGSize(width: proposal.width ?? result.width, height: result.height)
   }
 
-  func makeNSView(context: Context) -> NSScrollView {
-    let scrollView = NSScrollView()
-    scrollView.drawsBackground = false
-    scrollView.borderType = .noBorder
-    scrollView.hasVerticalScroller = true
-    scrollView.autohidesScrollers = true
-
-    let contentSize = scrollView.contentSize
-    let textView = NSTextView(
-      frame: NSRect(origin: .zero, size: contentSize)
-    )
-    textView.delegate = context.coordinator
-    textView.isEditable = false
-    textView.isSelectable = true
-    textView.isRichText = false
-    textView.drawsBackground = false
-    textView.isVerticallyResizable = true
-    textView.isHorizontallyResizable = false
-    textView.autoresizingMask = [.width]
-    textView.minSize = NSSize(width: 0, height: 0)
-    textView.maxSize = NSSize(
-      width: CGFloat.greatestFiniteMagnitude,
-      height: CGFloat.greatestFiniteMagnitude
-    )
-    textView.font = .preferredFont(forTextStyle: .body)
-    textView.textContainerInset = NSSize(width: 8, height: 8)
-    textView.textContainer?.widthTracksTextView = true
-    textView.textContainer?.containerSize = NSSize(
-      width: contentSize.width,
-      height: CGFloat.greatestFiniteMagnitude
-    )
-    textView.string = text
-
-    scrollView.documentView = textView
-    return scrollView
-  }
-
-  func updateNSView(_ scrollView: NSScrollView, context: Context) {
-    guard let textView = scrollView.documentView as? NSTextView else {
-      return
-    }
-    if textView.string != text {
-      textView.string = text
-      let emptyRange = NSRange(location: 0, length: 0)
-      textView.setSelectedRange(emptyRange)
-      context.coordinator.publishSelectedRange(emptyRange)
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) {
+    let result = layout(subviews: subviews, width: bounds.width)
+    for (index, point) in result.points.enumerated() {
+      subviews[index].place(
+        at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y),
+        anchor: .topLeading,
+        proposal: .unspecified
+      )
     }
   }
 
-  @MainActor
-  final class Coordinator: NSObject, NSTextViewDelegate {
-    @Binding private var selectedRange: NSRange
-    private var pendingSelectedRange: NSRange?
+  private func layout(subviews: Subviews, width: CGFloat) -> LayoutResult {
+    var points: [CGPoint] = []
+    var x: CGFloat = 0
+    var y: CGFloat = 0
+    var rowHeight: CGFloat = 0
+    var contentWidth: CGFloat = 0
 
-    init(selectedRange: Binding<NSRange>) {
-      _selectedRange = selectedRange
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      if x > 0, x + size.width > width {
+        x = 0
+        y += rowHeight + spacing
+        rowHeight = 0
+      }
+      points.append(CGPoint(x: x, y: y))
+      x += size.width + spacing
+      rowHeight = max(rowHeight, size.height)
+      contentWidth = max(contentWidth, x - spacing)
     }
 
-    func textViewDidChangeSelection(_ notification: Notification) {
-      guard let textView = notification.object as? NSTextView else {
-        return
-      }
-      publishSelectedRange(textView.selectedRange())
-    }
+    return LayoutResult(
+      points: points,
+      width: contentWidth,
+      height: subviews.isEmpty ? 0 : y + rowHeight
+    )
+  }
 
-    func publishSelectedRange(_ range: NSRange) {
-      guard selectedRange != range, pendingSelectedRange != range else {
-        return
-      }
-      pendingSelectedRange = range
-
-      DispatchQueue.main.async { [weak self] in
-        guard let self, self.pendingSelectedRange == range else {
-          return
-        }
-        self.pendingSelectedRange = nil
-        guard self.selectedRange != range else {
-          return
-        }
-        self.selectedRange = range
-      }
-    }
+  private struct LayoutResult {
+    let points: [CGPoint]
+    let width: CGFloat
+    let height: CGFloat
   }
 }
 
