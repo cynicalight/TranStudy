@@ -15,8 +15,6 @@ required_variable() {
 
 required_variable VERSION
 required_variable BUILD_NUMBER
-required_variable DEVELOPER_ID_APPLICATION
-required_variable NOTARY_KEYCHAIN_PROFILE
 required_variable RELEASE_NOTES_FILE
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -39,14 +37,6 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 65
 fi
 
-if ! security find-identity -v -p codesigning |
-  grep -F "\"$DEVELOPER_ID_APPLICATION\"" >/dev/null
-then
-  echo "Developer ID identity is unavailable: $DEVELOPER_ID_APPLICATION" >&2
-  exit 69
-fi
-
-development_team=${DEVELOPMENT_TEAM:-8HC6J9LU7U}
 release_root="$repo_root/build/releases/$VERSION"
 archive_path="$release_root/TranStudy.xcarchive"
 app_path="$archive_path/Products/Applications/TranStudy.app"
@@ -82,20 +72,16 @@ xcodebuild archive \
   -clonedSourcePackagesDirPath "$package_cache" \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-  DEVELOPMENT_TEAM="$development_team" \
+  DEVELOPMENT_TEAM= \
   CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="$DEVELOPER_ID_APPLICATION" \
-  OTHER_CODE_SIGN_FLAGS=--timestamp
+  CODE_SIGN_IDENTITY=- \
+  CODE_SIGNING_REQUIRED=YES
 
 "$repo_root/scripts/verify-release-artifact.sh" "$app_path"
 codesign --verify --deep --strict --verbose=2 "$app_path"
 signature_details=$(codesign --display --verbose=4 "$app_path" 2>&1)
-if ! grep -F "Authority=Developer ID Application:" <<<"$signature_details" >/dev/null; then
-  echo "app is not signed by a Developer ID Application authority" >&2
-  exit 65
-fi
-if ! grep -F "TeamIdentifier=$development_team" <<<"$signature_details" >/dev/null; then
-  echo "app signature does not match team $development_team" >&2
+if ! grep -F "Signature=adhoc" <<<"$signature_details" >/dev/null; then
+  echo "app is not ad-hoc signed" >&2
   exit 65
 fi
 
@@ -110,19 +96,7 @@ hdiutil create \
   -format UDZO \
   "$dmg_path"
 
-codesign \
-  --force \
-  --sign "$DEVELOPER_ID_APPLICATION" \
-  --timestamp \
-  "$dmg_path"
-
-xcrun notarytool submit "$dmg_path" \
-  --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" \
-  --wait
-xcrun stapler staple "$dmg_path"
-xcrun stapler validate "$dmg_path"
-codesign --verify --strict --verbose=2 "$dmg_path"
-spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg_path"
+(cd "$release_root" && shasum -a 256 "$dmg_name" > "$dmg_name.sha256")
 
 if [[ ! -x "$sparkle_tools/generate_appcast" ]]; then
   echo "Sparkle generate_appcast tool is unavailable at $sparkle_tools" >&2
@@ -148,4 +122,5 @@ if ! grep -F "sparkle:edSignature=" "$release_root/appcast.xml" >/dev/null; then
 fi
 
 echo "Release artifacts are ready in $release_root"
-echo "Upload $dmg_name and appcast.xml to GitHub release v$VERSION only after manual acceptance."
+echo "This build is ad-hoc signed and not notarized; Gatekeeper will require manual approval."
+echo "Upload $dmg_name, $dmg_name.sha256, and appcast.xml to GitHub release v$VERSION only after manual acceptance."
