@@ -278,26 +278,16 @@ final class AccessibilitySelectionProvider: SelectionProviding {
   }
 
   private func sensitiveControlRejectionReason(for element: AXUIElement) -> String? {
-    let subrole = stringAttribute(kAXSubroleAttribute as CFString, from: element)
-    if subrole == kAXSecureTextFieldSubrole as String {
-      return "secure-text-field"
-    }
-
-    if let protectedContent =
-      copyAttribute("AXContainsProtectedContent" as CFString, from: element) as? NSNumber,
-      protectedContent.boolValue
-    {
-      return "protected-content"
-    }
-
-    let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
-    if role == kAXTextFieldRole as String,
-      subrole == nil || subrole == kAXUnknownSubrole as String
-    {
-      return "unconfirmed-text-field-subrole"
-    }
-
-    return nil
+    let protectedContent =
+      (copyAttribute("AXContainsProtectedContent" as CFString, from: element) as? NSNumber)?
+      .boolValue
+    return SelectionControlPrivacyPolicy.rejectionReason(
+      for: SelectionControlAttributes(
+        role: stringAttribute(kAXRoleAttribute as CFString, from: element),
+        subrole: stringAttribute(kAXSubroleAttribute as CFString, from: element),
+        containsProtectedContent: protectedContent
+      )
+    )?.rawValue
   }
 
   private func stringAttribute(
