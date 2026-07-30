@@ -39,13 +39,28 @@ final class OpenAIChatTranslationClient {
       let contentData = Self.jsonData(from: content),
       let payload = try? JSONDecoder().decode(OpenAITranslationPayload.self, from: contentData)
     else {
-      throw TranslationError.invalidResponse(.malformedPayload)
+      throw Self.invalidWordResponse(
+        .malformedPayload,
+        check: "jsonDecoding",
+        content: content,
+        request: request
+      )
     }
     guard let inputKind = payload.inputKind else {
-      throw TranslationError.invalidResponse(.missingRequiredContent)
+      throw Self.invalidWordResponse(
+        .missingRequiredContent,
+        check: "missingInputKind",
+        content: content,
+        request: request
+      )
     }
     guard inputKind == .wordOrPhrase else {
-      throw TranslationError.invalidResponse(.unexpectedInputKind)
+      throw Self.invalidWordResponse(
+        .unexpectedInputKind,
+        check: "unexpectedInputKind actual=\(inputKind.rawValue)",
+        content: content,
+        request: request
+      )
     }
     guard
       let sourceText = Self.nonempty(payload.sourceText),
@@ -55,10 +70,21 @@ final class OpenAIChatTranslationClient {
       let payloadExampleSentence = Self.nonempty(payload.exampleSentence),
       let payloadSentenceTranslation = Self.nonempty(payload.sentenceTranslation)
     else {
-      throw TranslationError.invalidResponse(.missingRequiredContent)
+      throw Self.invalidWordResponse(
+        .missingRequiredContent,
+        check: "missingFields=\(Self.missingFieldNames(in: payload).joined(separator: ","))",
+        content: content,
+        request: request
+      )
     }
     guard Self.areRecoverablyEquivalent(sourceText, request.sourceText) else {
-      throw TranslationError.invalidResponse(.invalidEnglishContent)
+      throw Self.invalidWordResponse(
+        .invalidEnglishContent,
+        check:
+          "sourceTextMismatch expected=\(String(reflecting: request.sourceText)) actual=\(String(reflecting: sourceText))",
+        content: content,
+        request: request
+      )
     }
 
     let exampleAndTranslation =
@@ -83,7 +109,13 @@ final class OpenAIChatTranslationClient {
           targetSentence
         )
       else {
-        throw TranslationError.invalidResponse(.invalidEnglishContent)
+        throw Self.invalidWordResponse(
+          .invalidEnglishContent,
+          check:
+            "targetSentenceMismatch expected=\(String(reflecting: targetSentence)) actual=\(String(reflecting: exampleAndTranslation.exampleSentence))",
+          content: content,
+          request: request
+        )
       }
       exampleSentence = targetSentence
     } else {
@@ -95,13 +127,25 @@ final class OpenAIChatTranslationClient {
       !Self.containsHanCharacter(canonicalForm),
       Self.containsLatinLetter(exampleSentence)
     else {
-      throw TranslationError.invalidResponse(.invalidEnglishContent)
+      throw Self.invalidWordResponse(
+        .invalidEnglishContent,
+        check:
+          "invalidEnglishFields canonical_form=\(String(reflecting: canonicalForm)) example_sentence=\(String(reflecting: exampleSentence))",
+        content: content,
+        request: request
+      )
     }
     guard
       Self.containsHanCharacter(contextualMeaning),
       Self.containsHanCharacter(exampleAndTranslation.sentenceTranslation)
     else {
-      throw TranslationError.invalidResponse(.invalidChineseContent)
+      throw Self.invalidWordResponse(
+        .invalidChineseContent,
+        check:
+          "invalidChineseFields contextual_meaning=\(String(reflecting: contextualMeaning)) sentence_translation=\(String(reflecting: exampleAndTranslation.sentenceTranslation))",
+        content: content,
+        request: request
+      )
     }
 
     return TranslationResult(
@@ -347,6 +391,40 @@ final class OpenAIChatTranslationClient {
       OpenAIMessage(role: "user", content: "resilient"),
       OpenAIMessage(role: "assistant", content: response),
     ]
+  }
+
+  private static func missingFieldNames(in payload: OpenAITranslationPayload) -> [String] {
+    [
+      ("source_text", payload.sourceText),
+      ("canonical_form", payload.canonicalForm),
+      ("part_of_speech", payload.partOfSpeech),
+      ("contextual_meaning", payload.contextualMeaning),
+      ("example_sentence", payload.exampleSentence),
+      ("sentence_translation", payload.sentenceTranslation),
+    ].compactMap { fieldName, value in
+      nonempty(value) == nil ? fieldName : nil
+    }
+  }
+
+  private static func invalidWordResponse(
+    _ failure: TranslationResponseValidationFailure,
+    check: String,
+    content: String,
+    request: TranslationRequest
+  ) -> TranslationError {
+    #if DEBUG
+      print("[TranslationDebug] validation failed: reason=\(failure) check=\(check)")
+      print("[TranslationDebug] request.source_text=\(String(reflecting: request.sourceText))")
+      if let targetSentence = request.targetSentence {
+        print(
+          "[TranslationDebug] request.target_sentence=\(String(reflecting: targetSentence))"
+        )
+      }
+      print("[TranslationDebug] response.content.begin")
+      print(content)
+      print("[TranslationDebug] response.content.end")
+    #endif
+    return .invalidResponse(failure)
   }
 
   private static func systemPrompt(for writingSystem: ChineseWritingSystem) -> String {
