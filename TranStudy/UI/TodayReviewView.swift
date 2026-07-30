@@ -39,6 +39,7 @@ struct TodayReviewView: View {
               title: "学习中单词",
               value: shell.learningSummary.wordCount,
               systemImage: "textformat.abc",
+              systemImageLocale: Locale(identifier: "en"),
               tint: .blue
             )
             SummaryCard(
@@ -509,11 +510,12 @@ private struct SummaryCard: View {
   let title: String
   let value: Int
   let systemImage: String
+  var systemImageLocale: Locale? = nil
   let tint: Color
 
   var body: some View {
     HStack {
-      Image(systemName: systemImage)
+      systemIcon
         .font(.system(size: 36, weight: .semibold))
         .foregroundStyle(tint)
         .frame(width: 36)
@@ -535,6 +537,16 @@ private struct SummaryCard: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .contentSurface()
     .accessibilityElement(children: .combine)
+  }
+
+  @ViewBuilder
+  private var systemIcon: some View {
+    if let systemImageLocale {
+      Image(systemName: systemImage)
+        .environment(\.locale, systemImageLocale)
+    } else {
+      Image(systemName: systemImage)
+    }
   }
 }
 
