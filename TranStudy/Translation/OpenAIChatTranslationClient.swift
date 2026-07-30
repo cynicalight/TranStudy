@@ -34,7 +34,6 @@ final class OpenAIChatTranslationClient {
           "llm.target_sentence",
           content: request.targetSentence ?? "<unavailable>"
         )
-        Self.translationContextDebugLog("llm.user_content", content: userContent)
       }
     #endif
     let content = try await completionContent(
@@ -419,22 +418,10 @@ final class OpenAIChatTranslationClient {
 
   private static func invalidWordResponse(
     _ failure: TranslationResponseValidationFailure,
-    check: String,
-    content: String,
-    request: TranslationRequest
+    check _: String,
+    content _: String,
+    request _: TranslationRequest
   ) -> TranslationError {
-    #if DEBUG
-      print("[TranslationDebug] validation failed: reason=\(failure) check=\(check)")
-      print("[TranslationDebug] request.source_text=\(String(reflecting: request.sourceText))")
-      if let targetSentence = request.targetSentence {
-        print(
-          "[TranslationDebug] request.target_sentence=\(String(reflecting: targetSentence))"
-        )
-      }
-      print("[TranslationDebug] response.content.begin")
-      print(content)
-      print("[TranslationDebug] response.content.end")
-    #endif
     return .invalidResponse(failure)
   }
 
