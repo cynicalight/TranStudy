@@ -11,7 +11,8 @@ struct LearningLibraryView: View {
         PageHeader(
           title: "单词库",
           subtitle: librarySubtitle,
-          systemImage: "books.vertical.fill"
+          systemImage: "books.vertical.fill",
+          tint: .accentColor
         )
         .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
         .padding(.horizontal, 12)
@@ -214,6 +215,9 @@ struct LearningLibraryView: View {
         },
         tint: {
           $0 == .archived ? .red : .accentColor
+        },
+        selectedForeground: { _ in
+          .white
         }
       )
       .frame(width: 160)

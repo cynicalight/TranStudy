@@ -65,7 +65,6 @@ struct TranslationSettingsView: View {
                   .tag(shortcut)
               }
             }
-            .labelsHidden()
             .frame(width: 140)
           }
 

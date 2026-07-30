@@ -14,6 +14,11 @@ struct RootView: View {
 
       tabNavigation
     }
+    .tint(
+      shell.selectedDestination == .library
+        ? .accentColor
+        : TranStudyDesign.accentColor
+    )
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button(action: onTranslateClipboard) {

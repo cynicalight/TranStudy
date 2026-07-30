@@ -169,6 +169,7 @@ struct CenteredLabeledContent<Content: View>: View {
         .frame(width: 96, alignment: .leading)
 
       content
+        .labelsHidden()
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
   }

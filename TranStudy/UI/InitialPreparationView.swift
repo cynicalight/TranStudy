@@ -6,29 +6,16 @@ private enum PreparationStep: Int, CaseIterable {
   case notifications
   case ready
 
-  var title: String {
+  var presentation: (title: String, systemImage: String) {
     switch self {
     case .accessibility:
-      "划词权限"
+      ("划词权限", "hand.point.up.left.fill")
     case .translationService:
-      "翻译服务"
+      ("翻译服务", "network")
     case .notifications:
-      "复习提醒"
+      ("复习提醒", "bell.badge.fill")
     case .ready:
-      "准备完成"
-    }
-  }
-
-  var systemImage: String {
-    switch self {
-    case .accessibility:
-      "hand.point.up.left.fill"
-    case .translationService:
-      "network"
-    case .notifications:
-      "bell.badge.fill"
-    case .ready:
-      "checkmark.seal.fill"
+      ("准备完成", "checkmark.seal.fill")
     }
   }
 }
@@ -79,12 +66,13 @@ struct InitialPreparationView: View {
 
   @ViewBuilder
   private var stepContent: some View {
+    let presentation = step.presentation
     VStack(alignment: .leading, spacing: 20) {
-      Image(systemName: step.systemImage)
+      Image(systemName: presentation.systemImage)
         .font(.system(size: 38))
         .foregroundStyle(TranStudyDesign.accentColor)
 
-      Text(step.title)
+      Text(presentation.title)
         .font(.title.bold())
 
       switch step {
@@ -117,12 +105,14 @@ struct InitialPreparationView: View {
           shell.requestAccessibilityAuthorization()
         }
         .buttonStyle(.borderedProminent)
+        .disabled(shell.accessibilityAuthorizationStatus == .authorized)
 
         Button("重新检查") {
           Task {
             await shell.refreshPreparationStatus()
           }
         }
+        .disabled(shell.accessibilityAuthorizationStatus == .authorized)
       }
     }
   }
@@ -174,7 +164,7 @@ struct InitialPreparationView: View {
         .font(.caption)
         .foregroundStyle(.secondary)
 
-      ForEach(PreparationCapability.allCasesForDisplay) { capability in
+      ForEach(PreparationCapability.allCases) { capability in
         preparationSummaryRow(capability)
       }
     }
@@ -270,12 +260,6 @@ struct PreparationStatusBanner: View {
 }
 
 extension PreparationCapability {
-  fileprivate static let allCasesForDisplay: [PreparationCapability] = [
-    .accessibility,
-    .translationService,
-    .notifications,
-  ]
-
   fileprivate var title: String {
     switch self {
     case .accessibility:

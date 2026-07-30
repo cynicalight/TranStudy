@@ -56,9 +56,12 @@ struct TranslationPanelView: View {
     HStack(spacing: 11) {
       Image(systemName: "character.bubble.fill")
         .font(.system(size: 16, weight: .semibold))
-        .foregroundStyle(.tint)
+        .foregroundStyle(TranStudyDesign.accentColor)
         .frame(width: 32, height: 32)
-        .background(.tint.opacity(0.1), in: .rect(cornerRadius: 9))
+        .background(
+          TranStudyDesign.accentColor.opacity(0.1),
+          in: .rect(cornerRadius: 9)
+        )
 
       VStack(alignment: .leading, spacing: 1) {
         Text(shell.translationPresentationTitle)
@@ -70,17 +73,6 @@ struct TranslationPanelView: View {
 
       Spacer()
 
-      Button {
-        onDismiss()
-      } label: {
-        Image(systemName: "xmark")
-          .frame(width: 24, height: 24)
-      }
-      .buttonStyle(.plain)
-      .foregroundStyle(.secondary)
-      .contentShape(.rect)
-      .help("关闭")
-      .accessibilityLabel("关闭")
     }
     .padding(10)
     .adaptiveGlass(cornerRadius: 13)
@@ -239,8 +231,13 @@ struct TranslationPanelView: View {
           }
         } label: {
           Label("加入学习", systemImage: "plus")
+            .font(.body.weight(.semibold))
+            .foregroundStyle(TranStudyDesign.accentForegroundColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .adaptiveTintedGlassCapsule()
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.plain)
         .disabled(
           shell.translationDraft?.canonicalForm
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true

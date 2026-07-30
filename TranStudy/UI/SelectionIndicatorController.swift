@@ -36,7 +36,7 @@ final class SelectionIndicatorController: NSObject, SelectionIndicatorPresenting
     )
     button.isBordered = false
     button.bezelStyle = .circular
-    button.contentTintColor = .controlAccentColor
+    button.contentTintColor = TranStudyDesign.accentNSColor
     button.toolTip = "翻译选中文本"
     button.setAccessibilityLabel("翻译选中文本")
 

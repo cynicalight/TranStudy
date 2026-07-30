@@ -4,6 +4,18 @@ import SwiftUI
 enum TranStudyDesign {
   static let pageWidth: CGFloat = 820
   static let cornerRadius: CGFloat = 16
+  static let accentNSColor = NSColor(
+    srgbRed: 232.0 / 255.0,
+    green: 127.0 / 255.0,
+    blue: 79.0 / 255.0,
+    alpha: 1
+  )
+  static let accentColor = Color(nsColor: accentNSColor)
+  static let accentForegroundColor = Color(
+    red: 44.0 / 255.0,
+    green: 23.0 / 255.0,
+    blue: 16.0 / 255.0
+  )
 }
 
 struct TranStudySegmentedControl<Option: Hashable>: View {
@@ -11,6 +23,7 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
   @Binding var selection: Option
   let label: (Option) -> String
   let tint: (Option) -> Color
+  let selectedForeground: (Option) -> Color
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Namespace private var selectionNamespace
@@ -19,12 +32,16 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
     options: [Option],
     selection: Binding<Option>,
     label: @escaping (Option) -> String,
-    tint: @escaping (Option) -> Color = { _ in .accentColor }
+    tint: @escaping (Option) -> Color = { _ in TranStudyDesign.accentColor },
+    selectedForeground: @escaping (Option) -> Color = { _ in
+      TranStudyDesign.accentForegroundColor
+    }
   ) {
     self.options = options
     _selection = selection
     self.label = label
     self.tint = tint
+    self.selectedForeground = selectedForeground
   }
 
   var body: some View {
@@ -56,7 +73,7 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
       Text(label(option))
         .font(.subheadline)
         .fontWeight(isSelected ? .semibold : .regular)
-        .foregroundStyle(isSelected ? Color.white : Color.secondary)
+        .foregroundStyle(isSelected ? selectedForeground(option) : Color.secondary)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
@@ -82,14 +99,18 @@ struct PageHeader: View {
   let title: String
   let subtitle: String
   let systemImage: String
+  var tint: Color = TranStudyDesign.accentColor
 
   var body: some View {
     HStack(alignment: .center, spacing: 14) {
       Image(systemName: systemImage)
         .font(.system(size: 20, weight: .semibold))
-        .foregroundStyle(.tint)
+        .foregroundStyle(tint)
         .frame(width: 42, height: 42)
-        .background(.tint.opacity(0.1), in: .rect(cornerRadius: 12))
+        .background(
+          tint.opacity(0.1),
+          in: .rect(cornerRadius: 12)
+        )
 
       VStack(alignment: .leading, spacing: 3) {
         Text(title)
@@ -111,12 +132,30 @@ extension View {
   func adaptiveGlass(cornerRadius: CGFloat = 12) -> some View {
     modifier(
       AdaptiveGlassModifier(
-        shape: RoundedRectangle(cornerRadius: cornerRadius)
+        shape: RoundedRectangle(cornerRadius: cornerRadius),
+        tint: nil
       ))
   }
 
   func adaptiveGlassCapsule() -> some View {
-    modifier(AdaptiveGlassModifier(shape: Capsule()))
+    modifier(AdaptiveGlassModifier(shape: Capsule(), tint: nil))
+  }
+
+  func adaptiveTintedGlass(
+    cornerRadius: CGFloat = 12,
+    tint: Color = TranStudyDesign.accentColor
+  ) -> some View {
+    modifier(
+      AdaptiveGlassModifier(
+        shape: RoundedRectangle(cornerRadius: cornerRadius),
+        tint: tint
+      ))
+  }
+
+  func adaptiveTintedGlassCapsule(
+    tint: Color = TranStudyDesign.accentColor
+  ) -> some View {
+    modifier(AdaptiveGlassModifier(shape: Capsule(), tint: tint))
   }
 }
 
@@ -140,11 +179,13 @@ private struct AdaptiveGlassModifier<GlassShape: Shape>: ViewModifier {
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   let shape: GlassShape
+  let tint: Color?
 
   @ViewBuilder
   func body(content: Content) -> some View {
     if reduceTransparency {
       content
+        .background(tint ?? .clear, in: shape)
         .background(
           Color(nsColor: .windowBackgroundColor),
           in: shape
@@ -153,11 +194,15 @@ private struct AdaptiveGlassModifier<GlassShape: Shape>: ViewModifier {
           shape
             .stroke(.separator, lineWidth: 1)
         }
+    } else if #available(macOS 26, *), let tint {
+      content
+        .glassEffect(.regular.tint(tint), in: shape)
     } else if #available(macOS 26, *) {
       content
         .glassEffect(.regular, in: shape)
     } else {
       content
+        .background(tint?.opacity(0.78) ?? .clear, in: shape)
         .background(.regularMaterial, in: shape)
         .overlay {
           shape

@@ -61,6 +61,7 @@ struct TranStudyApp: App {
           coordinator.presentClipboardTranslation()
         }
       )
+      .tint(TranStudyDesign.accentColor)
       .frame(minWidth: 760, minHeight: 520)
       .background(
         NotificationRoutingBridge(

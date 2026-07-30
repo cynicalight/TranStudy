@@ -40,14 +40,18 @@ struct LongTextTranslationView: View {
                 } label: {
                   Text(token.word)
                     .font(.body)
-                    .foregroundStyle(isSelected(index) ? Color.white : Color.primary)
+                    .foregroundStyle(
+                      isSelected(index)
+                        ? TranStudyDesign.accentForegroundColor
+                        : Color.primary
+                    )
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background {
                       Capsule(style: .continuous)
                         .fill(
                           isSelected(index)
-                            ? Color.accentColor
+                            ? TranStudyDesign.accentColor
                             : Color.secondary.opacity(0.12)
                         )
                     }

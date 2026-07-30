@@ -56,10 +56,13 @@ struct TodayReviewView: View {
               }
           } label: {
             Label("开始复习", systemImage: "play.fill")
+              .font(.body.weight(.semibold))
+              .foregroundStyle(TranStudyDesign.accentForegroundColor)
+              .padding(.vertical, 10)
               .frame(maxWidth: .infinity)
+              .adaptiveTintedGlass(cornerRadius: 12)
           }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.large)
+          .buttonStyle(.plain)
           .disabled(shell.currentReviewItem == nil && !shell.hasMoreReviewBatches)
         }
         .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
@@ -489,19 +492,24 @@ private struct SummaryCard: View {
   let tint: Color
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      HStack {
-        Image(systemName: systemImage)
-          .foregroundStyle(tint)
-        Spacer()
+    HStack {
+      Image(systemName: systemImage)
+        .font(.system(size: 36, weight: .semibold))
+        .foregroundStyle(tint)
+        .frame(width: 36)
+        .padding(.horizontal, 8)
+
+      Spacer()
+
+      VStack(alignment: .trailing, spacing: 16) {
         Text(title)
           .font(.callout)
           .foregroundStyle(.secondary)
+        Text(value, format: .number)
+          .font(.system(size: 30, weight: .semibold, design: .rounded))
+          .contentTransition(.numericText())
       }
 
-      Text(value, format: .number)
-        .font(.system(size: 30, weight: .semibold, design: .rounded))
-        .contentTransition(.numericText())
     }
     .padding(18)
     .frame(maxWidth: .infinity, alignment: .leading)

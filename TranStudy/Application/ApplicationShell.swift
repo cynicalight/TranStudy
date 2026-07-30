@@ -32,7 +32,7 @@ enum LearningLibraryScope: Hashable {
   case archived
 }
 
-enum PreparationCapability: Equatable, Identifiable {
+enum PreparationCapability: CaseIterable, Equatable, Identifiable {
   case accessibility
   case translationService
   case notifications
