@@ -141,20 +141,18 @@ struct OpenAICompatibleTranslationProviderTests {
         kind: .contextualSelection,
         targetSentence: "She  ran home."
       ))
-    #expect(correctedContextResult.exampleSentence == "She  ran home.")
+    #expect(correctedContextResult.exampleSentence == "She ran home.")
     #expect(correctedContextResult.sentenceTranslation == "她跑回了家。")
 
-    await #expect(
-      throws: TranslationError.invalidResponse(.invalidEnglishContent)
-    ) {
-      try await provider.translate(
-        TranslationRequest(
-          sourceText: "ran",
-          context: "They ran away.",
-          kind: .contextualSelection,
-          targetSentence: "They ran away."
-        ))
-    }
+    let differentContextResult = try await provider.translate(
+      TranslationRequest(
+        sourceText: "ran",
+        context: "They ran away.",
+        kind: .contextualSelection,
+        targetSentence: "They ran away."
+      ))
+    #expect(differentContextResult.exampleSentence == "She ran home.")
+    #expect(differentContextResult.sentenceTranslation == "她跑回了家。")
   }
 
   @Test("recoverable source spelling drift does not replace the requested text")

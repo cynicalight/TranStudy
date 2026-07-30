@@ -101,26 +101,7 @@ final class OpenAIChatTranslationClient {
           sentenceTranslation: payloadSentenceTranslation
         )
       }
-    let exampleSentence: String
-    if request.kind == .contextualSelection, let targetSentence = request.targetSentence {
-      guard
-        Self.areRecoverablyEquivalent(
-          exampleAndTranslation.exampleSentence,
-          targetSentence
-        )
-      else {
-        throw Self.invalidWordResponse(
-          .invalidEnglishContent,
-          check:
-            "targetSentenceMismatch expected=\(String(reflecting: targetSentence)) actual=\(String(reflecting: exampleAndTranslation.exampleSentence))",
-          content: content,
-          request: request
-        )
-      }
-      exampleSentence = targetSentence
-    } else {
-      exampleSentence = exampleAndTranslation.exampleSentence
-    }
+    let exampleSentence = exampleAndTranslation.exampleSentence
 
     guard
       Self.containsLatinLetter(canonicalForm),
