@@ -10,10 +10,6 @@ struct SelectionSentenceContext: Equatable {
     selectedRange: CFRange
   ) -> SelectionSentenceContext? {
     let nsDocument = documentText as NSString
-    let sentenceDocument =
-      documentText
-      .replacingOccurrences(of: "\r", with: " ")
-      .replacingOccurrences(of: "\n", with: " ")
     guard
       selectedRange.location >= 0,
       selectedRange.location <= nsDocument.length,
@@ -23,17 +19,23 @@ struct SelectionSentenceContext: Equatable {
       return nil
     }
 
-    var sentences: [(text: String, range: NSRange)] = []
-    sentenceDocument.enumerateSubstrings(
-      in: sentenceDocument.startIndex..<sentenceDocument.endIndex,
-      options: [.bySentences, .substringNotRequired]
-    ) { _, substringRange, _, _ in
-      let range = NSRange(substringRange, in: sentenceDocument)
-      let text = TranslationTextNormalizer.collapseWhitespace(
-        in: nsDocument.substring(with: range)
-      )
-      if !text.isEmpty {
-        sentences.append((text, range))
+    var sentences: [(text: String, range: NSRange, lineRange: NSRange)] = []
+    documentText.enumerateSubstrings(
+      in: documentText.startIndex..<documentText.endIndex,
+      options: [.byLines, .substringNotRequired]
+    ) { _, lineSubstringRange, _, _ in
+      let lineRange = NSRange(lineSubstringRange, in: documentText)
+      documentText.enumerateSubstrings(
+        in: lineSubstringRange,
+        options: [.bySentences, .substringNotRequired]
+      ) { _, sentenceSubstringRange, _, _ in
+        let sentenceRange = NSRange(sentenceSubstringRange, in: documentText)
+        let text = TranslationTextNormalizer.collapseWhitespace(
+          in: nsDocument.substring(with: sentenceRange)
+        )
+        if !text.isEmpty {
+          sentences.append((text, sentenceRange, lineRange))
+        }
       }
     }
 
@@ -52,15 +54,29 @@ struct SelectionSentenceContext: Equatable {
       return nil
     }
 
+    let targetSentence = sentences[targetIndex]
+    let previousSentence =
+      if targetIndex > 0,
+        sentences[targetIndex - 1].lineRange == targetSentence.lineRange
+      {
+        sentences[targetIndex - 1].text
+      } else {
+        nil
+      }
+    let nextSentence =
+      if targetIndex + 1 < sentences.count,
+        sentences[targetIndex + 1].lineRange == targetSentence.lineRange
+      {
+        sentences[targetIndex + 1].text
+      } else {
+        nil
+      }
     return SelectionSentenceContext(
       targetSentence: TranslationTextNormalizer.cleanExampleSentenceBoundaries(
-        in: sentences[targetIndex].text
+        in: targetSentence.text
       ),
-      previousSentence: targetIndex > 0 ? sentences[targetIndex - 1].text : nil,
-      nextSentence:
-        targetIndex + 1 < sentences.count
-        ? sentences[targetIndex + 1].text
-        : nil
+      previousSentence: previousSentence,
+      nextSentence: nextSentence
     )
   }
 }
