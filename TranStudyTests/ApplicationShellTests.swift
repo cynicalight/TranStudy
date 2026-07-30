@@ -1432,6 +1432,8 @@ extension ApplicationEnvironment {
       selection: TestSelectionProvider(),
       clipboard: clipboard,
       translation: translation,
+      translationCache: InMemoryTranslationCacheStore(),
+      diagnostics: TestDiagnosticLogger(),
       learningStore: learningStore,
       apiKeyStore: apiKeyStore,
       connectionTester: connectionTester,
@@ -1451,6 +1453,9 @@ extension ApplicationEnvironment {
     )
   }
 }
+
+@MainActor
+private struct TestDiagnosticLogger: DiagnosticLogging {}
 
 private final class TestSentenceCardConfigurationStore:
   SentenceCardConfigurationStoring
@@ -1792,6 +1797,21 @@ private final class TestLearningStore: LearningStoring {
     reviewResetInvocations.append(
       ReviewResetInvocation(itemID: itemID, resetAt: resetAt)
     )
+  }
+
+  func exportArchive(exportedAt: Date) async throws -> LearningDataArchive {
+    LearningDataArchive(exportedAt: exportedAt, items: [])
+  }
+
+  func importArchive(_ archive: LearningDataArchive) async throws -> LearningDataImportSummary {
+    LearningDataImportSummary(importedItemCount: 0, mergedItemCount: 0)
+  }
+
+  func deleteAllLearningData() async throws {
+    storedItems.removeAll()
+    storedArchivedItems.removeAll()
+    storedDueItems.removeAll()
+    storedPendingDeletion = nil
   }
 }
 

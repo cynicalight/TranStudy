@@ -3,6 +3,17 @@ import Foundation
 struct SelectionCandidate: Equatable, Sendable {
   let screenPosition: CGPoint
   let sourceApplicationName: String
+  let sourceApplicationIdentifier: String?
+
+  init(
+    screenPosition: CGPoint,
+    sourceApplicationName: String,
+    sourceApplicationIdentifier: String? = nil
+  ) {
+    self.screenPosition = screenPosition
+    self.sourceApplicationName = sourceApplicationName
+    self.sourceApplicationIdentifier = sourceApplicationIdentifier
+  }
 }
 
 struct SelectionSnapshot: Equatable, Sendable {
@@ -12,6 +23,25 @@ struct SelectionSnapshot: Equatable, Sendable {
   let nextSentence: String?
   let screenPosition: CGPoint
   let sourceApplicationName: String
+  let sourceApplicationIdentifier: String?
+
+  init(
+    selectedText: String,
+    targetSentence: String?,
+    previousSentence: String?,
+    nextSentence: String?,
+    screenPosition: CGPoint,
+    sourceApplicationName: String,
+    sourceApplicationIdentifier: String? = nil
+  ) {
+    self.selectedText = selectedText
+    self.targetSentence = targetSentence
+    self.previousSentence = previousSentence
+    self.nextSentence = nextSentence
+    self.screenPosition = screenPosition
+    self.sourceApplicationName = sourceApplicationName
+    self.sourceApplicationIdentifier = sourceApplicationIdentifier
+  }
 
   var hasContext: Bool {
     targetSentence?.isEmpty == false

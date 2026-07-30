@@ -99,6 +99,7 @@ final class ApplicationShell {
   private var activeTranslationID: UUID?
   private var translationSuggestedCanonicalForm = ""
   private var translationSourceApplicationName = "剪贴板"
+  private var translationSourceApplicationIdentifier: String?
   private var pendingLearningAddition: LearningAddition?
   private var pendingLibraryCanonicalUpdate: (itemID: UUID, canonicalForm: String)?
 
@@ -416,6 +417,9 @@ final class ApplicationShell {
     let isWordOrShortPhrase = Self.isWordOrShortPhrase(sourceText)
     if let selection {
       translationSourceApplicationName = selection.sourceApplicationName
+      translationSourceApplicationIdentifier = selection.sourceApplicationIdentifier
+    } else {
+      translationSourceApplicationIdentifier = nil
     }
     selectionDebugLog(
       "translation input classified: source=\(selection == nil ? "clipboard" : "selection") selectedLength=\(sourceText.count) mode=\(isWordOrShortPhrase ? "word-or-phrase" : "long-text")"
@@ -452,6 +456,7 @@ final class ApplicationShell {
     translationError = nil
     longTextTranslation = nil
     translationStatus = .loading
+    let startedAt = beginTranslationDiagnostics()
 
     do {
       let result = try await environment.translation.translate(request)
@@ -466,6 +471,7 @@ final class ApplicationShell {
       pendingLearningMerge = nil
       pendingLearningAddition = nil
       translationStatus = .ready
+      finishTranslationDiagnostics(stage: .translationSucceeded, startedAt: startedAt)
       if languageAndSpeechPreferences.automaticallySpeaksTranslations {
         speak(result.sourceText)
       }
@@ -482,8 +488,88 @@ final class ApplicationShell {
         translationError = error as? TranslationError
         translationStatus = .failed
       }
+      finishTranslationDiagnostics(
+        stage: .translationFailed,
+        error: error,
+        startedAt: startedAt
+      )
       selectionDebugLog("translation failed: errorType=\(String(reflecting: type(of: error)))")
     }
+  }
+
+  func makeLearningDataExport() async throws -> Data {
+    let archive = try await environment.learningStore.exportArchive(
+      exportedAt: environment.clock.now
+    )
+    let data = try await Task.detached(priority: .userInitiated) {
+      try JSONEncoder.tranStudy.encode(archive)
+    }.value
+    environment.diagnostics.record(stage: .learningDataExported)
+    return data
+  }
+
+  func importLearningData(_ data: Data) async throws -> LearningDataImportSummary {
+    let archive = try JSONDecoder.tranStudy.decode(LearningDataArchive.self, from: data)
+    let summary = try await environment.learningStore.importArchive(archive)
+    environment.diagnostics.record(stage: .learningDataImported)
+    await refreshTodayReview()
+    await refreshLibrary()
+    return summary
+  }
+
+  func clearTranslationCache() throws {
+    try environment.translationCache.clear()
+    environment.diagnostics.record(stage: .translationCacheCleared)
+  }
+
+  func clearAllLearningData() async throws {
+    try await environment.learningStore.deleteAllLearningData()
+    environment.diagnostics.record(stage: .learningDataCleared)
+    await refreshTodayReview()
+    await refreshLibrary()
+  }
+
+  func makeDiagnosticExport() throws -> Data {
+    let archive = environment.diagnostics.exportArchive(exportedAt: environment.clock.now)
+    return try JSONEncoder.tranStudy.encode(archive)
+  }
+
+  private func diagnosticErrorType(for error: Error) -> DiagnosticErrorType {
+    guard let error = error as? TranslationError else {
+      return .unknown
+    }
+    switch error {
+    case .notConfigured:
+      return .configuration
+    case .timedOut, .networkUnavailable, .serviceUnavailable:
+      return .network
+    case .invalidResponse:
+      return .invalidResponse
+    case .inputTooLong:
+      return .configuration
+    }
+  }
+
+  private func beginTranslationDiagnostics() -> Date {
+    let startedAt = Date()
+    environment.diagnostics.record(
+      stage: .translationStarted,
+      sourceApplicationIdentifier: translationSourceApplicationIdentifier
+    )
+    return startedAt
+  }
+
+  private func finishTranslationDiagnostics(
+    stage: DiagnosticStage,
+    error: Error? = nil,
+    startedAt: Date
+  ) {
+    environment.diagnostics.record(
+      stage: stage,
+      sourceApplicationIdentifier: translationSourceApplicationIdentifier,
+      errorType: error.map(diagnosticErrorType(for:)),
+      durationMilliseconds: Int(Date().timeIntervalSince(startedAt) * 1_000)
+    )
   }
 
   private func translateLongText(_ sourceText: String) async {
@@ -495,6 +581,7 @@ final class ApplicationShell {
     longTextTranslation = nil
     translationError = nil
     translationStatus = .loading
+    let startedAt = beginTranslationDiagnostics()
 
     do {
       let result = try await environment.translation.translateLongText(
@@ -509,6 +596,7 @@ final class ApplicationShell {
       activeTranslationID = nil
       longTextTranslation = result
       translationStatus = .ready
+      finishTranslationDiagnostics(stage: .translationSucceeded, startedAt: startedAt)
       selectionDebugLog(
         "long text translation succeeded: sourceLength=\(sourceText.count) translatedLength=\(result.translatedText.count)"
       )
@@ -524,6 +612,11 @@ final class ApplicationShell {
         translationError = error as? TranslationError
         translationStatus = .failed
       }
+      finishTranslationDiagnostics(
+        stage: .translationFailed,
+        error: error,
+        startedAt: startedAt
+      )
       selectionDebugLog(
         "long text translation failed: errorType=\(String(reflecting: type(of: error)))"
       )

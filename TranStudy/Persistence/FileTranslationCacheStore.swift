@@ -19,6 +19,14 @@ final class FileTranslationCacheStore: TranslationCacheStoring {
     persist()
   }
 
+  func clear() throws {
+    entries.removeAll()
+    guard FileManager.default.fileExists(atPath: fileURL.path) else {
+      return
+    }
+    try FileManager.default.removeItem(at: fileURL)
+  }
+
   private func persist() {
     do {
       try FileManager.default.createDirectory(

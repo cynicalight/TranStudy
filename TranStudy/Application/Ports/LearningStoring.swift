@@ -109,7 +109,7 @@ enum LearningCanonicalUpdateResult: Equatable, Sendable {
   case merged
 }
 
-enum ReviewRating: String, CaseIterable, Equatable, Hashable, Sendable {
+enum ReviewRating: String, CaseIterable, Codable, Equatable, Hashable, Sendable {
   case forgot
   case hard
   case remembered
@@ -233,6 +233,9 @@ protocol LearningStoring {
   func setNextReviewDate(itemID: UUID, nextReviewAt: Date) async throws
   func setReviewPaused(itemID: UUID, isPaused: Bool) async throws
   func resetReviewProgress(itemID: UUID, resetAt: Date) async throws
+  func exportArchive(exportedAt: Date) async throws -> LearningDataArchive
+  func importArchive(_ archive: LearningDataArchive) async throws -> LearningDataImportSummary
+  func deleteAllLearningData() async throws
 }
 
 extension LearningStoring {
@@ -251,4 +254,5 @@ extension LearningStoring {
   ) async throws -> LearningCanonicalUpdateResult {
     .updated
   }
+
 }

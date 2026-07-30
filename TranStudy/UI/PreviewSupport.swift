@@ -12,6 +12,8 @@
           selection: PreviewSelectionProvider(),
           clipboard: PreviewClipboardReader(text: "serendipity"),
           translation: PreviewTranslationProvider(result: PreviewFixtures.translationResult),
+          translationCache: InMemoryTranslationCacheStore(),
+          diagnostics: PreviewDiagnosticLogger(),
           learningStore: PreviewLearningStore(
             summary: PreviewFixtures.learningSummary,
             items: PreviewFixtures.learningItems
@@ -98,6 +100,9 @@
 
     func save(_ isEnabled: Bool) {}
   }
+
+  @MainActor
+  private struct PreviewDiagnosticLogger: DiagnosticLogging {}
 
   private struct PreviewReviewReminderConfigurationStore:
     ReviewReminderConfigurationStoring
@@ -262,6 +267,18 @@
     func setReviewPaused(itemID: UUID, isPaused: Bool) async throws {}
 
     func resetReviewProgress(itemID: UUID, resetAt: Date) async throws {}
+
+    func exportArchive(exportedAt: Date) async throws -> LearningDataArchive {
+      LearningDataArchive(exportedAt: exportedAt, items: [])
+    }
+
+    func importArchive(_ archive: LearningDataArchive) async throws -> LearningDataImportSummary {
+      LearningDataImportSummary(importedItemCount: 0, mergedItemCount: 0)
+    }
+
+    func deleteAllLearningData() async throws {
+      storedItems.removeAll()
+    }
   }
 
   @MainActor

@@ -30,16 +30,20 @@ struct TranStudyApp: App {
       let httpClient = URLSessionHTTPClient()
       let providerConfigurationStore = UserDefaultsTranslationProviderConfigurationStore()
       let reviewNotifier = SystemReviewNotifier()
+      let translationCache = FileTranslationCacheStore()
+      let diagnostics = FileDiagnosticLogStore()
       let translationService = ConfiguredTranslationService(
         configurationStore: providerConfigurationStore,
         apiKeyStore: apiKeyStore,
         httpClient: httpClient,
-        cacheStore: FileTranslationCacheStore()
+        cacheStore: translationCache
       )
       let shell = ApplicationShell(
         environment: .live(
           learningStore: learningStore,
           translation: translationService,
+          translationCache: translationCache,
+          diagnostics: diagnostics,
           apiKeyStore: apiKeyStore,
           connectionTester: translationService,
           providerConfigurationStore: providerConfigurationStore,

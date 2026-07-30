@@ -13,6 +13,22 @@ final class SwiftDataLearningStore: LearningStoring {
     let value: String
   }
 
+  private struct EncounterSignature: Hashable {
+    let sourceText: String
+    let pronunciation: String
+    let partOfSpeech: String
+    let contextualMeaning: String
+    let exampleSentence: String
+    let sentenceTranslation: String
+    let sourceApplicationName: String
+    let encounteredAt: Date
+  }
+
+  private struct ExampleSignature: Hashable {
+    let englishText: String
+    let chineseTranslation: String
+  }
+
   private let context: ModelContext
   private let calendar: Calendar
 
@@ -471,6 +487,110 @@ final class SwiftDataLearningStore: LearningStoring {
     try saveOrRollback()
   }
 
+  func exportArchive(exportedAt: Date) async throws -> LearningDataArchive {
+    let items = try consolidatedRecords()
+      .sorted { $0.id.uuidString < $1.id.uuidString }
+      .map { record in
+        LearningDataArchive.Item(
+          id: record.id,
+          kind: learningKind(for: record),
+          sourceText: record.sourceText,
+          canonicalForm: record.canonicalForm,
+          pronunciation: record.pronunciation,
+          partOfSpeech: record.partOfSpeech,
+          contextualMeaning: record.contextualMeaning,
+          exampleSentence: record.exampleSentence,
+          sentenceTranslation: record.sentenceTranslation,
+          sourceApplicationName: record.sourceApplicationName,
+          createdAt: record.createdAt,
+          lastEncounteredAt: effectiveLastEncounteredAt(for: record),
+          userNote: record.userNote,
+          nextReviewAt: record.nextReviewAt,
+          isPaused: record.isPaused,
+          archivedAt: record.archivedAt,
+          reviewIntervalDays: record.reviewIntervalDays,
+          reviewEase: record.reviewEase,
+          reviewCount: record.reviewCount,
+          lapseCount: record.lapseCount,
+          encounters: encounterItems(for: record).map {
+            LearningDataArchive.Encounter(
+              id: $0.id,
+              sourceText: $0.sourceText,
+              pronunciation: $0.pronunciation,
+              partOfSpeech: $0.partOfSpeech,
+              contextualMeaning: $0.contextualMeaning,
+              exampleSentence: $0.exampleSentence,
+              sentenceTranslation: $0.sentenceTranslation,
+              sourceApplicationName: $0.sourceApplicationName,
+              encounteredAt: $0.encounteredAt
+            )
+          },
+          customExamples: record.customExamples
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map {
+              LearningDataArchive.CustomExample(
+                id: $0.id,
+                englishText: $0.englishText,
+                chineseTranslation: $0.chineseTranslation
+              )
+            },
+          reviewEvents: record.reviewEvents.compactMap { event in
+            guard let rating = ReviewRating(rawValue: event.ratingRawValue) else {
+              return nil
+            }
+            return LearningDataArchive.ReviewEvent(
+              id: event.id,
+              rating: rating,
+              reviewedAt: event.reviewedAt,
+              previousReviewAt: event.previousReviewAt,
+              nextReviewAt: event.nextReviewAt,
+              intervalDays: event.intervalDays
+            )
+          }
+        )
+      }
+    return LearningDataArchive(exportedAt: exportedAt, items: items)
+  }
+
+  func importArchive(_ archive: LearningDataArchive) async throws -> LearningDataImportSummary {
+    guard archive.formatVersion == LearningDataArchive.currentFormatVersion else {
+      throw LearningDataArchiveError.unsupportedFormatVersion(archive.formatVersion)
+    }
+    var records = try consolidatedRecords()
+    var importedItemCount = 0
+    var mergedItemCount = 0
+
+    for item in archive.items {
+      let identity = archiveIdentity(for: item)
+      let target =
+        records.first(where: { $0.id == item.id })
+        ?? records.first(where: { normalizedIdentity(for: $0) == identity })
+
+      if let target {
+        mergeImportedItem(item, into: target)
+        mergedItemCount += 1
+      } else {
+        let record = makeRecord(from: item)
+        context.insert(record)
+        records.append(record)
+        importedItemCount += 1
+      }
+    }
+    try saveOrRollback()
+    return LearningDataImportSummary(
+      importedItemCount: importedItemCount,
+      mergedItemCount: mergedItemCount
+    )
+  }
+
+  func deleteAllLearningData() async throws {
+    let records = try context.fetch(FetchDescriptor<LearningRecord>())
+    for record in records {
+      context.delete(record)
+    }
+    try saveOrRollback()
+  }
+
   private func learningItems(archived: Bool) throws -> [LearningItem] {
     try consolidatedRecords()
       .filter {
@@ -478,6 +598,228 @@ final class SwiftDataLearningStore: LearningStoring {
       }
       .sorted { effectiveLastEncounteredAt(for: $0) > effectiveLastEncounteredAt(for: $1) }
       .map(learningItem(from:))
+  }
+
+  private func archiveIdentity(for item: LearningDataArchive.Item) -> LearningIdentity {
+    LearningIdentity(
+      kind: item.kind,
+      value:
+        item.kind == .sentence
+        ? TranslationTextNormalizer.collapseWhitespace(in: item.sourceText)
+        : NormalizedCanonicalForm(item.canonicalForm).value
+    )
+  }
+
+  private func makeRecord(from item: LearningDataArchive.Item) -> LearningRecord {
+    let record = LearningRecord(
+      id: item.id,
+      kind: item.kind,
+      createdAt: item.createdAt,
+      sourceText: item.sourceText,
+      canonicalForm: item.canonicalForm,
+      pronunciation: item.pronunciation,
+      partOfSpeech: item.partOfSpeech,
+      contextualMeaning: item.contextualMeaning,
+      exampleSentence: item.exampleSentence,
+      sentenceTranslation: item.sentenceTranslation,
+      sourceApplicationName: item.sourceApplicationName,
+      nextReviewAt: item.nextReviewAt,
+      isPaused: item.isPaused
+    )
+    record.lastEncounteredAt = item.lastEncounteredAt
+    record.userNote = item.userNote
+    record.archivedAt = item.archivedAt
+    record.reviewIntervalDays = item.reviewIntervalDays
+    record.reviewEase = item.reviewEase
+    record.reviewCount = item.reviewCount
+    record.lapseCount = item.lapseCount
+    record.encounters = uniqueEncounters(item.encounters).map(makeEncounter(from:))
+    record.customExamples = uniqueExamples(item.customExamples).enumerated().map {
+      index, example in
+      LearningCustomExampleRecord(
+        id: example.id,
+        englishText: example.englishText,
+        chineseTranslation: example.chineseTranslation,
+        sortOrder: index
+      )
+    }
+    var reviewEventIDs: Set<UUID> = []
+    record.reviewEvents = item.reviewEvents.compactMap { event in
+      guard reviewEventIDs.insert(event.id).inserted else {
+        return nil
+      }
+      return makeReviewEvent(from: event)
+    }
+    return record
+  }
+
+  private func uniqueEncounters(
+    _ encounters: [LearningDataArchive.Encounter]
+  ) -> [LearningDataArchive.Encounter] {
+    var ids: Set<UUID> = []
+    var signatures: Set<EncounterSignature> = []
+    return encounters.filter { encounter in
+      ids.insert(encounter.id).inserted
+        && signatures.insert(encounterSignature(encounter)).inserted
+    }
+  }
+
+  private func uniqueExamples(
+    _ examples: [LearningDataArchive.CustomExample]
+  ) -> [LearningDataArchive.CustomExample] {
+    var ids: Set<UUID> = []
+    var signatures: Set<ExampleSignature> = []
+    return examples.filter { example in
+      ids.insert(example.id).inserted
+        && signatures.insert(exampleSignature(example)).inserted
+    }
+  }
+
+  private func mergeImportedItem(
+    _ item: LearningDataArchive.Item,
+    into record: LearningRecord
+  ) {
+    let useImportedSnapshot = item.lastEncounteredAt > effectiveLastEncounteredAt(for: record)
+    if useImportedSnapshot {
+      record.sourceText = item.sourceText
+      record.canonicalForm = item.canonicalForm
+      record.pronunciation = item.pronunciation
+      record.partOfSpeech = item.partOfSpeech
+      record.contextualMeaning = item.contextualMeaning
+      record.exampleSentence = item.exampleSentence
+      record.sentenceTranslation = item.sentenceTranslation
+      record.sourceApplicationName = item.sourceApplicationName
+      record.normalizedCanonicalForm = archiveIdentity(for: item).value
+    }
+    record.createdAt = min(record.createdAt, item.createdAt)
+    record.lastEncounteredAt = max(effectiveLastEncounteredAt(for: record), item.lastEncounteredAt)
+    let useImportedSchedule = isEarlier(item.nextReviewAt, than: record.nextReviewAt)
+    if useImportedSchedule {
+      record.reviewIntervalDays = item.reviewIntervalDays
+      record.reviewEase = item.reviewEase
+    }
+    record.nextReviewAt = earlierDate(record.nextReviewAt, item.nextReviewAt)
+    record.isPaused = record.isPaused && item.isPaused
+    record.archivedAt = earlierArchiveState(record.archivedAt, item.archivedAt)
+    record.userNote = mergedUserNote(record.userNote, item.userNote)
+
+    var encounterIDs = Set(record.encounters.map(\.id))
+    var encounterSignatures = Set(record.encounters.map(encounterSignature))
+    for encounter in item.encounters {
+      let signature = encounterSignature(encounter)
+      guard !encounterIDs.contains(encounter.id), !encounterSignatures.contains(signature) else {
+        continue
+      }
+      record.encounters.append(makeEncounter(from: encounter))
+      encounterIDs.insert(encounter.id)
+      encounterSignatures.insert(signature)
+    }
+
+    var exampleIDs = Set(record.customExamples.map(\.id))
+    var exampleSignatures = Set(record.customExamples.map(exampleSignature))
+    for example in item.customExamples {
+      let signature = exampleSignature(example)
+      guard !exampleIDs.contains(example.id), !exampleSignatures.contains(signature) else {
+        continue
+      }
+      record.customExamples.append(
+        LearningCustomExampleRecord(
+          id: example.id,
+          englishText: example.englishText,
+          chineseTranslation: example.chineseTranslation,
+          sortOrder: record.customExamples.count
+        )
+      )
+      exampleIDs.insert(example.id)
+      exampleSignatures.insert(signature)
+    }
+
+    var eventIDs = Set(record.reviewEvents.map(\.id))
+    for event in item.reviewEvents where !eventIDs.contains(event.id) {
+      record.reviewEvents.append(makeReviewEvent(from: event))
+      eventIDs.insert(event.id)
+    }
+    record.reviewCount = max(record.reviewCount, item.reviewCount, record.reviewEvents.count)
+    record.lapseCount = max(
+      record.lapseCount,
+      item.lapseCount,
+      record.reviewEvents.count(where: { $0.ratingRawValue == ReviewRating.forgot.rawValue })
+    )
+  }
+
+  private func makeEncounter(
+    from encounter: LearningDataArchive.Encounter
+  ) -> LearningEncounterRecord {
+    LearningEncounterRecord(
+      id: encounter.id,
+      sourceText: encounter.sourceText,
+      pronunciation: encounter.pronunciation,
+      partOfSpeech: encounter.partOfSpeech,
+      contextualMeaning: encounter.contextualMeaning,
+      exampleSentence: encounter.exampleSentence,
+      sentenceTranslation: encounter.sentenceTranslation,
+      sourceApplicationName: encounter.sourceApplicationName,
+      encounteredAt: encounter.encounteredAt
+    )
+  }
+
+  private func makeReviewEvent(
+    from event: LearningDataArchive.ReviewEvent
+  ) -> ReviewEventRecord {
+    ReviewEventRecord(
+      id: event.id,
+      rating: event.rating,
+      reviewedAt: event.reviewedAt,
+      previousReviewAt: event.previousReviewAt,
+      nextReviewAt: event.nextReviewAt,
+      intervalDays: event.intervalDays
+    )
+  }
+
+  private func encounterSignature(_ encounter: LearningEncounterRecord) -> EncounterSignature {
+    EncounterSignature(
+      sourceText: encounter.sourceText,
+      pronunciation: encounter.pronunciation,
+      partOfSpeech: encounter.partOfSpeech,
+      contextualMeaning: encounter.contextualMeaning,
+      exampleSentence: encounter.exampleSentence,
+      sentenceTranslation: encounter.sentenceTranslation,
+      sourceApplicationName: encounter.sourceApplicationName,
+      encounteredAt: encounter.encounteredAt
+    )
+  }
+
+  private func encounterSignature(
+    _ encounter: LearningDataArchive.Encounter
+  ) -> EncounterSignature {
+    EncounterSignature(
+      sourceText: encounter.sourceText,
+      pronunciation: encounter.pronunciation,
+      partOfSpeech: encounter.partOfSpeech,
+      contextualMeaning: encounter.contextualMeaning,
+      exampleSentence: encounter.exampleSentence,
+      sentenceTranslation: encounter.sentenceTranslation,
+      sourceApplicationName: encounter.sourceApplicationName,
+      encounteredAt: encounter.encounteredAt
+    )
+  }
+
+  private func exampleSignature(_ example: LearningCustomExampleRecord) -> ExampleSignature {
+    ExampleSignature(
+      englishText: TranslationTextNormalizer.collapseWhitespace(in: example.englishText),
+      chineseTranslation:
+        TranslationTextNormalizer.collapseWhitespace(in: example.chineseTranslation)
+    )
+  }
+
+  private func exampleSignature(
+    _ example: LearningDataArchive.CustomExample
+  ) -> ExampleSignature {
+    ExampleSignature(
+      englishText: TranslationTextNormalizer.collapseWhitespace(in: example.englishText),
+      chineseTranslation:
+        TranslationTextNormalizer.collapseWhitespace(in: example.chineseTranslation)
+    )
   }
 
   private func learningRecord(itemID: UUID) throws -> LearningRecord {

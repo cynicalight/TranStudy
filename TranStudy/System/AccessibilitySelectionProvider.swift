@@ -64,7 +64,8 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     candidatePosition = screenPosition
     return SelectionCandidate(
       screenPosition: screenPosition,
-      sourceApplicationName: sourceApplicationName(for: activeSelection.application)
+      sourceApplicationName: sourceApplicationName(for: activeSelection.application),
+      sourceApplicationIdentifier: activeSelection.application.bundleIdentifier
     )
   }
 
@@ -101,7 +102,8 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       previousSentence: context.previousSentence,
       nextSentence: context.nextSentence,
       screenPosition: candidatePosition,
-      sourceApplicationName: sourceApplicationName(for: activeSelection.application)
+      sourceApplicationName: sourceApplicationName(for: activeSelection.application),
+      sourceApplicationIdentifier: activeSelection.application.bundleIdentifier
     )
   }
 

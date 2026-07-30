@@ -9,4 +9,8 @@ final class InMemoryTranslationCacheStore: TranslationCacheStoring {
   func insert(_ result: TranslationResult, for key: TranslationCacheKey) {
     entries[key] = result
   }
+
+  func clear() throws {
+    entries.removeAll()
+  }
 }

@@ -5,6 +5,8 @@ struct ApplicationEnvironment {
   let selection: any SelectionProviding
   let clipboard: any ClipboardReading
   let translation: any TranslationProviding
+  let translationCache: any TranslationCacheStoring
+  let diagnostics: any DiagnosticLogging
   let learningStore: any LearningStoring
   let apiKeyStore: any APIKeyStoring
   let connectionTester: any TranslationConnectionTesting
@@ -28,6 +30,8 @@ extension ApplicationEnvironment {
   static func live(
     learningStore: any LearningStoring,
     translation: any TranslationProviding,
+    translationCache: any TranslationCacheStoring,
+    diagnostics: any DiagnosticLogging,
     apiKeyStore: any APIKeyStoring,
     connectionTester: any TranslationConnectionTesting,
     providerConfigurationStore: any TranslationProviderConfigurationStoring,
@@ -40,6 +44,8 @@ extension ApplicationEnvironment {
       ),
       clipboard: SystemClipboardReader(),
       translation: translation,
+      translationCache: translationCache,
+      diagnostics: diagnostics,
       learningStore: learningStore,
       apiKeyStore: apiKeyStore,
       connectionTester: connectionTester,
