@@ -69,6 +69,10 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
+### 许可
+
+TranStudy 采用双重许可模式。个人学习、研究、实验及其他非商业用途适用 [PolyForm Noncommercial License 1.0.0](./LICENSE)；任何不属于该协议许可范围的商业用途，必须事先取得单独的付费[商业许可](./COMMERCIAL-LICENSE.md)。
+
 ## English
 
 TranStudy is a native macOS app for contextual translation and spaced-repetition learning. It turns words, phrases, and sentences encountered while reading from one-off translations into learning material you can retain and revisit.
@@ -124,3 +128,7 @@ xcodebuild test \
   -destination 'platform=macOS' \
   CODE_SIGNING_ALLOWED=NO
 ```
+
+### License
+
+TranStudy uses a dual-license model. Personal study, research, experimentation, and other noncommercial uses are licensed under the [PolyForm Noncommercial License 1.0.0](./LICENSE). Any commercial use not permitted by that license requires a separate paid [commercial license](./COMMERCIAL-LICENSE.md) in advance.
