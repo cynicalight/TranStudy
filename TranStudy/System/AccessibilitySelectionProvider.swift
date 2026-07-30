@@ -76,12 +76,20 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       )
       return nil
     }
-    guard let selectedText = selectedText(in: activeSelection.element) else {
+    guard
+      let contentElement = contextualSelectionElement(
+        startingAt: activeSelection.element
+      )
+    else {
+      selectionDebugLog("snapshot failed: contextual AX element unavailable")
+      return nil
+    }
+    guard let selectedText = selectedText(in: contentElement) else {
       selectionDebugLog("snapshot failed: selected text unavailable")
       return nil
     }
 
-    guard let context = selectionContext(in: activeSelection.element) else {
+    guard let context = selectionContext(in: contentElement) else {
       selectionDebugLog("snapshot failed: sentence context unavailable")
       return nil
     }
@@ -271,6 +279,59 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     return "marker:\(CFHash(start)):\(CFHash(end))"
   }
 
+  private func textMarkerSelectionText(in element: AXUIElement) -> String? {
+    guard
+      let range = textMarkerRangeAttribute(
+        kAXSelectedTextMarkerRangeAttribute as CFString,
+        from: element
+      ),
+      let text = rawString(for: range, in: element),
+      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      return nil
+    }
+    return text
+  }
+
+  private func contextualSelectionElement(
+    startingAt selectedElement: AXUIElement
+  ) -> AXUIElement? {
+    guard let selectedText = textMarkerSelectionText(in: selectedElement) else {
+      return selectedElement
+    }
+
+    var contextElement = selectedElement
+    var currentElement = copyUIElementAttribute(
+      kAXParentAttribute as CFString,
+      from: selectedElement
+    )
+    for depth in 1..<32 {
+      guard let element = currentElement else {
+        break
+      }
+      if let rejectionReason = sensitiveControlRejectionReason(for: element) {
+        selectionDebugLog(
+          "snapshot failed: sensitive ancestor rejected at depth=\(depth) reason=\(rejectionReason)"
+        )
+        return nil
+      }
+      if textMarkerSelectionText(in: element) == selectedText {
+        contextElement = element
+      }
+      if stringAttribute(kAXRoleAttribute as CFString, from: element) == "AXWebArea" {
+        break
+      }
+      currentElement = copyUIElementAttribute(kAXParentAttribute as CFString, from: element)
+    }
+
+    Self.translationContextDebugLog(
+      "ax.context_element",
+      content:
+        "role=\(stringAttribute(kAXRoleAttribute as CFString, from: contextElement) ?? "unknown")"
+    )
+    return contextElement
+  }
+
   private func sensitiveControlRejectionReason(for element: AXUIElement) -> String? {
     let protectedContent =
       (copyAttribute("AXContainsProtectedContent" as CFString, from: element) as? NSNumber)?
@@ -292,14 +353,13 @@ final class AccessibilitySelectionProvider: SelectionProviding {
   }
 
   private func selectedText(in element: AXUIElement) -> String? {
-    guard
-      let text = copyAttribute(kAXSelectedTextAttribute as CFString, from: element)
-        as? String,
+    if let text = copyAttribute(kAXSelectedTextAttribute as CFString, from: element)
+      as? String,
       !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    else {
-      return nil
+    {
+      return text
     }
-    return text
+    return textMarkerSelectionText(in: element)
   }
 
   private func selectionContext(in element: AXUIElement) -> SelectionSentenceContext? {
