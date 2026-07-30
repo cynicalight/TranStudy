@@ -95,6 +95,7 @@
 		B505F81E9E4C381CA14257CB /* SystemLoginItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD86F07513671D7779208523 /* SystemLoginItemController.swift */; };
 		B64A33485150F63433B22B49 /* LoginItemControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5A9F38FC1A60D1EDB9DEB /* LoginItemControlling.swift */; };
 		B673B7C619B55B391532CE34 /* UserDefaultsSelectionConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750FA4507656C9EEDC4A7999 /* UserDefaultsSelectionConfigurationStore.swift */; };
+		B8CB94CCB664DFF18D8F5E41 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 81A266B23E770317BA37F1EC /* Assets.xcassets */; };
 		B9248E258528A907B24A2AB0 /* DeepSeekTranslationProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0024E9DFCF4F67D5F18251B6 /* DeepSeekTranslationProviderTests.swift */; };
 		B9D8BEF5D238880E2DDBC509 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = D15F00EF85EFFEB66C1518F1 /* Localizable.strings */; };
 		BBAB3FF1E0F52DFA2ED70554 /* SystemReviewNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E8EFBBBE46D8EE3E8A3EFA /* SystemReviewNotifier.swift */; };
@@ -185,6 +186,7 @@
 		7BE5A9F38FC1A60D1EDB9DEB /* LoginItemControlling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItemControlling.swift; sourceTree = "<group>"; };
 		7BE84DC09C1B9852BA4B7B22 /* SelectionSentenceContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSentenceContext.swift; sourceTree = "<group>"; };
 		813136C4D5EE2C9238A3B45C /* LearningLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningLibraryView.swift; sourceTree = "<group>"; };
+		81A266B23E770317BA37F1EC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		83124F4711414F1ACE428F16 /* SelectionConfigurationStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionConfigurationStoring.swift; sourceTree = "<group>"; };
 		840AC99294DED14888CA4322 /* ConfiguredTranslationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfiguredTranslationServiceTests.swift; sourceTree = "<group>"; };
 		84E8389C189D488477B36DB5 /* LearningRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningRecord.swift; sourceTree = "<group>"; };
@@ -328,6 +330,7 @@
 		5C976C5596D908AEE1B6A0F2 /* TranStudy */ = {
 			isa = PBXGroup;
 			children = (
+				81A266B23E770317BA37F1EC /* Assets.xcassets */,
 				F1B3241C16E983ECB719770B /* Info.plist */,
 				571B54B2E6D38AF604F0A9CF /* TranStudyApp.swift */,
 				22668E3E000D812ED4EA464B /* Application */,
@@ -548,6 +551,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B8CB94CCB664DFF18D8F5E41 /* Assets.xcassets in Resources */,
 				B9D8BEF5D238880E2DDBC509 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
