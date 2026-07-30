@@ -23,9 +23,15 @@ TranStudy 是一款原生 macOS 语境翻译与间隔复习应用。它把你在
 
 首次启动时，应用会引导你配置划词所需的辅助功能权限、翻译服务和可选的复习通知。你可以使用 DeepSeek，或填写自定义地址和模型来连接 OpenAI 兼容接口。
 
-### 在语境中翻译
+### 两种划词翻译方式
 
-用鼠标选中文字后，TranStudy 会显示一个轻量的翻译入口。只有在你主动点击入口后，应用才会读取当前选区及必要上下文并请求翻译。你也可以通过可配置的全局快捷键翻译剪贴板内容，或在应用内翻译长文本。
+在支持直接划词的应用中，用鼠标选中单词、短语或句子后，TranStudy 会在选区旁显示轻量的翻译图标。点击图标后，应用才会读取选区和必要的上下文并请求翻译。
+
+如果当前应用或内容无法显示翻译图标，先复制需要翻译的文字，再按默认全局快捷键 F5，即可强制翻译剪贴板内容。你可以在设置中修改这个快捷键，也可以在应用内翻译长文本。
+
+### 不只翻译单词，也保留遇见它的语境
+
+划词翻译不会把选中的生词孤立处理：TranStudy 会自动识别它所在的完整句子，并在可用时带上前后句作为翻译上下文。选择“加入学习”后，应用会保留你当时看到的原始句子及其译文，作为该生词的真实遇见记录，方便你在之后的复习中回到当时的语境。
 
 ### 从翻译到学习
 
@@ -73,9 +79,15 @@ Visit [GitHub Releases](https://github.com/cynicalight/TranStudy/releases) and d
 
 On first launch, TranStudy guides you through the Accessibility permission used for selection translation, translation-service configuration, and optional review notifications. You can use DeepSeek or connect to an OpenAI-compatible endpoint with a custom base URL and model.
 
-### Translate in context
+### Two ways to translate selected text
 
-After you select text with the mouse, TranStudy presents a lightweight translation entry point. The app reads the selection and its necessary context only after you explicitly click that entry point. You can also translate clipboard content with a configurable global shortcut or translate longer passages inside the app.
+In apps that support direct selection translation, select a word, phrase, or sentence with the mouse and TranStudy shows a lightweight translation icon beside it. The app reads the selection and necessary context only after you click that icon.
+
+If the icon cannot appear in the current app or content, copy the text you want to translate and press the default global shortcut, F5, to force a translation of the clipboard. You can change this shortcut in Settings or translate longer passages inside the app.
+
+### More than a definition: retain the context in which you met a word
+
+TranStudy does not treat a selected word in isolation. It identifies the complete sentence containing it and, when available, includes the surrounding sentences as translation context. When you choose “Add to Learning,” the original sentence you saw and its translation are retained as a real encounter record for that word, so later reviews can bring you back to that context.
 
 ### Turn translations into learning
 
