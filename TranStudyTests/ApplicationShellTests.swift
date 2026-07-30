@@ -1519,7 +1519,7 @@ private final class SentenceCardTranslationProvider: TranslationProviding {
   }
 
   func translate(_ request: TranslationRequest) async throws -> TranslationResult {
-    throw TranslationError.invalidResponse
+    throw TranslationError.invalidResponse(.malformedPayload)
   }
 
   func translateLongText(
@@ -1528,7 +1528,7 @@ private final class SentenceCardTranslationProvider: TranslationProviding {
   ) async throws -> LongTextTranslationResult {
     translatedSources.append(sourceText)
     guard let translation = translations[sourceText] else {
-      throw TranslationError.invalidResponse
+      throw TranslationError.invalidResponse(.malformedPayload)
     }
     return LongTextTranslationResult(
       sourceText: sourceText,

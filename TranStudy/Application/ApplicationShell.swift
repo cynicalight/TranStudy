@@ -571,8 +571,19 @@ final class ApplicationShell {
       return .timeout
     case .networkUnavailable, .serviceUnavailable:
       return .network
-    case .invalidResponse:
-      return .invalidResponse
+    case .invalidResponse(let failure):
+      switch failure {
+      case .malformedPayload:
+        return .malformedResponse
+      case .unexpectedInputKind:
+        return .unexpectedResponseKind
+      case .missingRequiredContent:
+        return .missingResponseContent
+      case .invalidEnglishContent:
+        return .invalidEnglishResponse
+      case .invalidChineseContent:
+        return .invalidChineseResponse
+      }
     }
   }
 

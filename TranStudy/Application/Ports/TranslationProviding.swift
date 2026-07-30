@@ -71,7 +71,9 @@ enum TranslationError: Error, Equatable, Sendable {
   case inputTooLong
   case timedOut
   case networkUnavailable
-  case invalidResponse
+  case invalidResponse(
+    TranslationResponseValidationFailure = .malformedPayload
+  )
   case invalidRequest
   case authenticationFailed
   case quotaExceeded
@@ -88,8 +90,8 @@ enum TranslationError: Error, Equatable, Sendable {
       "翻译请求超时。请检查网络后重试。"
     case .networkUnavailable:
       "无法连接到翻译服务。请检查网络、代理或服务地址。"
-    case .invalidResponse:
-      "翻译服务返回的内容格式不符合预期。请重试；若持续发生，请更换模型或导出诊断日志。"
+    case .invalidResponse(let failure):
+      failure.userFacingMessageKey
     case .invalidRequest:
       "翻译服务拒绝了请求。请检查服务地址、模型名称和输入内容。"
     case .authenticationFailed:
@@ -100,6 +102,29 @@ enum TranslationError: Error, Equatable, Sendable {
       "翻译请求过于频繁，服务暂时限流。请稍候再试。"
     case .serviceUnavailable:
       "翻译服务暂时不可用。请稍后重试。"
+    }
+  }
+}
+
+enum TranslationResponseValidationFailure: Equatable, Sendable {
+  case malformedPayload
+  case unexpectedInputKind
+  case missingRequiredContent
+  case invalidEnglishContent
+  case invalidChineseContent
+
+  var userFacingMessageKey: String {
+    switch self {
+    case .malformedPayload:
+      "翻译服务返回的数据无法解析。请重试。"
+    case .unexpectedInputKind:
+      "翻译服务返回了错误的内容类型。请重试。"
+    case .missingRequiredContent:
+      "翻译服务返回的学习内容不完整。请重试。"
+    case .invalidEnglishContent:
+      "翻译服务返回的英文词条或例句无效。请重试。"
+    case .invalidChineseContent:
+      "翻译服务返回的中文释义或译文无效。请重试。"
     }
   }
 }
@@ -123,6 +148,6 @@ extension TranslationProviding {
     _ sourceText: String,
     chineseWritingSystem: ChineseWritingSystem
   ) async throws -> LongTextTranslationResult {
-    throw TranslationError.invalidResponse
+    throw TranslationError.invalidResponse(.malformedPayload)
   }
 }

@@ -97,7 +97,7 @@ final class OpenAICompatibleTranslationProvider:
       let content = completion.choices.first?.message.content,
       !content.isEmpty
     else {
-      throw TranslationError.invalidResponse
+      throw TranslationError.invalidResponse(.malformedPayload)
     }
   }
 

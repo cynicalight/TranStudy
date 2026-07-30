@@ -89,7 +89,7 @@ final class DeepSeekTranslationProvider: TranslationConnectionTesting, Translati
     do {
       modelList = try JSONDecoder().decode(ModelList.self, from: data)
     } catch {
-      throw TranslationError.invalidResponse
+      throw TranslationError.invalidResponse(.malformedPayload)
     }
 
     guard modelList.data.contains(where: { $0.id == model.rawValue }) else {

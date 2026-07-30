@@ -19,6 +19,11 @@ enum DiagnosticErrorType: String, Codable, Sendable {
   case timeout
   case network
   case invalidResponse
+  case malformedResponse
+  case unexpectedResponseKind
+  case missingResponseContent
+  case invalidEnglishResponse
+  case invalidChineseResponse
   case storage
   case unknown
 }

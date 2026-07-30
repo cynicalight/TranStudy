@@ -219,6 +219,11 @@
 "翻译请求超时。请检查网络后重试。" = "The translation request timed out. Check your network and try again.";
 "无法连接到翻译服务。请检查网络、代理或服务地址。" = "Could not connect to the translation service. Check your network, proxy, or service URL.";
 "翻译服务返回的内容格式不符合预期。请重试；若持续发生，请更换模型或导出诊断日志。" = "The translation service returned an unexpected response format. Try again; if it continues, change the model or export diagnostics.";
+"翻译服务返回的数据无法解析。请重试。" = "The translation service returned data that could not be parsed. Try again.";
+"翻译服务返回了错误的内容类型。请重试。" = "The translation service returned the wrong content type. Try again.";
+"翻译服务返回的学习内容不完整。请重试。" = "The translation service returned incomplete learning content. Try again.";
+"翻译服务返回的英文词条或例句无效。请重试。" = "The translation service returned an invalid English entry or example. Try again.";
+"翻译服务返回的中文释义或译文无效。请重试。" = "The translation service returned an invalid Chinese meaning or translation. Try again.";
 "翻译服务拒绝了请求。请检查服务地址、模型名称和输入内容。" = "The translation service rejected the request. Check the service URL, model name, and input.";
 "API Key 无效、已失效，或没有使用当前模型的权限。请在设置中更新 Key 或模型。" = "The API key is invalid, expired, or lacks permission for the current model. Update the key or model in Settings.";
 "API Key 的余额或可用额度不足。请在服务商后台充值，或更换 API Key。" = "The API key has insufficient balance or quota. Add credit with the provider or use a different API key.";

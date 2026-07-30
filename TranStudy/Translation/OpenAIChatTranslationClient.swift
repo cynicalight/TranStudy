@@ -29,63 +29,88 @@ final class OpenAIChatTranslationClient {
     let content = try await completionContent(
       systemPrompt: Self.systemPrompt(for: request.chineseWritingSystem),
       userContent: request.promptContent,
+      exampleMessages: Self.wordOrPhraseExampleMessages(
+        for: request.chineseWritingSystem
+      ),
       maxTokens: 800,
       timeoutInterval: 30
     )
     guard
       let contentData = Self.jsonData(from: content),
-      let payload = try? JSONDecoder().decode(OpenAITranslationPayload.self, from: contentData),
-      payload.inputKind == .wordOrPhrase,
-      payload.sourceText == request.sourceText,
-      !payload.canonicalForm.isEmpty,
-      !payload.partOfSpeech.isEmpty,
-      !payload.contextualMeaning.isEmpty,
-      !payload.exampleSentence.isEmpty,
-      !payload.sentenceTranslation.isEmpty
+      let payload = try? JSONDecoder().decode(OpenAITranslationPayload.self, from: contentData)
     else {
-      throw TranslationError.invalidResponse
+      throw TranslationError.invalidResponse(.malformedPayload)
+    }
+    guard let inputKind = payload.inputKind else {
+      throw TranslationError.invalidResponse(.missingRequiredContent)
+    }
+    guard inputKind == .wordOrPhrase else {
+      throw TranslationError.invalidResponse(.unexpectedInputKind)
+    }
+    guard
+      let sourceText = Self.nonempty(payload.sourceText),
+      let canonicalForm = Self.nonempty(payload.canonicalForm),
+      let partOfSpeech = Self.nonempty(payload.partOfSpeech),
+      let contextualMeaning = Self.nonempty(payload.contextualMeaning),
+      let payloadExampleSentence = Self.nonempty(payload.exampleSentence),
+      let payloadSentenceTranslation = Self.nonempty(payload.sentenceTranslation)
+    else {
+      throw TranslationError.invalidResponse(.missingRequiredContent)
+    }
+    guard Self.areRecoverablyEquivalent(sourceText, request.sourceText) else {
+      throw TranslationError.invalidResponse(.invalidEnglishContent)
     }
 
     let exampleAndTranslation =
-      if Self.containsHanCharacter(payload.exampleSentence),
-        Self.containsLatinLetter(payload.sentenceTranslation)
+      if Self.containsHanCharacter(payloadExampleSentence),
+        Self.containsLatinLetter(payloadSentenceTranslation)
       {
         (
-          exampleSentence: payload.sentenceTranslation,
-          sentenceTranslation: payload.exampleSentence
+          exampleSentence: payloadSentenceTranslation,
+          sentenceTranslation: payloadExampleSentence
         )
       } else {
         (
-          exampleSentence: payload.exampleSentence,
-          sentenceTranslation: payload.sentenceTranslation
+          exampleSentence: payloadExampleSentence,
+          sentenceTranslation: payloadSentenceTranslation
         )
       }
+    let exampleSentence: String
+    if request.kind == .contextualSelection, let targetSentence = request.targetSentence {
+      guard
+        Self.areRecoverablyEquivalent(
+          exampleAndTranslation.exampleSentence,
+          targetSentence
+        )
+      else {
+        throw TranslationError.invalidResponse(.invalidEnglishContent)
+      }
+      exampleSentence = targetSentence
+    } else {
+      exampleSentence = exampleAndTranslation.exampleSentence
+    }
 
     guard
-      Self.containsLatinLetter(payload.canonicalForm),
-      !Self.containsHanCharacter(payload.canonicalForm),
-      !Self.containsHanCharacter(payload.pronunciation),
-      payload.pronunciation.isEmpty || Self.looksLikeIPA(payload.pronunciation),
-      Self.containsHanCharacter(payload.contextualMeaning),
-      Self.containsLatinLetter(exampleAndTranslation.exampleSentence),
-      Self.containsHanCharacter(exampleAndTranslation.sentenceTranslation),
-      request.kind != .contextualSelection
-        || request.targetSentence == nil
-        || request.targetSentence?.trimmingCharacters(in: .whitespacesAndNewlines)
-          == exampleAndTranslation.exampleSentence.trimmingCharacters(
-            in: .whitespacesAndNewlines
-          )
+      Self.containsLatinLetter(canonicalForm),
+      !Self.containsHanCharacter(canonicalForm),
+      Self.containsLatinLetter(exampleSentence)
     else {
-      throw TranslationError.invalidResponse
+      throw TranslationError.invalidResponse(.invalidEnglishContent)
+    }
+    guard
+      Self.containsHanCharacter(contextualMeaning),
+      Self.containsHanCharacter(exampleAndTranslation.sentenceTranslation)
+    else {
+      throw TranslationError.invalidResponse(.invalidChineseContent)
     }
 
     return TranslationResult(
       sourceText: request.sourceText,
-      canonicalForm: payload.canonicalForm,
-      pronunciation: payload.pronunciation,
-      partOfSpeech: payload.partOfSpeech,
-      contextualMeaning: payload.contextualMeaning,
-      exampleSentence: exampleAndTranslation.exampleSentence,
+      canonicalForm: canonicalForm,
+      pronunciation: Self.normalizedPronunciation(payload.pronunciation),
+      partOfSpeech: partOfSpeech,
+      contextualMeaning: contextualMeaning,
+      exampleSentence: exampleSentence,
       sentenceTranslation: exampleAndTranslation.sentenceTranslation
     )
   }
@@ -102,24 +127,39 @@ final class OpenAIChatTranslationClient {
     )
     guard
       let contentData = Self.jsonData(from: content),
-      let payload = try? JSONDecoder().decode(OpenAILongTextPayload.self, from: contentData),
-      payload.inputKind == .longText,
-      payload.sourceText == sourceText,
-      !payload.translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      Self.containsHanCharacter(payload.translation)
+      let payload = try? JSONDecoder().decode(OpenAILongTextPayload.self, from: contentData)
     else {
-      throw TranslationError.invalidResponse
+      throw TranslationError.invalidResponse(.malformedPayload)
+    }
+    guard let inputKind = payload.inputKind else {
+      throw TranslationError.invalidResponse(.missingRequiredContent)
+    }
+    guard inputKind == .longText else {
+      throw TranslationError.invalidResponse(.unexpectedInputKind)
+    }
+    guard
+      let payloadSourceText = Self.nonempty(payload.sourceText),
+      let translation = Self.nonempty(payload.translation)
+    else {
+      throw TranslationError.invalidResponse(.missingRequiredContent)
+    }
+    guard payloadSourceText == sourceText else {
+      throw TranslationError.invalidResponse(.invalidEnglishContent)
+    }
+    guard Self.containsHanCharacter(translation) else {
+      throw TranslationError.invalidResponse(.invalidChineseContent)
     }
 
     return LongTextTranslationResult(
       sourceText: sourceText,
-      translatedText: payload.translation
+      translatedText: translation
     )
   }
 
   private func completionContent(
     systemPrompt: String,
     userContent: String,
+    exampleMessages: [OpenAIMessage] = [],
     maxTokens: Int,
     timeoutInterval: TimeInterval
   ) async throws -> String {
@@ -139,10 +179,9 @@ final class OpenAIChatTranslationClient {
     urlRequest.httpBody = try JSONEncoder().encode(
       OpenAIChatRequest(
         model: model,
-        messages: [
-          OpenAIMessage(role: "system", content: systemPrompt),
-          OpenAIMessage(role: "user", content: userContent),
-        ],
+        messages: [OpenAIMessage(role: "system", content: systemPrompt)]
+          + exampleMessages
+          + [OpenAIMessage(role: "user", content: userContent)],
         responseFormat: OpenAIResponseFormat(type: "json_object"),
         thinking: addsDisabledThinking ? OpenAIThinking(type: "disabled") : nil,
         maxTokens: maxTokens
@@ -157,7 +196,7 @@ final class OpenAIChatTranslationClient {
       let content = completion.choices.first?.message.content,
       !content.isEmpty
     else {
-      throw TranslationError.invalidResponse
+      throw TranslationError.invalidResponse(.malformedPayload)
     }
     return content
   }
@@ -255,6 +294,61 @@ final class OpenAIChatTranslationClient {
       && pronunciation.rangeOfCharacter(from: pinyinToneMarks) == nil
   }
 
+  private static func normalizedPronunciation(_ text: String?) -> String {
+    guard
+      let text,
+      !containsHanCharacter(text),
+      looksLikeIPA(text)
+    else {
+      return ""
+    }
+    return text.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private static func nonempty(_ text: String?) -> String? {
+    guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return nil
+    }
+    return text
+  }
+
+  private static func areRecoverablyEquivalent(_ lhs: String, _ rhs: String) -> Bool {
+    normalizedEnglishIdentity(lhs) == normalizedEnglishIdentity(rhs)
+  }
+
+  private static func normalizedEnglishIdentity(_ text: String) -> String {
+    text
+      .folding(
+        options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+        locale: Locale(identifier: "en_US_POSIX")
+      )
+      .split(whereSeparator: \.isWhitespace)
+      .joined(separator: " ")
+  }
+
+  private static func wordOrPhraseExampleMessages(
+    for writingSystem: ChineseWritingSystem
+  ) -> [OpenAIMessage] {
+    let contextualMeaning: String
+    let sentenceTranslation: String
+    switch writingSystem {
+    case .simplified:
+      contextualMeaning = "有韧性的"
+      sentenceTranslation = "团队依然保持韧性。"
+    case .traditional:
+      contextualMeaning = "有韌性的"
+      sentenceTranslation = "團隊依然保持韌性。"
+    }
+
+    let response = """
+      {"input_kind":"word_or_phrase","source_text":"resilient","canonical_form":"resilient","pronunciation":"/rɪˈzɪliənt/","part_of_speech":"adjective","contextual_meaning":"\(contextualMeaning)","example_sentence":"The team remained resilient.","sentence_translation":"\(sentenceTranslation)"}
+      """
+    return [
+      OpenAIMessage(role: "user", content: "resilient"),
+      OpenAIMessage(role: "assistant", content: response),
+    ]
+  }
+
   private static func systemPrompt(for writingSystem: ChineseWritingSystem) -> String {
     """
     Translate the supplied English word or short phrase into Chinese for a vocabulary learner.
@@ -341,14 +435,14 @@ struct OpenAIResponseMessage: Decodable {
 }
 
 private struct OpenAITranslationPayload: Decodable {
-  let inputKind: OpenAITranslationInputKind
-  let sourceText: String
-  let canonicalForm: String
-  let pronunciation: String
-  let partOfSpeech: String
-  let contextualMeaning: String
-  let exampleSentence: String
-  let sentenceTranslation: String
+  let inputKind: OpenAITranslationInputKind?
+  let sourceText: String?
+  let canonicalForm: String?
+  let pronunciation: String?
+  let partOfSpeech: String?
+  let contextualMeaning: String?
+  let exampleSentence: String?
+  let sentenceTranslation: String?
 
   enum CodingKeys: String, CodingKey {
     case inputKind = "input_kind"
@@ -363,9 +457,9 @@ private struct OpenAITranslationPayload: Decodable {
 }
 
 private struct OpenAILongTextPayload: Decodable {
-  let inputKind: OpenAITranslationInputKind
-  let sourceText: String
-  let translation: String
+  let inputKind: OpenAITranslationInputKind?
+  let sourceText: String?
+  let translation: String?
 
   enum CodingKeys: String, CodingKey {
     case inputKind = "input_kind"

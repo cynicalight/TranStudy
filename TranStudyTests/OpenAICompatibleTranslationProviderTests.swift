@@ -63,6 +63,10 @@ struct OpenAICompatibleTranslationProviderTests {
       systemPrompt.contains("Use Traditional Chinese characters for every Chinese output field."))
     #expect(systemPrompt.contains("first non-whitespace character must be `{`"))
     #expect(systemPrompt.contains("Never use a Markdown code fence"))
+    #expect(messages.map { $0["role"] } == ["system", "user", "assistant", "user"])
+    #expect(messages[1]["content"] == "resilient")
+    #expect(messages[2]["content"]?.contains("\"source_text\":\"resilient\"") == true)
+    #expect(messages[2]["content"]?.contains("\"pronunciation\":\"/rɪˈzɪliənt/\"") == true)
   }
 
   @Test("custom provider uses its configured endpoint model and API key")
@@ -130,7 +134,19 @@ struct OpenAICompatibleTranslationProviderTests {
     #expect(userMessage.contains("Return this exact target sentence unchanged"))
     #expect(result.canonicalForm == "run")
 
-    await #expect(throws: TranslationError.invalidResponse) {
+    let correctedContextResult = try await provider.translate(
+      TranslationRequest(
+        sourceText: "ran",
+        context: "She  ran home.",
+        kind: .contextualSelection,
+        targetSentence: "She  ran home."
+      ))
+    #expect(correctedContextResult.exampleSentence == "She  ran home.")
+    #expect(correctedContextResult.sentenceTranslation == "她跑回了家。")
+
+    await #expect(
+      throws: TranslationError.invalidResponse(.invalidEnglishContent)
+    ) {
       try await provider.translate(
         TranslationRequest(
           sourceText: "ran",
@@ -141,18 +157,18 @@ struct OpenAICompatibleTranslationProviderTests {
     }
   }
 
-  @Test("structured response must preserve the requested source text")
-  func structuredResponseMustPreserveSourceText() async throws {
+  @Test("recoverable source spelling drift does not replace the requested text")
+  func responseSourceSpellingDriftUsesRequestedText() async throws {
     let responseContent = try JSONSerialization.data(
       withJSONObject: [
         "input_kind": "word_or_phrase",
-        "source_text": "different text",
-        "canonical_form": "run",
-        "pronunciation": "/ræn/",
-        "part_of_speech": "verb",
-        "contextual_meaning": "奔跑",
-        "example_sentence": "She ran home.",
-        "sentence_translation": "她跑回了家。",
+        "source_text": "cliché",
+        "canonical_form": "cliché",
+        "pronunciation": "/kliːˈʃeɪ/",
+        "part_of_speech": "noun",
+        "contextual_meaning": "陈词滥调",
+        "example_sentence": "The ending felt like a cliche.",
+        "sentence_translation": "这个结局感觉像是陈词滥调。",
       ]
     )
     let responseBody = try JSONSerialization.data(
@@ -178,8 +194,15 @@ struct OpenAICompatibleTranslationProviderTests {
       httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
     )
 
-    await #expect(throws: TranslationError.invalidResponse) {
-      try await provider.translate(TranslationRequest(sourceText: "ran"))
+    let result = try await provider.translate(TranslationRequest(sourceText: "cliche"))
+
+    #expect(result.sourceText == "cliche")
+    #expect(result.canonicalForm == "cliché")
+
+    await #expect(
+      throws: TranslationError.invalidResponse(.invalidEnglishContent)
+    ) {
+      try await provider.translate(TranslationRequest(sourceText: "different text"))
     }
   }
 
@@ -269,8 +292,50 @@ struct OpenAICompatibleTranslationProviderTests {
     #expect(result.canonicalForm == "run")
   }
 
-  @Test("Mandarin pinyin is rejected as an invalid English pronunciation")
-  func mandarinPinyinIsRejected() async throws {
+  @Test("cliche response without pronunciation is accepted")
+  func clicheResponseWithoutPronunciationIsAccepted() async throws {
+    let responseContent = try JSONSerialization.data(
+      withJSONObject: [
+        "input_kind": "word_or_phrase",
+        "source_text": "cliche",
+        "canonical_form": "cliché",
+        "part_of_speech": "noun",
+        "contextual_meaning": "陈词滥调",
+        "example_sentence": "The ending felt like a cliche.",
+        "sentence_translation": "这个结局感觉像是陈词滥调。",
+      ]
+    )
+    let responseBody = try JSONSerialization.data(
+      withJSONObject: [
+        "choices": [
+          [
+            "message": [
+              "content": try #require(String(data: responseContent, encoding: .utf8))
+            ]
+          ]
+        ]
+      ]
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
+    )
+
+    let result = try await provider.translate(TranslationRequest(sourceText: "cliche"))
+
+    #expect(result.canonicalForm == "cliché")
+    #expect(result.pronunciation.isEmpty)
+    #expect(result.contextualMeaning == "陈词滥调")
+  }
+
+  @Test("Mandarin pinyin is discarded without failing the translation")
+  func mandarinPinyinIsDiscarded() async throws {
     let responseContent = try JSONSerialization.data(
       withJSONObject: [
         "input_kind": "word_or_phrase",
@@ -305,8 +370,51 @@ struct OpenAICompatibleTranslationProviderTests {
       httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
     )
 
-    await #expect(throws: TranslationError.invalidResponse) {
-      try await provider.translate(TranslationRequest(sourceText: "word"))
+    let result = try await provider.translate(TranslationRequest(sourceText: "word"))
+
+    #expect(result.pronunciation.isEmpty)
+    #expect(result.contextualMeaning == "单词")
+  }
+
+  @Test("missing learning content reports its response failure reason")
+  func missingLearningContentReportsItsReason() async throws {
+    let responseContent = try JSONSerialization.data(
+      withJSONObject: [
+        "input_kind": "word_or_phrase",
+        "source_text": "cliche",
+        "canonical_form": "cliché",
+        "pronunciation": "/kliːˈʃeɪ/",
+        "part_of_speech": "noun",
+        "example_sentence": "The ending felt like a cliche.",
+        "sentence_translation": "这个结局感觉像是陈词滥调。",
+      ]
+    )
+    let responseBody = try JSONSerialization.data(
+      withJSONObject: [
+        "choices": [
+          [
+            "message": [
+              "content": try #require(String(data: responseContent, encoding: .utf8))
+            ]
+          ]
+        ]
+      ]
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
+    )
+
+    await #expect(
+      throws: TranslationError.invalidResponse(.missingRequiredContent)
+    ) {
+      try await provider.translate(TranslationRequest(sourceText: "cliche"))
     }
   }
 
