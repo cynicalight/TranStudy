@@ -577,7 +577,9 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       )
     )
     if let context {
-      let normalizedWindow = TranslationTextNormalizer.collapseWhitespace(in: windowText)
+      let normalizedWindow = TranslationTextNormalizer.cleanExampleSentenceBoundaries(
+        in: windowText
+      )
       let touchesTruncatedStart =
         windowStartIndex > documentStartIndex
         && normalizedWindow.hasPrefix(context.targetSentence)

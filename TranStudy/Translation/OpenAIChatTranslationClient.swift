@@ -104,7 +104,9 @@ final class OpenAIChatTranslationClient {
           sentenceTranslation: payloadSentenceTranslation
         )
       }
-    let exampleSentence = exampleAndTranslation.exampleSentence
+    let exampleSentence = TranslationTextNormalizer.cleanExampleSentenceBoundaries(
+      in: exampleAndTranslation.exampleSentence
+    )
 
     guard
       Self.containsLatinLetter(canonicalForm),

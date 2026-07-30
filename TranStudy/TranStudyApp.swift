@@ -1,4 +1,3 @@
-import AppKit
 import SwiftData
 import SwiftUI
 
@@ -94,10 +93,6 @@ struct TranStudyApp: App {
         Button(shell.localized("翻译剪贴板")) {
           coordinator.presentClipboardTranslation()
         }
-        .keyboardShortcut(
-          shell.translationShortcut.keyEquivalent,
-          modifiers: []
-        )
       }
     }
 
@@ -108,26 +103,5 @@ struct TranStudyApp: App {
       Label("TranStudy", systemImage: "character.book.closed")
     }
     .menuBarExtraStyle(.menu)
-  }
-}
-
-extension TranslationShortcutKey {
-  fileprivate var keyEquivalent: KeyEquivalent {
-    let functionKey: Int
-    switch self {
-    case .f1: functionKey = NSF1FunctionKey
-    case .f2: functionKey = NSF2FunctionKey
-    case .f3: functionKey = NSF3FunctionKey
-    case .f4: functionKey = NSF4FunctionKey
-    case .f5: functionKey = NSF5FunctionKey
-    case .f6: functionKey = NSF6FunctionKey
-    case .f7: functionKey = NSF7FunctionKey
-    case .f8: functionKey = NSF8FunctionKey
-    case .f9: functionKey = NSF9FunctionKey
-    case .f10: functionKey = NSF10FunctionKey
-    case .f11: functionKey = NSF11FunctionKey
-    case .f12: functionKey = NSF12FunctionKey
-    }
-    return KeyEquivalent(Character(UnicodeScalar(functionKey)!))
   }
 }

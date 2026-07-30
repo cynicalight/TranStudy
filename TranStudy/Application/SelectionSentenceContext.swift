@@ -53,7 +53,9 @@ struct SelectionSentenceContext: Equatable {
     }
 
     return SelectionSentenceContext(
-      targetSentence: sentences[targetIndex].text,
+      targetSentence: TranslationTextNormalizer.cleanExampleSentenceBoundaries(
+        in: sentences[targetIndex].text
+      ),
       previousSentence: targetIndex > 0 ? sentences[targetIndex - 1].text : nil,
       nextSentence:
         targetIndex + 1 < sentences.count
