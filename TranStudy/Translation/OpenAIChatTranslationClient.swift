@@ -57,18 +57,10 @@ final class OpenAIChatTranslationClient {
         request: request
       )
     }
-    guard let inputKind = payload.inputKind else {
+    guard payload.inputKind != nil else {
       throw Self.invalidWordResponse(
         .missingRequiredContent,
         check: "missingInputKind",
-        content: content,
-        request: request
-      )
-    }
-    guard inputKind == .wordOrPhrase else {
-      throw Self.invalidWordResponse(
-        .unexpectedInputKind,
-        check: "unexpectedInputKind actual=\(inputKind.rawValue)",
         content: content,
         request: request
       )
