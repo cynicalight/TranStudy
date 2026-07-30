@@ -405,13 +405,6 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       return nil
     }
 
-    if let context = webIndexedSelectionContext(
-      selectedRange: selectedRange,
-      in: element
-    ), !Self.endsAtUnclosedOpeningDoubleQuote(context.context.targetSentence) {
-      return context
-    }
-
     if let context = webParagraphSelectionContext(
       selectedRange: selectedRange,
       in: element
@@ -486,103 +479,6 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       ),
       sourceParagraphText: targetSentence
     )
-  }
-
-  private func webIndexedSelectionContext(
-    selectedRange: AXTextMarkerRange,
-    in element: AXUIElement
-  ) -> SelectionContextCapture? {
-    let selectionStart = AXTextMarkerRangeCopyStartMarker(selectedRange)
-    let selectionEnd = AXTextMarkerRangeCopyEndMarker(selectedRange)
-    guard
-      let selectionStartIndex = textMarkerIndex(selectionStart, in: element),
-      let selectionEndIndex = textMarkerIndex(selectionEnd, in: element),
-      selectionEndIndex > selectionStartIndex,
-      let documentRange = textMarkerRangeForUIElement(element),
-      let documentStartIndex = textMarkerIndex(
-        AXTextMarkerRangeCopyStartMarker(documentRange),
-        in: element
-      ),
-      let documentEndIndex = textMarkerIndex(
-        AXTextMarkerRangeCopyEndMarker(documentRange),
-        in: element
-      ),
-      documentStartIndex >= 0,
-      documentStartIndex <= selectionStartIndex,
-      selectionStartIndex < selectionEndIndex,
-      selectionEndIndex <= documentEndIndex
-    else {
-      return nil
-    }
-
-    let contextRadius = 2_048
-    let windowStartIndex =
-      selectionStartIndex
-      - min(contextRadius, selectionStartIndex - documentStartIndex)
-    let windowEndIndex =
-      selectionEndIndex
-      + min(contextRadius, documentEndIndex - selectionEndIndex)
-    guard
-      let windowStart = textMarker(at: windowStartIndex, in: element),
-      let windowEnd = textMarker(at: windowEndIndex, in: element)
-    else {
-      return nil
-    }
-
-    let windowRange = AXTextMarkerRangeCreate(nil, windowStart, windowEnd)
-    guard let windowText = rawString(for: windowRange, in: element) else {
-      return nil
-    }
-    let prefixText: String
-    if CFEqual(windowStart, selectionStart) {
-      prefixText = ""
-    } else {
-      let prefixRange = AXTextMarkerRangeCreate(nil, windowStart, selectionStart)
-      guard let value = rawString(for: prefixRange, in: element) else {
-        return nil
-      }
-      prefixText = value
-    }
-    guard let selectedText = rawString(for: selectedRange, in: element) else {
-      return nil
-    }
-    let localSelectionRange = NSRange(
-      location: (prefixText as NSString).length,
-      length: (selectedText as NSString).length
-    )
-    let nsWindowText = windowText as NSString
-    guard
-      NSMaxRange(localSelectionRange) <= nsWindowText.length,
-      nsWindowText.substring(with: localSelectionRange) == selectedText
-    else {
-      return nil
-    }
-
-    let context = SelectionSentenceContext.extract(
-      from: windowText,
-      selectedRange: CFRange(
-        location: localSelectionRange.location,
-        length: localSelectionRange.length
-      )
-    )
-    if let context {
-      let normalizedWindow = TranslationTextNormalizer.cleanExampleSentenceBoundaries(
-        in: windowText
-      )
-      let touchesTruncatedStart =
-        windowStartIndex > documentStartIndex
-        && normalizedWindow.hasPrefix(context.targetSentence)
-      let touchesTruncatedEnd =
-        windowEndIndex < documentEndIndex
-        && normalizedWindow.hasSuffix(context.targetSentence)
-      guard !touchesTruncatedStart, !touchesTruncatedEnd else {
-        return nil
-      }
-    }
-    guard let context else {
-      return nil
-    }
-    return SelectionContextCapture(context: context, sourceParagraphText: windowText)
   }
 
   private static func endsAtUnclosedOpeningDoubleQuote(_ text: String) -> Bool {
@@ -769,50 +665,6 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       return nil
     }
     return unsafeDowncast(value, to: AXTextMarker.self)
-  }
-
-  private func textMarkerIndex(
-    _ marker: AXTextMarker,
-    in element: AXUIElement
-  ) -> Int? {
-    (copyParameterizedAttribute(
-      kAXIndexForTextMarkerParameterizedAttribute as CFString,
-      parameter: marker,
-      from: element
-    ) as? NSNumber)?.intValue
-  }
-
-  private func textMarker(
-    at index: Int,
-    in element: AXUIElement
-  ) -> AXTextMarker? {
-    guard
-      let value = copyParameterizedAttribute(
-        kAXTextMarkerForIndexParameterizedAttribute as CFString,
-        parameter: NSNumber(value: index),
-        from: element
-      ),
-      CFGetTypeID(value) == AXTextMarkerGetTypeID()
-    else {
-      return nil
-    }
-    return unsafeDowncast(value, to: AXTextMarker.self)
-  }
-
-  private func textMarkerRangeForUIElement(
-    _ element: AXUIElement
-  ) -> AXTextMarkerRange? {
-    guard
-      let value = copyParameterizedAttribute(
-        kAXTextMarkerRangeForUIElementParameterizedAttribute as CFString,
-        parameter: element,
-        from: element
-      ),
-      CFGetTypeID(value) == AXTextMarkerRangeGetTypeID()
-    else {
-      return nil
-    }
-    return unsafeDowncast(value, to: AXTextMarkerRange.self)
   }
 
   private func string(
