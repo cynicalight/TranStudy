@@ -20,6 +20,7 @@
           connectionTester: PreviewConnectionTester(),
           clock: PreviewClock(),
           notifications: PreviewReviewNotifier(),
+          accessibilityAuthorization: PreviewAccessibilityAuthorizer(),
           reviewReminderConfigurationStore: PreviewReviewReminderConfigurationStore(),
           loginItem: PreviewLoginItemController(),
           speech: PreviewSpeechPlayer(),
@@ -29,7 +30,8 @@
           ),
           selectionConfigurationStore: PreviewSelectionConfigurationStore(),
           shortcutStore: PreviewTranslationShortcutStore(),
-          sentenceCardConfigurationStore: PreviewSentenceCardConfigurationStore()
+          sentenceCardConfigurationStore: PreviewSentenceCardConfigurationStore(),
+          preparationStateStore: PreviewPreparationStateStore()
         ))
     }
 
@@ -286,7 +288,32 @@
 
   @MainActor
   private struct PreviewReviewNotifier: ReviewNotifying {
+    func authorizationStatus() async -> PreparationAuthorizationStatus {
+      .authorized
+    }
+
+    func requestAuthorization() async throws -> Bool {
+      true
+    }
+
     func replaceScheduledReminder(with reminder: ReviewReminder?) async throws {}
+  }
+
+  @MainActor
+  private struct PreviewAccessibilityAuthorizer: AccessibilityAuthorizing {
+    var authorizationStatus: PreparationAuthorizationStatus {
+      .authorized
+    }
+
+    func requestAuthorization() {}
+  }
+
+  private struct PreviewPreparationStateStore: PreparationStateStoring {
+    func loadHasCompletedInitialFlow() -> Bool {
+      true
+    }
+
+    func saveHasCompletedInitialFlow(_ hasCompleted: Bool) {}
   }
 
   private struct PreviewSpeechPlayer: SpeechPlaying {

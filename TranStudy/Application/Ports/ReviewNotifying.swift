@@ -11,5 +11,7 @@ struct ReviewReminder: Equatable, Sendable {
 
 @MainActor
 protocol ReviewNotifying {
+  func authorizationStatus() async -> PreparationAuthorizationStatus
+  func requestAuthorization() async throws -> Bool
   func replaceScheduledReminder(with reminder: ReviewReminder?) async throws
 }

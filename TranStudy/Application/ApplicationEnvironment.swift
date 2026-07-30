@@ -10,6 +10,7 @@ struct ApplicationEnvironment {
   let connectionTester: any TranslationConnectionTesting
   let clock: any DateProviding
   let notifications: any ReviewNotifying
+  let accessibilityAuthorization: any AccessibilityAuthorizing
   let reviewReminderConfigurationStore: any ReviewReminderConfigurationStoring
   let loginItem: any LoginItemControlling
   let speech: any SpeechPlaying
@@ -18,6 +19,7 @@ struct ApplicationEnvironment {
   let selectionConfigurationStore: any SelectionConfigurationStoring
   let shortcutStore: any TranslationShortcutStoring
   let sentenceCardConfigurationStore: any SentenceCardConfigurationStoring
+  let preparationStateStore: any PreparationStateStoring
 }
 
 extension ApplicationEnvironment {
@@ -42,6 +44,7 @@ extension ApplicationEnvironment {
       connectionTester: connectionTester,
       clock: SystemDateProvider(),
       notifications: notifications,
+      accessibilityAuthorization: SystemAccessibilityAuthorizer(),
       reviewReminderConfigurationStore: UserDefaultsReviewReminderConfigurationStore(),
       loginItem: SystemLoginItemController(),
       speech: DisabledSpeechPlayer(),
@@ -49,7 +52,8 @@ extension ApplicationEnvironment {
       providerConfigurationStore: providerConfigurationStore,
       selectionConfigurationStore: selectionConfigurationStore,
       shortcutStore: UserDefaultsTranslationShortcutStore(),
-      sentenceCardConfigurationStore: UserDefaultsSentenceCardConfigurationStore()
+      sentenceCardConfigurationStore: UserDefaultsSentenceCardConfigurationStore(),
+      preparationStateStore: UserDefaultsPreparationStateStore()
     )
   }
 }

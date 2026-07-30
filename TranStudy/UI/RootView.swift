@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct RootView: View {
@@ -5,15 +6,46 @@ struct RootView: View {
   let onTranslateClipboard: () -> Void
 
   var body: some View {
-    tabNavigation
-      .toolbar {
-        ToolbarItem(placement: .primaryAction) {
-          Button(action: onTranslateClipboard) {
-            Label("翻译剪贴板", systemImage: "character.bubble")
-          }
-          .help("翻译剪贴板（\(shell.translationShortcut.title)）")
-        }
+    VStack(spacing: 0) {
+      if !shell.missingPreparationCapabilities.isEmpty {
+        PreparationStatusBanner(shell: shell)
+        Divider()
       }
+
+      tabNavigation
+    }
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button(action: onTranslateClipboard) {
+          Label("翻译剪贴板", systemImage: "character.bubble")
+        }
+        .help("翻译剪贴板（\(shell.translationShortcut.title)）")
+      }
+    }
+    .sheet(
+      isPresented: Binding(
+        get: { shell.isPreparationPresented },
+        set: { isPresented in
+          if !isPresented {
+            shell.completeInitialPreparation()
+          }
+        }
+      )
+    ) {
+      InitialPreparationView(shell: shell)
+    }
+    .task {
+      await shell.refreshPreparationStatus()
+    }
+    .onReceive(
+      NotificationCenter.default.publisher(
+        for: NSApplication.didBecomeActiveNotification
+      )
+    ) { _ in
+      Task {
+        await shell.refreshPreparationStatus()
+      }
+    }
   }
 
   @ViewBuilder

@@ -32,6 +32,16 @@ enum LearningLibraryScope: Hashable {
   case archived
 }
 
+enum PreparationCapability: Equatable, Identifiable {
+  case accessibility
+  case translationService
+  case notifications
+
+  var id: Self {
+    self
+  }
+}
+
 @MainActor
 @Observable
 final class ApplicationShell {
@@ -42,6 +52,11 @@ final class ApplicationShell {
   private(set) var lastReviewRefreshDate: Date?
   var translationDraft: TranslationDraft?
   private(set) var connectionStatus: TranslationConnectionStatus = .idle
+  private(set) var isPreparationPresented: Bool
+  private(set) var accessibilityAuthorizationStatus: PreparationAuthorizationStatus
+  private(set) var notificationAuthorizationStatus: PreparationAuthorizationStatus =
+    .notDetermined
+  private(set) var isTranslationServiceConfigured: Bool
   private(set) var translationStatus: TranslationStatus = .idle
   private(set) var translationError: TranslationError?
   private(set) var translationSourceText = ""
@@ -102,8 +117,30 @@ final class ApplicationShell {
     translationPresentationTitle == "翻译长文本"
   }
 
+  var missingPreparationCapabilities: [PreparationCapability] {
+    var capabilities: [PreparationCapability] = []
+    if accessibilityAuthorizationStatus != .authorized {
+      capabilities.append(.accessibility)
+    }
+    if !isTranslationServiceConfigured {
+      capabilities.append(.translationService)
+    }
+    if notificationAuthorizationStatus != .authorized {
+      capabilities.append(.notifications)
+    }
+    return capabilities
+  }
+
   init(environment: ApplicationEnvironment) {
     self.environment = environment
+    isPreparationPresented =
+      !environment.preparationStateStore.loadHasCompletedInitialFlow()
+    accessibilityAuthorizationStatus =
+      environment.accessibilityAuthorization.authorizationStatus
+    isTranslationServiceConfigured = Self.hasConfiguredTranslationService(
+      in: environment,
+      provider: environment.providerConfigurationStore.load().provider
+    )
     translationPanelPosition = environment.panelPositionStore.load()
     translationProviderConfiguration = environment.providerConfigurationStore.load()
     selectionConfiguration = environment.selectionConfigurationStore.load()
@@ -111,6 +148,52 @@ final class ApplicationShell {
     isSentenceCardsEnabled = environment.sentenceCardConfigurationStore.load()
     reviewReminderConfiguration = environment.reviewReminderConfigurationStore.load()
     isLaunchAtLoginEnabled = environment.loginItem.isEnabled
+  }
+
+  func refreshPreparationStatus() async {
+    accessibilityAuthorizationStatus =
+      environment.accessibilityAuthorization.authorizationStatus
+    notificationAuthorizationStatus = await environment.notifications.authorizationStatus()
+    isTranslationServiceConfigured = Self.hasConfiguredTranslationService(
+      in: environment,
+      provider: translationProviderConfiguration.provider
+    )
+  }
+
+  func requestAccessibilityAuthorization() {
+    environment.accessibilityAuthorization.requestAuthorization()
+    accessibilityAuthorizationStatus =
+      environment.accessibilityAuthorization.authorizationStatus
+  }
+
+  func requestNotificationAuthorization() async {
+    do {
+      let granted = try await environment.notifications.requestAuthorization()
+      notificationAuthorizationStatus = granted ? .authorized : .denied
+    } catch {
+      notificationAuthorizationStatus = .denied
+    }
+  }
+
+  func presentPreparation() {
+    isPreparationPresented = true
+  }
+
+  func completeInitialPreparation() {
+    environment.preparationStateStore.saveHasCompletedInitialFlow(true)
+    isPreparationPresented = false
+  }
+
+  private static func hasConfiguredTranslationService(
+    in environment: ApplicationEnvironment,
+    provider: TranslationProviderKind
+  ) -> Bool {
+    do {
+      let apiKey = try environment.apiKeyStore.loadAPIKey(for: provider)
+      return !(apiKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    } catch {
+      return false
+    }
   }
 
   func refreshTodayReview() async {
@@ -1041,6 +1124,10 @@ final class ApplicationShell {
   func selectTranslationProvider(_ provider: TranslationProviderKind) {
     translationProviderConfiguration.provider = provider
     environment.providerConfigurationStore.save(translationProviderConfiguration)
+    isTranslationServiceConfigured = Self.hasConfiguredTranslationService(
+      in: environment,
+      provider: provider
+    )
     connectionStatus = .idle
   }
 
@@ -1075,6 +1162,7 @@ final class ApplicationShell {
         normalizedAPIKey,
         for: translationProviderConfiguration.provider
       )
+      isTranslationServiceConfigured = true
       connectionStatus = .connected
     } catch {
       connectionStatus = .failed

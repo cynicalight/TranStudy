@@ -306,6 +306,7 @@ struct ApplicationShellTests {
     #expect(connectionTester.lastAPIKey == "test-api-key")
     #expect(apiKeyStore.savedAPIKeys[.deepSeek] == "test-api-key")
     #expect(shell.connectionStatus == .connected)
+    #expect(shell.isTranslationServiceConfigured)
   }
 
   @Test("custom provider settings and API key are saved for the selected provider")
@@ -1264,6 +1265,74 @@ struct ApplicationShellTests {
     #expect(shell.lastReviewRefreshDate == Date(timeIntervalSince1970: 1_234))
     #expect(notifier.lastReminder == nil)
   }
+
+  @Test("first preparation flow is shown once and completion persists")
+  func firstPreparationFlowIsShownOnce() {
+    let preparationStore = TestPreparationStateStore()
+    let firstShell = ApplicationShell(
+      environment: .test(preparationStateStore: preparationStore)
+    )
+
+    #expect(firstShell.isPreparationPresented)
+
+    firstShell.completeInitialPreparation()
+
+    #expect(!firstShell.isPreparationPresented)
+    #expect(preparationStore.hasCompletedInitialFlow)
+
+    let relaunchedShell = ApplicationShell(
+      environment: .test(preparationStateStore: preparationStore)
+    )
+
+    #expect(!relaunchedShell.isPreparationPresented)
+  }
+
+  @Test("preparation status reflects replaceable system capabilities")
+  func preparationStatusReflectsSystemCapabilities() async {
+    let accessibility = TestAccessibilityAuthorizer(status: .denied)
+    let notifier = TestReviewNotifier(authorizationStatus: .authorized)
+    let apiKeyStore = TestApplicationAPIKeyStore(apiKey: "saved-key")
+    let shell = ApplicationShell(
+      environment: .test(
+        apiKeyStore: apiKeyStore,
+        notifier: notifier,
+        accessibility: accessibility
+      )
+    )
+
+    await shell.refreshPreparationStatus()
+
+    #expect(shell.accessibilityAuthorizationStatus == .denied)
+    #expect(shell.notificationAuthorizationStatus == .authorized)
+    #expect(shell.isTranslationServiceConfigured)
+    #expect(shell.missingPreparationCapabilities == [.accessibility])
+  }
+
+  @Test("optional permission requests do not gate the main application")
+  func optionalPermissionRequestsDoNotGateMainApplication() async {
+    let accessibility = TestAccessibilityAuthorizer(status: .denied)
+    let notifier = TestReviewNotifier(
+      authorizationStatus: .notDetermined,
+      authorizationRequestResult: false
+    )
+    let shell = ApplicationShell(
+      environment: .test(
+        notifier: notifier,
+        accessibility: accessibility
+      )
+    )
+
+    shell.requestAccessibilityAuthorization()
+    await shell.requestNotificationAuthorization()
+    shell.completeInitialPreparation()
+
+    #expect(accessibility.didRequestAuthorization)
+    #expect(notifier.didRequestAuthorization)
+    #expect(shell.accessibilityAuthorizationStatus == .denied)
+    #expect(shell.notificationAuthorizationStatus == .denied)
+    #expect(!shell.isPreparationPresented)
+    #expect(shell.selectedDestination == .todayReview)
+  }
 }
 
 extension ApplicationEnvironment {
@@ -1275,6 +1344,7 @@ extension ApplicationEnvironment {
     apiKeyStore: TestApplicationAPIKeyStore = TestApplicationAPIKeyStore(),
     connectionTester: TestTranslationConnectionTester = TestTranslationConnectionTester(),
     notifier: TestReviewNotifier = TestReviewNotifier(),
+    accessibility: TestAccessibilityAuthorizer = TestAccessibilityAuthorizer(),
     reminderConfigurationStore: TestReviewReminderConfigurationStore =
       TestReviewReminderConfigurationStore(),
     loginItem: TestLoginItemController = TestLoginItemController(),
@@ -1285,7 +1355,8 @@ extension ApplicationEnvironment {
       TestSelectionConfigurationStore(),
     shortcutStore: TestTranslationShortcutStore = TestTranslationShortcutStore(),
     sentenceCardConfigurationStore: TestSentenceCardConfigurationStore =
-      TestSentenceCardConfigurationStore()
+      TestSentenceCardConfigurationStore(),
+    preparationStateStore: TestPreparationStateStore = TestPreparationStateStore()
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: TestSelectionProvider(),
@@ -1296,6 +1367,7 @@ extension ApplicationEnvironment {
       connectionTester: connectionTester,
       clock: TestClock(),
       notifications: notifier,
+      accessibilityAuthorization: accessibility,
       reviewReminderConfigurationStore: reminderConfigurationStore,
       loginItem: loginItem,
       speech: TestSpeechPlayer(),
@@ -1303,7 +1375,8 @@ extension ApplicationEnvironment {
       providerConfigurationStore: providerConfigurationStore,
       selectionConfigurationStore: selectionConfigurationStore,
       shortcutStore: shortcutStore,
-      sentenceCardConfigurationStore: sentenceCardConfigurationStore
+      sentenceCardConfigurationStore: sentenceCardConfigurationStore,
+      preparationStateStore: preparationStateStore
     )
   }
 }
@@ -1680,6 +1753,12 @@ private struct ReviewResetInvocation: Equatable {
 private final class TestApplicationAPIKeyStore: APIKeyStoring {
   private(set) var savedAPIKeys: [TranslationProviderKind: String] = [:]
 
+  init(apiKey: String? = nil) {
+    if let apiKey {
+      savedAPIKeys[.deepSeek] = apiKey
+    }
+  }
+
   func loadAPIKey(for provider: TranslationProviderKind) throws -> String? {
     savedAPIKeys[provider]
   }
@@ -1713,9 +1792,27 @@ private final class TestReviewNotifier: ReviewNotifying {
   var lastReminder: ReviewReminder?
   private(set) var receivedReminders: [ReviewReminder?] = []
   private let error: TestReviewNotifierError?
+  private let storedAuthorizationStatus: PreparationAuthorizationStatus
+  private let authorizationRequestResult: Bool
+  private(set) var didRequestAuthorization = false
 
-  init(error: TestReviewNotifierError? = nil) {
+  init(
+    error: TestReviewNotifierError? = nil,
+    authorizationStatus: PreparationAuthorizationStatus = .notDetermined,
+    authorizationRequestResult: Bool = true
+  ) {
     self.error = error
+    storedAuthorizationStatus = authorizationStatus
+    self.authorizationRequestResult = authorizationRequestResult
+  }
+
+  func authorizationStatus() async -> PreparationAuthorizationStatus {
+    storedAuthorizationStatus
+  }
+
+  func requestAuthorization() async throws -> Bool {
+    didRequestAuthorization = true
+    return authorizationRequestResult
   }
 
   func replaceScheduledReminder(with reminder: ReviewReminder?) async throws {
@@ -1736,6 +1833,40 @@ private final class TestLoginItemController: LoginItemControlling {
 
   func setEnabled(_ isEnabled: Bool) throws {
     self.isEnabled = isEnabled
+  }
+}
+
+@MainActor
+private final class TestAccessibilityAuthorizer: AccessibilityAuthorizing {
+  private(set) var status: PreparationAuthorizationStatus
+  private(set) var didRequestAuthorization = false
+
+  init(status: PreparationAuthorizationStatus = .authorized) {
+    self.status = status
+  }
+
+  var authorizationStatus: PreparationAuthorizationStatus {
+    status
+  }
+
+  func requestAuthorization() {
+    didRequestAuthorization = true
+  }
+}
+
+private final class TestPreparationStateStore: PreparationStateStoring {
+  private(set) var hasCompletedInitialFlow: Bool
+
+  init(hasCompletedInitialFlow: Bool = false) {
+    self.hasCompletedInitialFlow = hasCompletedInitialFlow
+  }
+
+  func loadHasCompletedInitialFlow() -> Bool {
+    hasCompletedInitialFlow
+  }
+
+  func saveHasCompletedInitialFlow(_ hasCompleted: Bool) {
+    hasCompletedInitialFlow = hasCompleted
   }
 }
 

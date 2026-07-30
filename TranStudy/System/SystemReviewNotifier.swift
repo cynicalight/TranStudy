@@ -4,16 +4,10 @@ enum ReviewNotificationError: Error {
   case permissionDenied
 }
 
-enum ReviewNotificationAuthorizationStatus {
-  case notDetermined
-  case authorized
-  case denied
-}
-
 @MainActor
 protocol ReviewNotificationCenterClient: AnyObject {
   func setDelegate(_ delegate: UNUserNotificationCenterDelegate)
-  func authorizationStatus() async -> ReviewNotificationAuthorizationStatus
+  func authorizationStatus() async -> PreparationAuthorizationStatus
   func requestAuthorization() async throws -> Bool
   func removePendingNotificationRequests(withIdentifiers identifiers: [String])
   func add(_ request: UNNotificationRequest) async throws
@@ -31,7 +25,7 @@ private final class UserNotificationCenterClient: ReviewNotificationCenterClient
     center.delegate = delegate
   }
 
-  func authorizationStatus() async -> ReviewNotificationAuthorizationStatus {
+  func authorizationStatus() async -> PreparationAuthorizationStatus {
     switch await center.notificationSettings().authorizationStatus {
     case .notDetermined:
       .notDetermined
@@ -72,6 +66,14 @@ final class SystemReviewNotifier: NSObject, ReviewNotifying {
 
   func start() {
     center.setDelegate(self)
+  }
+
+  func authorizationStatus() async -> PreparationAuthorizationStatus {
+    await center.authorizationStatus()
+  }
+
+  func requestAuthorization() async throws -> Bool {
+    try await center.requestAuthorization()
   }
 
   func replaceScheduledReminder(with reminder: ReviewReminder?) async throws {

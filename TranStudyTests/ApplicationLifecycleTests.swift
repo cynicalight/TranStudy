@@ -63,7 +63,7 @@ private final class TestReviewNotificationCenter: ReviewNotificationCenterClient
 
   func setDelegate(_ delegate: UNUserNotificationCenterDelegate) {}
 
-  func authorizationStatus() async -> ReviewNotificationAuthorizationStatus {
+  func authorizationStatus() async -> PreparationAuthorizationStatus {
     .authorized
   }
 
