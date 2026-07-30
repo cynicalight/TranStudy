@@ -6,7 +6,7 @@ repo_root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
 usage() {
-  echo "usage: $0 [--yes] VERSION /path/to/release-notes.md" >&2
+  echo "usage: $0 [--yes] VERSION [/path/to/release-notes.md]" >&2
 }
 
 assume_yes=false
@@ -15,13 +15,13 @@ if [[ "${1:-}" == "--yes" ]]; then
   shift
 fi
 
-if [[ $# -ne 2 ]]; then
+if [[ $# -lt 1 || $# -gt 2 ]]; then
   usage
   exit 64
 fi
 
 version=$1
-release_notes_input=$2
+release_notes_input=${2:-}
 tag="v$version"
 
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -29,19 +29,24 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 64
 fi
 
-if [[ ! -f "$release_notes_input" ]]; then
-  echo "release notes file does not exist: $release_notes_input" >&2
-  exit 66
-fi
+release_notes_file=
+release_notes_description="generated from Git commits"
+if [[ -n "$release_notes_input" ]]; then
+  if [[ ! -f "$release_notes_input" ]]; then
+    echo "release notes file does not exist: $release_notes_input" >&2
+    exit 66
+  fi
 
-release_notes_dir=$(cd "$(dirname "$release_notes_input")" && pwd)
-release_notes_file="$release_notes_dir/$(basename "$release_notes_input")"
+  release_notes_dir=$(cd "$(dirname "$release_notes_input")" && pwd)
+  release_notes_file="$release_notes_dir/$(basename "$release_notes_input")"
+  release_notes_description=$release_notes_file
 
-if grep -F "Describe the user-visible changes" "$release_notes_file" >/dev/null ||
-  grep -F "# TranStudy VERSION" "$release_notes_file" >/dev/null
-then
-  echo "release notes still contain template placeholders: $release_notes_file" >&2
-  exit 65
+  if grep -F "Describe the user-visible changes" "$release_notes_file" >/dev/null ||
+    grep -F "# TranStudy VERSION" "$release_notes_file" >/dev/null
+  then
+    echo "release notes still contain template placeholders: $release_notes_file" >&2
+    exit 65
+  fi
 fi
 
 for command_name in git gh xcodegen xcodebuild hdiutil codesign shasum perl; do
@@ -133,7 +138,7 @@ echo "  branch: $branch"
 echo "  version: $current_version -> $version"
 echo "  build: $current_build_number -> $build_number"
 echo "  tag: $tag"
-echo "  notes: $release_notes_file"
+echo "  notes: $release_notes_description"
 echo "  action: commit version changes, build DMG, push, and publish GitHub Release"
 
 if [[ "$assume_yes" != true ]]; then
@@ -170,6 +175,36 @@ if ! git diff --cached --quiet; then
 fi
 
 release_commit=$(git rev-parse HEAD)
+
+temporary_notes_file=$(mktemp "${TMPDIR%/}/transtudy-release-notes.XXXXXX")
+cleanup() {
+  rm -f "$temporary_notes_file"
+}
+trap cleanup EXIT
+
+if [[ -z "$release_notes_file" ]]; then
+  previous_tag=$(git describe --tags --abbrev=0 "$release_commit^" \
+    2>/dev/null || true)
+  revision_range=$release_commit
+  if [[ -n "$previous_tag" ]]; then
+    revision_range="$previous_tag..$release_commit"
+  fi
+
+  {
+    printf '# TranStudy %s\n\n' "$version"
+    printf '## Changes\n\n'
+    git log --format='- %s (%h)' "$revision_range"
+  } >"$temporary_notes_file"
+else
+  cp "$release_notes_file" "$temporary_notes_file"
+fi
+
+{
+  printf '\n\n## Installation note\n\n'
+  printf '%s\n' \
+    'This build is ad-hoc signed and is not notarized by Apple. On first launch, Control-click TranStudy in Finder, choose Open, and confirm Open. If macOS still blocks it, open System Settings → Privacy & Security and choose Open Anyway.'
+} >>"$temporary_notes_file"
+release_notes_file=$temporary_notes_file
 
 VERSION="$version" \
 BUILD_NUMBER="$build_number" \

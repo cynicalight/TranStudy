@@ -23,11 +23,19 @@ The script refuses to overwrite an existing release directory. It archives with 
 
 ## Build and publish automatically
 
-For a complete release, prepare final release notes without the template placeholders, start from a clean default branch, and run:
+For a complete release, start from a clean default branch and run:
+
+```sh
+scripts/publish-release.sh 1.0.0
+```
+
+Release notes are optional. When omitted, the publisher generates notes from Git commits since the previous tag. To provide edited notes instead, pass an additional file without template placeholders:
 
 ```sh
 scripts/publish-release.sh 1.0.0 /absolute/path/to/release-notes.md
 ```
+
+In both cases, the publisher appends the complete unnotarized installation notice to the published notes.
 
 The publisher checks GitHub authentication, the branch and upstream state, existing tags, releases, and output directories before changing the project. It updates `MARKETING_VERSION` in `project.yml`, increments `CURRENT_PROJECT_VERSION` when the marketing version changes, regenerates the Xcode project, commits the version change when needed, builds and verifies the DMG, pushes the default branch, and publishes the DMG, checksum, and signed appcast as the latest GitHub Release. It displays the complete release plan and requires confirmation before making version or publishing changes. `--yes` skips this confirmation for an explicitly authorized non-interactive run.
 
