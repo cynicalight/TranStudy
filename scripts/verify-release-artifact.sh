@@ -45,4 +45,26 @@ if [[ ! -d "$app_path/Contents/Frameworks/Sparkle.framework" ]]; then
   exit 65
 fi
 
+signature_details=$(codesign --display --verbose=4 "$app_path" 2>&1)
+if ! grep -F "Signature=adhoc" <<<"$signature_details" >/dev/null; then
+  echo "app is not ad-hoc signed" >&2
+  exit 65
+fi
+
+if grep -E 'flags=.*runtime' <<<"$signature_details" >/dev/null; then
+  normalized_entitlements=$(
+    codesign --display --entitlements :- "$app_path" 2>&1 |
+      tr -d '[:space:]'
+  )
+  if ! grep -F \
+    '<key>com.apple.security.cs.disable-library-validation</key><true/>' \
+    <<<"$normalized_entitlements" >/dev/null
+  then
+    echo \
+      "ad-hoc hardened runtime must disable library validation so Sparkle can load without a Team ID" \
+      >&2
+    exit 65
+  fi
+fi
+
 echo "Release configuration is valid."

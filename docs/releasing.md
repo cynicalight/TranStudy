@@ -19,7 +19,7 @@ RELEASE_NOTES_FILE='/absolute/path/to/release-notes.md' \
 scripts/release.sh
 ```
 
-The script refuses to overwrite an existing release directory. It archives with the requested marketing version and monotonically increasing build number, verifies the embedded update policy and Sparkle framework, applies an ad-hoc code signature, creates a drag-to-Applications DMG and SHA-256 checksum, and creates an `appcast.xml` whose update enclosure is signed with Sparkle’s EdDSA key. It does not create or upload a GitHub Release.
+The script refuses to overwrite an existing release directory. It archives with the requested marketing version and monotonically increasing build number, verifies the embedded update policy and Sparkle framework, applies an ad-hoc code signature, creates a drag-to-Applications DMG and SHA-256 checksum, and creates an `appcast.xml` whose update enclosure is signed with Sparkle’s EdDSA key. Because ad-hoc signatures do not share an Apple Team ID with Sparkle, this no-Developer-ID release archive keeps Hardened Runtime enabled but disables Library Validation so macOS can load the embedded framework. The Library Validation exception must be removed when the project adopts Developer ID signing and notarization. The script does not create or upload a GitHub Release.
 
 ## Build and publish automatically
 

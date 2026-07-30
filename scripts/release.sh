@@ -75,15 +75,11 @@ xcodebuild archive \
   DEVELOPMENT_TEAM= \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY=- \
-  CODE_SIGNING_REQUIRED=YES
+  CODE_SIGNING_REQUIRED=YES \
+  CODE_SIGN_ENTITLEMENTS="$repo_root/config/AdHocRelease.entitlements"
 
 "$repo_root/scripts/verify-release-artifact.sh" "$app_path"
 codesign --verify --deep --strict --verbose=2 "$app_path"
-signature_details=$(codesign --display --verbose=4 "$app_path" 2>&1)
-if ! grep -F "Signature=adhoc" <<<"$signature_details" >/dev/null; then
-  echo "app is not ad-hoc signed" >&2
-  exit 65
-fi
 
 mkdir -p "$staging_root/dmg"
 ditto "$app_path" "$staging_root/dmg/TranStudy.app"
