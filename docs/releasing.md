@@ -21,6 +21,18 @@ scripts/release.sh
 
 The script refuses to overwrite an existing release directory. It archives with the requested marketing version and monotonically increasing build number, verifies the embedded update policy and Sparkle framework, applies an ad-hoc code signature, creates a drag-to-Applications DMG and SHA-256 checksum, and creates an `appcast.xml` whose update enclosure is signed with Sparkle’s EdDSA key. It does not create or upload a GitHub Release.
 
+## Build and publish automatically
+
+For a complete release, prepare final release notes without the template placeholders, start from a clean default branch, and run:
+
+```sh
+scripts/publish-release.sh 1.0.0 /absolute/path/to/release-notes.md
+```
+
+The publisher checks GitHub authentication, the branch and upstream state, existing tags, releases, and output directories before changing the project. It updates `MARKETING_VERSION` in `project.yml`, increments `CURRENT_PROJECT_VERSION` when the marketing version changes, regenerates the Xcode project, commits the version change when needed, builds and verifies the DMG, pushes the default branch, and publishes the DMG, checksum, and signed appcast as the latest GitHub Release. It displays the complete release plan and requires confirmation before making version or publishing changes. `--yes` skips this confirmation for an explicitly authorized non-interactive run.
+
+The automatic publisher creates a normal release rather than a prerelease because the application feed uses GitHub’s `/releases/latest/download/appcast.xml` URL. If any step after the version commit fails, inspect the local commit and release artifacts before retrying; the script never force-pushes or overwrites an existing tag, release, or output directory.
+
 ## Release acceptance
 
 Before upload, verify the generated checksum with `(cd build/releases/<VERSION> && shasum -a 256 -c TranStudy-<VERSION>.dmg.sha256)`. Mount the DMG on a clean macOS 14-or-newer test account or Mac and drag TranStudy to Applications. Because the app is not notarized, a normal double-click may be blocked. In Finder, Control-click TranStudy, choose Open, then confirm Open. If macOS still blocks it, open System Settings → Privacy & Security and choose Open Anyway. Do not tell users that this release is Apple-verified or notarized.
