@@ -14,6 +14,7 @@ struct ApplicationEnvironment {
   let reviewReminderConfigurationStore: any ReviewReminderConfigurationStoring
   let loginItem: any LoginItemControlling
   let speech: any SpeechPlaying
+  let languageAndSpeechPreferencesStore: any LanguageAndSpeechPreferencesStoring
   let panelPositionStore: any TranslationPanelPositionStoring
   let providerConfigurationStore: any TranslationProviderConfigurationStoring
   let selectionConfigurationStore: any SelectionConfigurationStoring
@@ -47,7 +48,8 @@ extension ApplicationEnvironment {
       accessibilityAuthorization: SystemAccessibilityAuthorizer(),
       reviewReminderConfigurationStore: UserDefaultsReviewReminderConfigurationStore(),
       loginItem: SystemLoginItemController(),
-      speech: DisabledSpeechPlayer(),
+      speech: SystemSpeechPlayer(),
+      languageAndSpeechPreferencesStore: UserDefaultsLanguageAndSpeechPreferencesStore(),
       panelPositionStore: UserDefaultsTranslationPanelPositionStore(),
       providerConfigurationStore: providerConfigurationStore,
       selectionConfigurationStore: selectionConfigurationStore,
@@ -68,8 +70,4 @@ private struct SystemDateProvider: DateProviding {
   var now: Date {
     Date()
   }
-}
-
-private struct DisabledSpeechPlayer: SpeechPlaying {
-  func speak(_ text: String) {}
 }

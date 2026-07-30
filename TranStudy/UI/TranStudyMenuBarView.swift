@@ -20,10 +20,14 @@ struct TranStudyMenuBarView: View {
 
     Divider()
 
-    Button(
-      shell.selectionConfiguration.isEnabled ? "暂停划词" : "恢复划词"
-    ) {
+    Button {
       shell.setSelectionEnabled(!shell.selectionConfiguration.isEnabled)
+    } label: {
+      Text(
+        shell.selectionConfiguration.isEnabled
+          ? LocalizedStringKey("暂停划词")
+          : LocalizedStringKey("恢复划词")
+      )
     }
 
     Divider()

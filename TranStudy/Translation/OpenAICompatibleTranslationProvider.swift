@@ -37,7 +37,10 @@ final class OpenAICompatibleTranslationProvider:
     ).translate(request)
   }
 
-  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+  func translateLongText(
+    _ sourceText: String,
+    chineseWritingSystem: ChineseWritingSystem
+  ) async throws -> LongTextTranslationResult {
     guard
       configuration.provider == .openAICompatible,
       let baseURL = Self.validBaseURL(configuration.customBaseURL),
@@ -52,7 +55,10 @@ final class OpenAICompatibleTranslationProvider:
       addsDisabledThinking: false,
       apiKeyStore: apiKeyStore,
       httpClient: httpClient
-    ).translateLongText(sourceText)
+    ).translateLongText(
+      sourceText,
+      chineseWritingSystem: chineseWritingSystem
+    )
   }
 
   func testConnection(

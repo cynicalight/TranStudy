@@ -5,6 +5,66 @@ import Testing
 
 @MainActor
 struct OpenAICompatibleTranslationProviderTests {
+  @Test("structured prompt follows the selected Chinese writing system")
+  func structuredPromptUsesSelectedChineseWritingSystem() async throws {
+    let responseContent = try JSONSerialization.data(
+      withJSONObject: [
+        "input_kind": "word_or_phrase",
+        "source_text": "resilient",
+        "canonical_form": "resilient",
+        "pronunciation": "/rɪˈzɪliənt/",
+        "part_of_speech": "adjective",
+        "contextual_meaning": "有韌性的",
+        "example_sentence": "The team remained resilient.",
+        "sentence_translation": "團隊依然保持韌性。",
+      ]
+    )
+    let responseBody = try JSONSerialization.data(
+      withJSONObject: [
+        "choices": [
+          [
+            "message": [
+              "content": try #require(String(data: responseContent, encoding: .utf8))
+            ]
+          ]
+        ]
+      ]
+    )
+    let httpClient = CustomProviderTestHTTPClient(
+      data: responseBody,
+      statusCode: 200
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: httpClient
+    )
+
+    _ = try await provider.translate(
+      TranslationRequest(
+        sourceText: "resilient",
+        chineseWritingSystem: .traditional
+      )
+    )
+
+    let request = try #require(httpClient.lastRequest)
+    let bodyData = try #require(request.httpBody)
+    let body = try #require(
+      JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+    )
+    let messages = try #require(body["messages"] as? [[String: String]])
+    #expect(
+      messages.first?["content"]?.contains(
+        "Use Traditional Chinese characters for every Chinese output field."
+      ) == true
+    )
+  }
+
   @Test("custom provider uses its configured endpoint model and API key")
   func customProviderUsesConfiguredRequest() async throws {
     let responseContent = try JSONSerialization.data(

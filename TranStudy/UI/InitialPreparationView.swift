@@ -72,7 +72,7 @@ struct InitialPreparationView: View {
         .font(.system(size: 38))
         .foregroundStyle(TranStudyDesign.accentColor)
 
-      Text(presentation.title)
+      Text(LocalizedStringKey(presentation.title))
         .font(.title.bold())
 
       switch step {
@@ -97,7 +97,10 @@ struct InitialPreparationView: View {
       capabilityStatus(
         shell.accessibilityAuthorizationStatus,
         availableText: "已允许读取明确触发的文字选区",
-        unavailableText: "尚未允许；仍可使用 \(shell.translationShortcut.title) 翻译剪贴板"
+        unavailableText: shell.localizedFormat(
+          "尚未允许；仍可使用 %@ 翻译剪贴板",
+          shell.translationShortcut.title
+        )
       )
 
       HStack {
@@ -213,17 +216,18 @@ struct InitialPreparationView: View {
     unavailableText: String
   ) -> some View {
     let isAuthorized = status == .authorized
-    return Label(
-      isAuthorized ? availableText : unavailableText,
-      systemImage: isAuthorized ? "checkmark.circle.fill" : "info.circle.fill"
-    )
+    return Label {
+      Text(LocalizedStringKey(isAuthorized ? availableText : unavailableText))
+    } icon: {
+      Image(systemName: isAuthorized ? "checkmark.circle.fill" : "info.circle.fill")
+    }
     .foregroundStyle(isAuthorized ? .green : .secondary)
   }
 
   private func preparationSummaryRow(_ capability: PreparationCapability) -> some View {
     let isAvailable = !shell.missingPreparationCapabilities.contains(capability)
     return Label(
-      capability.title,
+      shell.localized(capability.title),
       systemImage: isAvailable ? "checkmark.circle.fill" : "circle.dashed"
     )
     .foregroundStyle(isAvailable ? .green : .secondary)
@@ -241,7 +245,11 @@ struct PreparationStatusBanner: View {
       VStack(alignment: .leading, spacing: 2) {
         Text("还有功能尚未准备")
           .font(.callout.weight(.semibold))
-        Text(shell.missingPreparationCapabilities.map(\.title).joined(separator: "、"))
+        Text(
+          shell.missingPreparationCapabilities
+            .map { shell.localized($0.title) }
+            .joined(separator: shell.localized("、"))
+        )
           .font(.caption)
           .foregroundStyle(.secondary)
       }

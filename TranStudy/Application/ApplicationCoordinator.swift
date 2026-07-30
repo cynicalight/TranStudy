@@ -12,7 +12,7 @@ final class ApplicationCoordinator {
   init(shell: ApplicationShell) {
     let translationPanel = TranslationPanelController(shell: shell)
     let selectionEvents = SystemSelectionEventMonitor()
-    let selectionIndicator = SelectionIndicatorController()
+    let selectionIndicator = SelectionIndicatorController(shell: shell)
 
     self.shell = shell
     self.translationPanel = translationPanel

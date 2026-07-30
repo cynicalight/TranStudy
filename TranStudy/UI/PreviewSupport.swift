@@ -24,6 +24,7 @@
           reviewReminderConfigurationStore: PreviewReviewReminderConfigurationStore(),
           loginItem: PreviewLoginItemController(),
           speech: PreviewSpeechPlayer(),
+          languageAndSpeechPreferencesStore: PreviewLanguageAndSpeechPreferencesStore(),
           panelPositionStore: PreviewPanelPositionStore(),
           providerConfigurationStore: PreviewProviderConfigurationStore(
             configuration: providerConfiguration
@@ -318,6 +319,16 @@
 
   private struct PreviewSpeechPlayer: SpeechPlaying {
     func speak(_ text: String) {}
+  }
+
+  private struct PreviewLanguageAndSpeechPreferencesStore:
+    LanguageAndSpeechPreferencesStoring
+  {
+    func load() -> LanguageAndSpeechPreferences {
+      .default
+    }
+
+    func save(_ preferences: LanguageAndSpeechPreferences) {}
   }
 
   private final class PreviewPanelPositionStore: TranslationPanelPositionStoring {

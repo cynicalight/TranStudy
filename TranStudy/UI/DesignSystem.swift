@@ -70,7 +70,7 @@ struct TranStudySegmentedControl<Option: Hashable>: View {
         performanceTime: .now
       )
     } label: {
-      Text(label(option))
+      Text(LocalizedStringKey(label(option)))
         .font(.subheadline)
         .fontWeight(isSelected ? .semibold : .regular)
         .foregroundStyle(isSelected ? selectedForeground(option) : Color.secondary)
@@ -113,14 +113,31 @@ struct PageHeader: View {
         )
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(title)
+        Text(LocalizedStringKey(title))
           .font(.title2.weight(.semibold))
-        Text(subtitle)
+        Text(LocalizedStringKey(subtitle))
           .font(.callout)
           .foregroundStyle(.secondary)
       }
     }
     .accessibilityElement(children: .combine)
+  }
+}
+
+struct SpeechButton: View {
+  let text: String
+  let speak: (String) -> Void
+
+  var body: some View {
+    Button {
+      speak(text)
+    } label: {
+      Image(systemName: "speaker.wave.2.fill")
+    }
+    .buttonStyle(.borderless)
+    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    .help("朗读")
+    .accessibilityLabel("朗读")
   }
 }
 

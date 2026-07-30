@@ -58,9 +58,15 @@ final class SystemReviewNotifier: NSObject, ReviewNotifying {
   var onReviewRequested: (() -> Void)?
 
   private let center: any ReviewNotificationCenterClient
+  private let preferencesStore: any LanguageAndSpeechPreferencesStoring
 
-  init(center: any ReviewNotificationCenterClient = UserNotificationCenterClient()) {
+  init(
+    center: any ReviewNotificationCenterClient = UserNotificationCenterClient(),
+    preferencesStore: any LanguageAndSpeechPreferencesStoring =
+      UserDefaultsLanguageAndSpeechPreferencesStore()
+  ) {
     self.center = center
+    self.preferencesStore = preferencesStore
     super.init()
   }
 
@@ -100,8 +106,13 @@ final class SystemReviewNotifier: NSObject, ReviewNotifying {
     }
 
     let content = UNMutableNotificationContent()
-    content.title = "该复习了"
-    content.body = reminder.notificationBody
+    let language = preferencesStore.load().interfaceLanguage
+    content.title = AppLocalization.string("该复习了", language: language)
+    content.body = AppLocalization.format(
+      "今天有 %@ 张卡片待复习。",
+      language: language,
+      "\(reminder.dueCount)"
+    )
     content.sound = .default
 
     let trigger = UNTimeIntervalNotificationTrigger(

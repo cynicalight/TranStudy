@@ -27,7 +27,7 @@ final class OpenAIChatTranslationClient {
 
   func translate(_ request: TranslationRequest) async throws -> TranslationResult {
     let content = try await completionContent(
-      systemPrompt: Self.systemPrompt,
+      systemPrompt: Self.systemPrompt(for: request.chineseWritingSystem),
       userContent: request.promptContent,
       maxTokens: 800,
       timeoutInterval: 30
@@ -90,9 +90,12 @@ final class OpenAIChatTranslationClient {
     )
   }
 
-  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+  func translateLongText(
+    _ sourceText: String,
+    chineseWritingSystem: ChineseWritingSystem
+  ) async throws -> LongTextTranslationResult {
     let content = try await completionContent(
-      systemPrompt: Self.longTextSystemPrompt,
+      systemPrompt: Self.longTextSystemPrompt(for: chineseWritingSystem),
       userContent: sourceText,
       maxTokens: 6_000,
       timeoutInterval: 60
@@ -187,8 +190,10 @@ final class OpenAIChatTranslationClient {
       && pronunciation.rangeOfCharacter(from: pinyinToneMarks) == nil
   }
 
-  private static let systemPrompt = """
+  private static func systemPrompt(for writingSystem: ChineseWritingSystem) -> String {
+    """
     Translate the supplied English word or short phrase into Chinese for a vocabulary learner.
+    \(writingSystem.promptInstruction)
     Return one JSON object only, with exactly these string fields:
     input_kind, source_text, canonical_form, pronunciation, part_of_speech,
     contextual_meaning, example_sentence, sentence_translation.
@@ -207,15 +212,21 @@ final class OpenAIChatTranslationClient {
     source fields and Chinese translation fields. Do not include markdown or explanations
     outside the JSON object.
     """
+  }
 
-  private static let longTextSystemPrompt = """
+  private static func longTextSystemPrompt(
+    for writingSystem: ChineseWritingSystem
+  ) -> String {
+    """
     Translate the supplied English sentence or paragraph into natural Chinese.
+    \(writingSystem.promptInstruction)
     Preserve paragraph breaks and meaning. Return one JSON object only with exactly these
     string fields: input_kind, source_text, translation.
     Set input_kind to "long_text". Set source_text to the exact supplied English text,
     unchanged. Set translation to the complete Chinese translation. Do not summarize,
     omit content, add commentary, or include markdown outside the JSON object.
     """
+  }
 }
 
 struct OpenAIChatRequest: Encodable {

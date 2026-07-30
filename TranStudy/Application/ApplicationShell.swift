@@ -88,6 +88,7 @@ final class ApplicationShell {
   private(set) var selectionConfiguration: SelectionConfiguration
   private(set) var translationShortcut: TranslationShortcutKey
   private(set) var isSentenceCardsEnabled: Bool
+  private(set) var languageAndSpeechPreferences: LanguageAndSpeechPreferences
   private(set) var isAddingSentenceCard = false
   private(set) var sentenceCardAdditionStatus: SentenceCardAdditionStatus?
   private(set) var translationShortcutRegistrationStatus: TranslationShortcutRegistrationStatus =
@@ -115,6 +116,18 @@ final class ApplicationShell {
 
   var isLongTextTranslationPresentation: Bool {
     translationPresentationTitle == "翻译长文本"
+  }
+
+  var interfaceLanguage: InterfaceLanguage {
+    languageAndSpeechPreferences.interfaceLanguage
+  }
+
+  var chineseWritingSystem: ChineseWritingSystem {
+    languageAndSpeechPreferences.chineseWritingSystem
+  }
+
+  var availableSpeechVoices: [SpeechVoice] {
+    environment.speech.availableVoices
   }
 
   var missingPreparationCapabilities: [PreparationCapability] {
@@ -146,6 +159,7 @@ final class ApplicationShell {
     selectionConfiguration = environment.selectionConfigurationStore.load()
     translationShortcut = environment.shortcutStore.load()
     isSentenceCardsEnabled = environment.sentenceCardConfigurationStore.load()
+    languageAndSpeechPreferences = environment.languageAndSpeechPreferencesStore.load()
     reviewReminderConfiguration = environment.reviewReminderConfigurationStore.load()
     isLaunchAtLoginEnabled = environment.loginItem.isEnabled
   }
@@ -321,6 +335,43 @@ final class ApplicationShell {
     isLaunchAtLoginEnabled = environment.loginItem.isEnabled
   }
 
+  func setInterfaceLanguage(_ language: InterfaceLanguage) {
+    languageAndSpeechPreferences.interfaceLanguage = language
+    saveLanguageAndSpeechPreferences()
+  }
+
+  func setChineseWritingSystem(_ writingSystem: ChineseWritingSystem) {
+    languageAndSpeechPreferences.chineseWritingSystem = writingSystem
+    saveLanguageAndSpeechPreferences()
+  }
+
+  func setSpeechVoiceIdentifier(_ identifier: String?) {
+    languageAndSpeechPreferences.speechVoiceIdentifier = identifier
+    saveLanguageAndSpeechPreferences()
+  }
+
+  func setSpeechRate(_ rate: Float) {
+    languageAndSpeechPreferences.speechRate = min(max(rate, 0.35), 0.65)
+    saveLanguageAndSpeechPreferences()
+  }
+
+  func setAutomaticallySpeaksTranslations(_ isEnabled: Bool) {
+    languageAndSpeechPreferences.automaticallySpeaksTranslations = isEnabled
+    saveLanguageAndSpeechPreferences()
+  }
+
+  func speak(_ text: String) {
+    environment.speech.speak(
+      text,
+      voiceIdentifier: languageAndSpeechPreferences.speechVoiceIdentifier,
+      rate: languageAndSpeechPreferences.speechRate
+    )
+  }
+
+  private func saveLanguageAndSpeechPreferences() {
+    environment.languageAndSpeechPreferencesStore.save(languageAndSpeechPreferences)
+  }
+
   func translateClipboard() async {
     await translateClipboard(environment.clipboard.readText())
   }
@@ -388,6 +439,13 @@ final class ApplicationShell {
   }
 
   private func translate(_ request: TranslationRequest) async {
+    let request = TranslationRequest(
+      sourceText: request.sourceText,
+      context: request.context,
+      kind: request.kind,
+      targetSentence: request.targetSentence,
+      chineseWritingSystem: chineseWritingSystem
+    )
     let translationID = UUID()
     activeTranslationID = translationID
     translationSourceText = request.sourceText
@@ -408,6 +466,9 @@ final class ApplicationShell {
       pendingLearningMerge = nil
       pendingLearningAddition = nil
       translationStatus = .ready
+      if languageAndSpeechPreferences.automaticallySpeaksTranslations {
+        speak(result.sourceText)
+      }
       selectionDebugLog("translation succeeded: kind=\(request.kind)")
     } catch is CancellationError {
       if activeTranslationID == translationID {
@@ -436,7 +497,10 @@ final class ApplicationShell {
     translationStatus = .loading
 
     do {
-      let result = try await environment.translation.translateLongText(sourceText)
+      let result = try await environment.translation.translateLongText(
+        sourceText,
+        chineseWritingSystem: chineseWritingSystem
+      )
       try Task.checkCancellation()
       guard activeTranslationID == translationID else {
         return
@@ -500,7 +564,10 @@ final class ApplicationShell {
     }
 
     do {
-      let result = try await environment.translation.translateLongText(sentence)
+      let result = try await environment.translation.translateLongText(
+        sentence,
+        chineseWritingSystem: chineseWritingSystem
+      )
       let draft = TranslationDraft(
         sourceText: sentence,
         canonicalForm: sentence,

@@ -171,7 +171,7 @@ private struct ReviewSessionView: View {
                   await shell.rateCurrentReview(rating)
                 }
               } label: {
-                Text(rating.title)
+                Text(LocalizedStringKey(rating.title))
                   .frame(maxWidth: .infinity)
               }
               .buttonStyle(.bordered)
@@ -210,12 +210,18 @@ private struct ReviewSessionView: View {
         Label("句子卡", systemImage: "text.quote")
           .font(.caption.weight(.medium))
           .foregroundStyle(.purple)
+        HStack {
+          Text(item.sourceText)
+            .font(.title3.weight(.medium))
+          SpeechButton(text: item.sourceText, speak: shell.speak)
+        }
         Text(item.sentenceTranslation)
           .font(.title2.weight(.medium))
       } else {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
           Text(item.canonicalForm)
             .font(.largeTitle.weight(.semibold))
+          SpeechButton(text: item.canonicalForm, speak: shell.speak)
           if !item.pronunciation.isEmpty {
             Text(item.pronunciation)
               .font(.title3)
@@ -236,9 +242,12 @@ private struct ReviewSessionView: View {
           .font(.title3.weight(.medium))
 
         VStack(alignment: .leading, spacing: 7) {
-          Text(item.exampleSentence)
-            .font(.body)
-            .italic()
+          HStack {
+            Text(item.exampleSentence)
+              .font(.body)
+              .italic()
+            SpeechButton(text: item.exampleSentence, speak: shell.speak)
+          }
           Text(item.sentenceTranslation)
             .foregroundStyle(.secondary)
         }
@@ -258,8 +267,14 @@ private struct ReviewSessionView: View {
                         .foregroundStyle(.secondary)
                     }
                   }
-                  Text(encounter.exampleSentence)
-                    .italic()
+                  HStack {
+                    Text(encounter.exampleSentence)
+                      .italic()
+                    SpeechButton(
+                      text: encounter.exampleSentence,
+                      speak: shell.speak
+                    )
+                  }
                   Text(encounter.sentenceTranslation)
                     .foregroundStyle(.secondary)
                 }
@@ -318,16 +333,21 @@ private struct ReviewSessionView: View {
 
   private var reviewStatusTitle: String {
     if shell.learningSummary.dueCount == 0 {
-      return "今天的复习已完成"
+      return shell.localized("今天的复习已完成")
     }
-    return "还有 \(shell.learningSummary.dueCount) 项等待复习"
+    return shell.localizedFormat(
+      "还有 %@ 项等待复习",
+      "\(shell.learningSummary.dueCount)"
+    )
   }
 
   private var reviewStatusDescription: String {
     if shell.learningSummary.dueCount == 0 {
-      return "当前没有到期内容。继续从真实语境中积累，复习会在合适的时间出现。"
+      return shell.localized(
+        "当前没有到期内容。继续从真实语境中积累，复习会在合适的时间出现。"
+      )
     }
-    return "完成今天的复习，保持记忆节奏稳定。"
+    return shell.localized("完成今天的复习，保持记忆节奏稳定。")
   }
 
   private var reviewStatusImage: String {
@@ -502,7 +522,7 @@ private struct SummaryCard: View {
       Spacer()
 
       VStack(alignment: .trailing, spacing: 16) {
-        Text(title)
+        Text(LocalizedStringKey(title))
           .font(.callout)
           .foregroundStyle(.secondary)
         Text(value, format: .number)

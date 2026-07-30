@@ -59,7 +59,7 @@ struct RootView: View {
       TabView(selection: $shell.selectedDestination) {
         ForEach(shell.destinations) { destination in
           Tab(
-            destination.title,
+            shell.localized(destination.title),
             systemImage: destination.systemImage,
             value: destination
           ) {
@@ -72,7 +72,10 @@ struct RootView: View {
         ForEach(shell.destinations) { destination in
           destinationView(for: destination)
             .tabItem {
-              Label(destination.title, systemImage: destination.systemImage)
+              Label(
+                shell.localized(destination.title),
+                systemImage: destination.systemImage
+              )
             }
             .tag(destination)
         }

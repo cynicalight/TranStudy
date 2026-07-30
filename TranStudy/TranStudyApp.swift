@@ -62,6 +62,7 @@ struct TranStudyApp: App {
         }
       )
       .tint(TranStudyDesign.accentColor)
+      .environment(\.locale, shell.interfaceLanguage.locale)
       .frame(minWidth: 760, minHeight: 520)
       .background(
         NotificationRoutingBridge(
@@ -79,8 +80,8 @@ struct TranStudyApp: App {
     }
     .defaultSize(width: 940, height: 640)
     .commands {
-      CommandMenu("翻译") {
-        Button("翻译剪贴板") {
+      CommandMenu(shell.localized("翻译")) {
+        Button(shell.localized("翻译剪贴板")) {
           coordinator.presentClipboardTranslation()
         }
         .keyboardShortcut(
@@ -92,6 +93,7 @@ struct TranStudyApp: App {
 
     MenuBarExtra {
       TranStudyMenuBarView(shell: shell)
+        .environment(\.locale, shell.interfaceLanguage.locale)
     } label: {
       Label("TranStudy", systemImage: "character.book.closed")
     }

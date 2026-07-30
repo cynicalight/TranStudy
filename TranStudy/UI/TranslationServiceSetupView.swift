@@ -16,7 +16,7 @@ struct TranslationServiceSetupView: View {
               apiKey = ""
             }
           ),
-          label: \.title
+          label: { shell.localized($0.title) }
         )
         .frame(maxWidth: 420)
       }
@@ -164,7 +164,7 @@ struct CenteredLabeledContent<Content: View>: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: 12) {
-      Text(title)
+      Text(LocalizedStringKey(title))
         .lineLimit(1)
         .frame(width: 96, alignment: .leading)
 

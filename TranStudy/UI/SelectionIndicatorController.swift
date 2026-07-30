@@ -2,8 +2,13 @@ import AppKit
 
 @MainActor
 final class SelectionIndicatorController: NSObject, SelectionIndicatorPresenting {
+  private let shell: ApplicationShell
   private var panel: SelectionIndicatorPanel?
   private var onSelect: (() -> Void)?
+
+  init(shell: ApplicationShell) {
+    self.shell = shell
+  }
 
   func present(_ candidate: SelectionCandidate, onSelect: @escaping () -> Void) {
     selectionDebugLog(
@@ -26,10 +31,11 @@ final class SelectionIndicatorController: NSObject, SelectionIndicatorPresenting
     panel.isReleasedWhenClosed = false
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
+    let accessibilityLabel = shell.localized("翻译选中文本")
     let button = NSButton(
       image: NSImage(
         systemSymbolName: "character.book.closed.fill",
-        accessibilityDescription: "翻译选中文本"
+        accessibilityDescription: accessibilityLabel
       ) ?? NSImage(),
       target: self,
       action: #selector(selectCurrentSelection)
@@ -37,8 +43,8 @@ final class SelectionIndicatorController: NSObject, SelectionIndicatorPresenting
     button.isBordered = false
     button.bezelStyle = .circular
     button.contentTintColor = TranStudyDesign.accentNSColor
-    button.toolTip = "翻译选中文本"
-    button.setAccessibilityLabel("翻译选中文本")
+    button.toolTip = accessibilityLabel
+    button.setAccessibilityLabel(accessibilityLabel)
 
     let effectView = NSVisualEffectView(frame: panel.contentView?.bounds ?? .zero)
     effectView.material = .popover

@@ -49,6 +49,7 @@ struct LearningLibraryView: View {
     .sheet(item: $editingItem) { item in
       LearningItemEditorView(
         item: item,
+        speak: shell.speak,
         onSave: { canonicalForm, details in
           await shell.saveLearningItem(
             itemID: item.id,
@@ -98,8 +99,11 @@ struct LearningLibraryView: View {
       }
     } message: { summary in
       Text(
-        "“\(summary.incomingSourceText)”将合并到“\(summary.canonicalForm)”。"
-          + "合并后会保留双方的释义、例句和全部语境。"
+        shell.localizedFormat(
+          "“%@”将合并到“%@”。合并后会保留双方的释义、例句和全部语境。",
+          summary.incomingSourceText,
+          summary.canonicalForm
+        )
       )
     }
   }
@@ -169,7 +173,7 @@ struct LearningLibraryView: View {
           }
           .disabled(shell.displayedLearningItems.isEmpty)
 
-          Button(shell.libraryScope == .active ? "归档" : "恢复") {
+          Button {
             Task {
               if shell.libraryScope == .active {
                 await shell.archiveSelectedLibraryItems()
@@ -177,6 +181,12 @@ struct LearningLibraryView: View {
                 await shell.restoreSelectedLibraryItems()
               }
             }
+          } label: {
+            Text(
+              shell.libraryScope == .active
+                ? LocalizedStringKey("归档")
+                : LocalizedStringKey("恢复")
+            )
           }
           .buttonStyle(.borderedProminent)
           .tint(shell.libraryScope == .active ? .red : .accentColor)
@@ -241,9 +251,14 @@ struct LearningLibraryView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-          "\(isSelected ? "取消选择" : "选择") \(item.kind == .sentence ? item.sourceText : item.canonicalForm)"
+          shell.localizedFormat(
+            isSelected ? "取消选择 %@" : "选择 %@",
+            item.kind == .sentence ? item.sourceText : item.canonicalForm
+          )
         )
-        .accessibilityValue(isSelected ? "已选择" : "未选择")
+        .accessibilityValue(
+          shell.localized(isSelected ? "已选择" : "未选择")
+        )
         .accessibilityAddTraits(isSelected ? .isSelected : [])
       }
 
@@ -255,6 +270,10 @@ struct LearningLibraryView: View {
             Text(item.pronunciation)
               .foregroundStyle(.secondary)
           }
+          SpeechButton(
+            text: item.kind == .sentence ? item.sourceText : item.canonicalForm,
+            speak: shell.speak
+          )
           Spacer()
 
           if !shell.isLibrarySelecting {
@@ -295,9 +314,12 @@ struct LearningLibraryView: View {
             .font(.body.weight(.medium))
 
           if !item.exampleSentence.isEmpty {
-            Text(item.exampleSentence)
-              .italic()
-              .foregroundStyle(.secondary)
+            HStack {
+              Text(item.exampleSentence)
+                .italic()
+                .foregroundStyle(.secondary)
+              SpeechButton(text: item.exampleSentence, speak: shell.speak)
+            }
           }
 
           if !item.sentenceTranslation.isEmpty {
@@ -320,6 +342,7 @@ struct LearningLibraryView: View {
                 VStack(alignment: .leading, spacing: 3) {
                   Text(example.englishText)
                     .italic()
+                  SpeechButton(text: example.englishText, speak: shell.speak)
                   if !example.chineseTranslation.isEmpty {
                     Text(example.chineseTranslation)
                       .foregroundStyle(.secondary)
@@ -342,7 +365,7 @@ struct LearningLibraryView: View {
     VStack(alignment: .leading, spacing: 7) {
       HStack(spacing: 5) {
         Image(systemName: "doc.on.clipboard")
-        Text(item.sourceApplicationName)
+        Text(LocalizedStringKey(item.sourceApplicationName))
         Text("·")
         Text(
           item.encounters.first?.encounteredAt ?? item.createdAt,
@@ -372,10 +395,13 @@ struct LearningLibraryView: View {
 
   private var librarySubtitle: String {
     if shell.learningItems.isEmpty, shell.archivedLearningItems.isEmpty {
-      return "从真实语境中积累值得记住的单词、短语和句子。"
+      return shell.localized("从真实语境中积累值得记住的单词、短语和句子。")
     }
-    return
-      "学习中 \(shell.learningItems.count) 条，已归档 \(shell.archivedLearningItems.count) 条。"
+    return shell.localizedFormat(
+      "学习中 %@ 条，已归档 %@ 条。",
+      "\(shell.learningItems.count)",
+      "\(shell.archivedLearningItems.count)"
+    )
   }
 
   private var emptyLibrary: some View {
@@ -386,7 +412,7 @@ struct LearningLibraryView: View {
         .frame(width: 62, height: 62)
         .background(.tint.opacity(0.1), in: .circle)
 
-      Text(emptyLibraryTitle)
+      Text(LocalizedStringKey(emptyLibraryTitle))
         .font(.title3.weight(.semibold))
 
       if !shell.librarySearchQuery.isEmpty {
@@ -460,15 +486,21 @@ struct LearningLibraryView: View {
         Text(encounter.contextualMeaning)
       }
       if kind == .word, !encounter.exampleSentence.isEmpty {
-        Text(encounter.exampleSentence)
-          .italic()
-          .foregroundStyle(.secondary)
+        HStack {
+          Text(encounter.exampleSentence)
+            .italic()
+            .foregroundStyle(.secondary)
+          SpeechButton(text: encounter.exampleSentence, speak: shell.speak)
+        }
       }
       if !encounter.sentenceTranslation.isEmpty {
         Text(encounter.sentenceTranslation)
           .foregroundStyle(.secondary)
       }
-      Label(encounter.sourceApplicationName, systemImage: "app")
+      Label(
+        LocalizedStringKey(encounter.sourceApplicationName),
+        systemImage: "app"
+      )
         .font(.caption)
         .foregroundStyle(.tertiary)
     }
@@ -477,6 +509,7 @@ struct LearningLibraryView: View {
 
 private struct LearningItemEditorView: View {
   let item: LearningItem
+  let speak: (String) -> Void
   let onSave: (String, LearningItemDetailsUpdate) async -> Bool
   let onDelete: () async -> Bool
   let scheduleActions: LearningReviewScheduleActions
@@ -496,11 +529,13 @@ private struct LearningItemEditorView: View {
 
   init(
     item: LearningItem,
+    speak: @escaping (String) -> Void,
     onSave: @escaping (String, LearningItemDetailsUpdate) async -> Bool,
     onDelete: @escaping () async -> Bool,
     scheduleActions: LearningReviewScheduleActions
   ) {
     self.item = item
+    self.speak = speak
     self.onSave = onSave
     self.onDelete = onDelete
     self.scheduleActions = scheduleActions
@@ -520,7 +555,11 @@ private struct LearningItemEditorView: View {
     VStack(spacing: 0) {
       HStack {
         VStack(alignment: .leading, spacing: 4) {
-          Text(item.kind == .word ? "编辑词条" : "编辑句子卡")
+          Text(
+            item.kind == .word
+              ? LocalizedStringKey("编辑词条")
+              : LocalizedStringKey("编辑句子卡")
+          )
             .font(.title2.weight(.semibold))
           Text("真实遇词历史会保持原样。")
             .foregroundStyle(.secondary)
@@ -541,11 +580,17 @@ private struct LearningItemEditorView: View {
           }
         }
 
-        Section(item.kind == .word ? "主要例句" : "句子翻译") {
+        Section {
           if item.kind == .word {
             TextField("英文例句", text: $exampleSentence, axis: .vertical)
           }
           TextField("中文翻译", text: $sentenceTranslation, axis: .vertical)
+        } header: {
+          Text(
+            item.kind == .word
+              ? LocalizedStringKey("主要例句")
+              : LocalizedStringKey("句子翻译")
+          )
         }
 
         Section("个人笔记") {
@@ -608,17 +653,28 @@ private struct LearningItemEditorView: View {
       Divider()
 
       HStack {
-        Button(item.kind == .word ? "删除词条" : "删除句子卡", role: .destructive) {
+        Button(role: .destructive) {
           isDeleteConfirmationPresented = true
+        } label: {
+          Text(
+            item.kind == .word
+              ? LocalizedStringKey("删除词条")
+              : LocalizedStringKey("删除句子卡")
+          )
         }
         .foregroundStyle(.red)
         .disabled(isSaving)
 
         if saveFailed || deleteFailed {
-          Label(
-            saveFailed ? "保存失败，请检查后重试" : "删除失败，请重试",
-            systemImage: "exclamationmark.circle"
-          )
+          Label {
+            Text(
+              saveFailed
+                ? LocalizedStringKey("保存失败，请检查后重试")
+                : LocalizedStringKey("删除失败，请重试")
+            )
+          } icon: {
+            Image(systemName: "exclamationmark.circle")
+          }
           .font(.callout)
           .foregroundStyle(.red)
         }
@@ -661,7 +717,9 @@ private struct LearningItemEditorView: View {
     }
     .frame(width: 620, height: 680)
     .alert(
-      item.kind == .word ? "删除这个词条？" : "删除这张句子卡？",
+      item.kind == .word
+        ? LocalizedStringKey("删除这个词条？")
+        : LocalizedStringKey("删除这张句子卡？"),
       isPresented: $isDeleteConfirmationPresented
     ) {
       Button("取消", role: .cancel) {}
@@ -685,6 +743,7 @@ private struct LearningItemEditorView: View {
       HStack {
         Text(encounter.sourceText)
           .fontWeight(.semibold)
+        SpeechButton(text: encounter.sourceText, speak: speak)
         if item.kind == .word, !encounter.partOfSpeech.isEmpty {
           Text(encounter.partOfSpeech)
             .font(.caption)
@@ -698,8 +757,11 @@ private struct LearningItemEditorView: View {
       if !encounter.exampleSentence.isEmpty,
         encounter.exampleSentence != encounter.sourceText
       {
-        Text(encounter.exampleSentence)
-          .italic()
+        HStack {
+          Text(encounter.exampleSentence)
+            .italic()
+          SpeechButton(text: encounter.exampleSentence, speak: speak)
+        }
       }
       if !encounter.sentenceTranslation.isEmpty {
         Text(encounter.sentenceTranslation)
@@ -707,7 +769,10 @@ private struct LearningItemEditorView: View {
       }
 
       HStack(spacing: 5) {
-        Label(encounter.sourceApplicationName, systemImage: "app")
+        Label(
+          LocalizedStringKey(encounter.sourceApplicationName),
+          systemImage: "app"
+        )
         Text("·")
         Text(
           encounter.encounteredAt,
@@ -751,7 +816,10 @@ private struct LearningReviewScheduleEditor: View {
       HStack {
         Text("当前状态")
         Spacer()
-        Label(reviewStatus.label, systemImage: reviewStatus.systemImage)
+        Label(
+          LocalizedStringKey(reviewStatus.label),
+          systemImage: reviewStatus.systemImage
+        )
           .foregroundStyle(reviewStatus.color)
       }
 
@@ -772,7 +840,7 @@ private struct LearningReviewScheduleEditor: View {
           }
         }
 
-        Button(isPaused ? "恢复复习" : "暂停复习") {
+        Button {
           Task {
             isUpdating = true
             updateFailed = false
@@ -785,6 +853,12 @@ private struct LearningReviewScheduleEditor: View {
               updateFailed = true
             }
           }
+        } label: {
+          Text(
+            isPaused
+              ? LocalizedStringKey("恢复复习")
+              : LocalizedStringKey("暂停复习")
+          )
         }
 
         Spacer()
@@ -835,7 +909,7 @@ private struct LearningReviewScheduleEditor: View {
     return ("学习中", "checkmark.circle.fill", .green)
   }
 
-  private var scheduleExplanation: String {
+  private var scheduleExplanation: LocalizedStringKey {
     if item.archivedAt != nil {
       return "归档期间不会进入复习队列；排程调整会在恢复后生效。重置仍会清除复习历史。"
     }

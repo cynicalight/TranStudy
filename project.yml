@@ -2,6 +2,7 @@ name: TranStudy
 
 options:
   bundleIdPrefix: com.cynicalight
+  developmentLanguage: zh-Hans
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true

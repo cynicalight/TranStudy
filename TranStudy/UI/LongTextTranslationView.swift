@@ -106,7 +106,11 @@ struct LongTextTranslationView: View {
 
       if shell.isSentenceCardsEnabled, let status = shell.sentenceCardAdditionStatus {
         Label {
-          Text(status == .added ? "已加入句子卡" : "加入失败，请重试")
+          Text(
+            status == .added
+              ? LocalizedStringKey("已加入句子卡")
+              : LocalizedStringKey("加入失败，请重试")
+          )
         } icon: {
           Image(
             systemName: status == .added

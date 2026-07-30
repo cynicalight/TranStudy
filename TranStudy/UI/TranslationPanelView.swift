@@ -46,8 +46,12 @@ struct TranslationPanelView: View {
       }
     } message: { summary in
       Text(
-        "“\(summary.incomingSourceText)”将合并到“\(summary.canonicalForm)”。"
-          + "已有 \(summary.existingEncounterCount) 条语境会全部保留，并新增当前语境。"
+        shell.localizedFormat(
+          "“%@”将合并到“%@”。已有 %@ 条语境会全部保留，并新增当前语境。",
+          summary.incomingSourceText,
+          summary.canonicalForm,
+          "\(summary.existingEncounterCount)"
+        )
       )
     }
   }
@@ -64,7 +68,7 @@ struct TranslationPanelView: View {
         )
 
       VStack(alignment: .leading, spacing: 1) {
-        Text(shell.translationPresentationTitle)
+        Text(LocalizedStringKey(shell.translationPresentationTitle))
           .font(.headline)
         Text("按 Esc 关闭")
           .font(.caption)
@@ -107,8 +111,10 @@ struct TranslationPanelView: View {
           .font(.title3.weight(.semibold))
         Text(
           shell.translationError == .inputTooLong
-            ? "内容超过约 12000 字符或 token 预算，请缩短后重试。"
-            : "请检查翻译服务设置和网络，然后重试。"
+            ? LocalizedStringKey(
+              "内容超过约 12000 字符或 token 预算，请缩短后重试。"
+            )
+            : LocalizedStringKey("请检查翻译服务设置和网络，然后重试。")
         )
         .foregroundStyle(.secondary)
       }
@@ -176,6 +182,7 @@ struct TranslationPanelView: View {
               .lineLimit(2)
               .textSelection(.enabled)
               .frame(maxWidth: .infinity, alignment: .leading)
+            SpeechButton(text: shell.translationSourceText, speak: shell.speak)
           }
 
           DraftField(
@@ -205,11 +212,17 @@ struct TranslationPanelView: View {
         text: binding(\.contextualMeaning)
       )
 
-      DraftField(
-        title: "英文例句",
-        text: binding(\.exampleSentence),
-        axis: .vertical
-      )
+      HStack(alignment: .bottom, spacing: 8) {
+        DraftField(
+          title: "英文例句",
+          text: binding(\.exampleSentence),
+          axis: .vertical
+        )
+        SpeechButton(
+          text: shell.translationDraft?.exampleSentence ?? "",
+          speak: shell.speak
+        )
+      }
 
       DraftField(
         title: "例句中文翻译",
@@ -290,10 +303,10 @@ private struct DraftField: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
-      Text(title)
+      Text(LocalizedStringKey(title))
         .font(.caption)
         .foregroundStyle(.secondary)
-      TextField(title, text: $text, axis: axis)
+      TextField(LocalizedStringKey(title), text: $text, axis: axis)
         .lineLimit(axis == .vertical ? 2...4 : 1...1)
     }
   }

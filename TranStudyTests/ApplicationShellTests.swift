@@ -6,6 +6,73 @@ import Testing
 
 @MainActor
 struct ApplicationShellTests {
+  @Test("writing system is persisted and attached to new translation requests")
+  func writingSystemPersistsAndAppliesToNewTranslations() async throws {
+    let preferencesStore = TestLanguageAndSpeechPreferencesStore()
+    let translator = TestTranslationProvider(
+      result: TranslationResult(
+        sourceText: "resilient",
+        canonicalForm: "resilient",
+        pronunciation: "/rɪˈzɪliənt/",
+        partOfSpeech: "adjective",
+        contextualMeaning: "有韌性的",
+        exampleSentence: "The team remained resilient.",
+        sentenceTranslation: "團隊依然保持韌性。"
+      ))
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "resilient"),
+        translation: translator,
+        languageAndSpeechPreferencesStore: preferencesStore
+      ))
+
+    shell.setChineseWritingSystem(.traditional)
+    await shell.translateClipboard()
+
+    #expect(preferencesStore.preferences.chineseWritingSystem == .traditional)
+    #expect(translator.lastRequest?.chineseWritingSystem == .traditional)
+  }
+
+  @Test("automatic speech remains off until enabled and uses saved voice settings")
+  func automaticSpeechUsesSavedVoiceSettings() async throws {
+    let speech = TestSpeechPlayer()
+    let translator = TestTranslationProvider(
+      result: TranslationResult(
+        sourceText: "resilient",
+        canonicalForm: "resilient",
+        pronunciation: "/rɪˈzɪliənt/",
+        partOfSpeech: "adjective",
+        contextualMeaning: "有韧性的",
+        exampleSentence: "The team remained resilient.",
+        sentenceTranslation: "团队依然保持韧性。"
+      ))
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "resilient"),
+        translation: translator,
+        speech: speech
+      ))
+
+    await shell.translateClipboard()
+    #expect(speech.spokenItems.isEmpty)
+
+    shell.setSpeechVoiceIdentifier("voice.en-US")
+    shell.setSpeechRate(0.6)
+    shell.setAutomaticallySpeaksTranslations(true)
+    await shell.translateClipboard()
+
+    #expect(
+      speech.spokenItems
+        == [
+          .init(
+            text: "resilient",
+            voiceIdentifier: "voice.en-US",
+            rate: 0.6
+          )
+        ]
+    )
+  }
+
   @Test("clipboard translation creates an editable session draft")
   func clipboardTranslationCreatesEditableSessionDraft() async throws {
     let clipboard = TestClipboardReader(text: "  ran  ")
@@ -1348,6 +1415,9 @@ extension ApplicationEnvironment {
     reminderConfigurationStore: TestReviewReminderConfigurationStore =
       TestReviewReminderConfigurationStore(),
     loginItem: TestLoginItemController = TestLoginItemController(),
+    speech: any SpeechPlaying = TestSpeechPlayer(),
+    languageAndSpeechPreferencesStore: TestLanguageAndSpeechPreferencesStore =
+      TestLanguageAndSpeechPreferencesStore(),
     panelPositionStore: TestTranslationPanelPositionStore = TestTranslationPanelPositionStore(),
     providerConfigurationStore: TestTranslationProviderConfigurationStore =
       TestTranslationProviderConfigurationStore(),
@@ -1370,7 +1440,8 @@ extension ApplicationEnvironment {
       accessibilityAuthorization: accessibility,
       reviewReminderConfigurationStore: reminderConfigurationStore,
       loginItem: loginItem,
-      speech: TestSpeechPlayer(),
+      speech: speech,
+      languageAndSpeechPreferencesStore: languageAndSpeechPreferencesStore,
       panelPositionStore: panelPositionStore,
       providerConfigurationStore: providerConfigurationStore,
       selectionConfigurationStore: selectionConfigurationStore,
@@ -1412,7 +1483,10 @@ private final class SentenceCardTranslationProvider: TranslationProviding {
     throw TranslationError.invalidResponse
   }
 
-  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+  func translateLongText(
+    _ sourceText: String,
+    chineseWritingSystem: ChineseWritingSystem
+  ) async throws -> LongTextTranslationResult {
     translatedSources.append(sourceText)
     guard let translation = translations[sourceText] else {
       throw TranslationError.invalidResponse
@@ -1480,7 +1554,10 @@ private final class TestLongTextTranslationProvider: TranslationProviding {
     )
   }
 
-  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+  func translateLongText(
+    _ sourceText: String,
+    chineseWritingSystem: ChineseWritingSystem
+  ) async throws -> LongTextTranslationResult {
     lastLongTextSource = sourceText
     return LongTextTranslationResult(
       sourceText: sourceText,
@@ -1888,8 +1965,56 @@ private final class TestReviewReminderConfigurationStore:
   }
 }
 
-private struct TestSpeechPlayer: SpeechPlaying {
-  func speak(_ text: String) {}
+private final class TestSpeechPlayer: SpeechPlaying {
+  struct SpokenItem: Equatable {
+    let text: String
+    let voiceIdentifier: String?
+    let rate: Float
+  }
+
+  private(set) var spokenItems: [SpokenItem] = []
+
+  func speak(_ text: String) {
+    spokenItems.append(
+      SpokenItem(
+        text: text,
+        voiceIdentifier: nil,
+        rate: LanguageAndSpeechPreferences.default.speechRate
+      )
+    )
+  }
+
+  func speak(
+    _ text: String,
+    voiceIdentifier: String?,
+    rate: Float
+  ) {
+    spokenItems.append(
+      SpokenItem(
+        text: text,
+        voiceIdentifier: voiceIdentifier,
+        rate: rate
+      )
+    )
+  }
+}
+
+private final class TestLanguageAndSpeechPreferencesStore:
+  LanguageAndSpeechPreferencesStoring
+{
+  private(set) var preferences: LanguageAndSpeechPreferences
+
+  init(preferences: LanguageAndSpeechPreferences = .default) {
+    self.preferences = preferences
+  }
+
+  func load() -> LanguageAndSpeechPreferences {
+    preferences
+  }
+
+  func save(_ preferences: LanguageAndSpeechPreferences) {
+    self.preferences = preferences
+  }
 }
 
 private final class TestTranslationPanelPositionStore: TranslationPanelPositionStoring {

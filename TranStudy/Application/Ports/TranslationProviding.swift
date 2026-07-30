@@ -9,17 +9,20 @@ struct TranslationRequest: Codable, Equatable, Hashable, Sendable {
   let context: String?
   let kind: TranslationRequestKind
   let targetSentence: String?
+  let chineseWritingSystem: ChineseWritingSystem
 
   init(
     sourceText: String,
     context: String? = nil,
     kind: TranslationRequestKind = .wordOrPhrase,
-    targetSentence: String? = nil
+    targetSentence: String? = nil,
+    chineseWritingSystem: ChineseWritingSystem = .simplified
   ) {
     self.sourceText = sourceText
     self.context = context
     self.kind = kind
     self.targetSentence = targetSentence
+    self.chineseWritingSystem = chineseWritingSystem
   }
 
   var promptContent: String {
@@ -76,10 +79,21 @@ enum TranslationError: Error, Equatable, Sendable {
 protocol TranslationProviding {
   func translate(_ request: TranslationRequest) async throws -> TranslationResult
   func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult
+  func translateLongText(
+    _ sourceText: String,
+    chineseWritingSystem: ChineseWritingSystem
+  ) async throws -> LongTextTranslationResult
 }
 
 extension TranslationProviding {
   func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
+    try await translateLongText(sourceText, chineseWritingSystem: .simplified)
+  }
+
+  func translateLongText(
+    _ sourceText: String,
+    chineseWritingSystem: ChineseWritingSystem
+  ) async throws -> LongTextTranslationResult {
     throw TranslationError.invalidResponse
   }
 }

@@ -51,8 +51,15 @@ final class ConfiguredTranslationService:
     return result
   }
 
-  func translateLongText(_ sourceText: String) async throws -> LongTextTranslationResult {
-    let request = TranslationRequest(sourceText: sourceText, kind: .longText)
+  func translateLongText(
+    _ sourceText: String,
+    chineseWritingSystem: ChineseWritingSystem
+  ) async throws -> LongTextTranslationResult {
+    let request = TranslationRequest(
+      sourceText: sourceText,
+      kind: .longText,
+      chineseWritingSystem: chineseWritingSystem
+    )
     try validate(request)
     let configuration = configurationStore.load()
 
@@ -63,13 +70,19 @@ final class ConfiguredTranslationService:
           apiKeyStore: apiKeyStore,
           httpClient: httpClient,
           model: configuration.deepSeekModel
-        ).translateLongText(sourceText)
+        ).translateLongText(
+          sourceText,
+          chineseWritingSystem: chineseWritingSystem
+        )
       case .openAICompatible:
         return try await OpenAICompatibleTranslationProvider(
           configuration: configuration,
           apiKeyStore: apiKeyStore,
           httpClient: httpClient
-        ).translateLongText(sourceText)
+        ).translateLongText(
+          sourceText,
+          chineseWritingSystem: chineseWritingSystem
+        )
       }
     }
   }

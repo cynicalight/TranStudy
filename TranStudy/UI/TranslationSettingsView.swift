@@ -19,6 +19,92 @@ struct TranslationSettingsView: View {
 
       Form {
         Section {
+          Picker(
+            "界面语言",
+            selection: Binding(
+              get: { shell.interfaceLanguage },
+              set: { shell.setInterfaceLanguage($0) }
+            )
+          ) {
+            ForEach(InterfaceLanguage.allCases) { language in
+              Text(language.localizedTitle)
+                .tag(language)
+            }
+          }
+
+          Picker(
+            "中文输出",
+            selection: Binding(
+              get: { shell.chineseWritingSystem },
+              set: { shell.setChineseWritingSystem($0) }
+            )
+          ) {
+            ForEach(ChineseWritingSystem.allCases) { writingSystem in
+              Text(writingSystem.localizedTitle)
+                .tag(writingSystem)
+            }
+          }
+        } header: {
+          Label("语言与翻译", systemImage: "globe")
+        } footer: {
+          Text("中文书写形式只影响之后的新翻译，不会改写已有学习记录。")
+        }
+
+        Section {
+          Picker(
+            "英语语音",
+            selection: Binding(
+              get: { shell.languageAndSpeechPreferences.speechVoiceIdentifier },
+              set: { shell.setSpeechVoiceIdentifier($0) }
+            )
+          ) {
+            Text("系统默认英语语音")
+              .tag(String?.none)
+            ForEach(shell.availableSpeechVoices) { voice in
+              Text("\(voice.name)（\(voice.language)）")
+                .tag(Optional(voice.identifier))
+            }
+          }
+
+          HStack {
+            Text("语速")
+            Slider(
+              value: Binding(
+                get: { Double(shell.languageAndSpeechPreferences.speechRate) },
+                set: { shell.setSpeechRate(Float($0)) }
+              ),
+              in: 0.35...0.65,
+              step: 0.05
+            )
+            Text(
+              shell.languageAndSpeechPreferences.speechRate,
+              format: .number.precision(.fractionLength(2))
+            )
+            .monospacedDigit()
+          }
+
+          Toggle(
+            "翻译完成后自动朗读英文",
+            isOn: Binding(
+              get: {
+                shell.languageAndSpeechPreferences.automaticallySpeaksTranslations
+              },
+              set: { shell.setAutomaticallySpeaksTranslations($0) }
+            )
+          )
+
+          Button {
+            shell.speak("TranStudy helps you learn from context.")
+          } label: {
+            Label("试听语音", systemImage: "speaker.wave.2")
+          }
+        } header: {
+          Label("发音", systemImage: "waveform")
+        } footer: {
+          Text("自动朗读默认关闭；单词和例句旁的朗读按钮始终可以手动使用。")
+        }
+
+        Section {
           Toggle(
             "登录时启动",
             isOn: Binding(
@@ -108,7 +194,11 @@ struct TranslationSettingsView: View {
           CenteredLabeledContent("排除应用") {
             Menu {
               ForEach(availableApplications, id: \.bundleIdentifier) { application in
-                Button(application.localizedName ?? application.bundleIdentifier ?? "未知应用") {
+                Button(
+                  application.localizedName
+                    ?? application.bundleIdentifier
+                    ?? shell.localized("未知应用")
+                ) {
                   guard let bundleIdentifier = application.bundleIdentifier else {
                     return
                   }
@@ -162,7 +252,7 @@ struct TranslationSettingsView: View {
                   shell.setTranslationPanelPosition($0)
                 }
               ),
-              label: \.title
+              label: { shell.localized($0.title) }
             )
             .frame(maxWidth: 420)
           }
@@ -245,12 +335,38 @@ struct TranslationSettingsView: View {
     HStack {
       Text(application)
       Spacer()
-      Label(detail, systemImage: "checkmark.circle.fill")
+      Label(LocalizedStringKey(detail), systemImage: "checkmark.circle.fill")
         .font(.callout)
         .foregroundStyle(.secondary)
     }
   }
 
+}
+
+extension InterfaceLanguage {
+  fileprivate var localizedTitle: LocalizedStringKey {
+    switch self {
+    case .system:
+      "跟随 macOS"
+    case .simplifiedChinese:
+      "简体中文"
+    case .traditionalChinese:
+      "繁體中文"
+    case .english:
+      "English"
+    }
+  }
+}
+
+extension ChineseWritingSystem {
+  fileprivate var localizedTitle: LocalizedStringKey {
+    switch self {
+    case .simplified:
+      "简体中文"
+    case .traditional:
+      "繁體中文"
+    }
+  }
 }
 
 #if DEBUG

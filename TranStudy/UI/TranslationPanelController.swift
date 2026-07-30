@@ -148,7 +148,8 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
           )
         }
       )
-      .tint(TranStudyDesign.accentColor))
+      .tint(TranStudyDesign.accentColor)
+      .environment(\.locale, shell.interfaceLanguage.locale))
     panel.contentView = hostingView
     applyCurrentSizing(to: panel)
 
