@@ -221,6 +221,37 @@ struct ConfiguredTranslationServiceTests {
     )
   }
 
+  @Test("HTTP failures expose an actionable translation error")
+  func HTTPFailuresExposeActionableTranslationErrors() async throws {
+    let cases: [(statusCode: Int, response: String, expected: TranslationError)] = [
+      (400, "bad request", .invalidRequest),
+      (401, "unauthorized", .authenticationFailed),
+      (402, "insufficient balance", .quotaExceeded),
+      (413, "payload too large", .inputTooLong),
+      (429, "rate limit exceeded", .rateLimited),
+      (429, "insufficient_quota", .quotaExceeded),
+      (503, "service unavailable", .serviceUnavailable),
+    ]
+
+    for testCase in cases {
+      let service = ConfiguredTranslationService(
+        configurationStore: RoutingTestConfigurationStore(configuration: .default),
+        apiKeyStore: RoutingTestAPIKeyStore(apiKeys: [.deepSeek: "deepseek-key"]),
+        httpClient: RoutingTestHTTPClient(
+          data: Data(testCase.response.utf8),
+          statusCode: testCase.statusCode
+        )
+      )
+
+      do {
+        _ = try await service.translate(TranslationRequest(sourceText: "ran"))
+        Issue.record("Expected HTTP \(testCase.statusCode) to fail")
+      } catch let error as TranslationError {
+        #expect(error == testCase.expected)
+      }
+    }
+  }
+
   @Test("cancelling translation cancels the in-flight HTTP operation")
   func cancellationStopsHTTPWork() async {
     let httpClient = CancellationTrackingHTTPClient()

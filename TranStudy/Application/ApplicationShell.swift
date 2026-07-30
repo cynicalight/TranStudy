@@ -557,14 +557,22 @@ final class ApplicationShell {
       return .unknown
     }
     switch error {
-    case .notConfigured:
+    case .notConfigured, .inputTooLong:
       return .configuration
-    case .timedOut, .networkUnavailable, .serviceUnavailable:
+    case .invalidRequest:
+      return .requestRejected
+    case .authenticationFailed:
+      return .authentication
+    case .quotaExceeded:
+      return .quota
+    case .rateLimited:
+      return .rateLimited
+    case .timedOut:
+      return .timeout
+    case .networkUnavailable, .serviceUnavailable:
       return .network
     case .invalidResponse:
       return .invalidResponse
-    case .inputTooLong:
-      return .configuration
     }
   }
 

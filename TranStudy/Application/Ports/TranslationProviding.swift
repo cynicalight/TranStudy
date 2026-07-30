@@ -72,7 +72,36 @@ enum TranslationError: Error, Equatable, Sendable {
   case timedOut
   case networkUnavailable
   case invalidResponse
+  case invalidRequest
+  case authenticationFailed
+  case quotaExceeded
+  case rateLimited
   case serviceUnavailable
+
+  var userFacingMessageKey: String {
+    switch self {
+    case .notConfigured:
+      "尚未配置此翻译服务的 API Key。请到“设置 > 翻译服务”完成配置。"
+    case .inputTooLong:
+      "内容超过约 12000 字符或 token 预算，请缩短后重试。"
+    case .timedOut:
+      "翻译请求超时。请检查网络后重试。"
+    case .networkUnavailable:
+      "无法连接到翻译服务。请检查网络、代理或服务地址。"
+    case .invalidResponse:
+      "翻译服务返回的内容格式不符合预期。请重试；若持续发生，请更换模型或导出诊断日志。"
+    case .invalidRequest:
+      "翻译服务拒绝了请求。请检查服务地址、模型名称和输入内容。"
+    case .authenticationFailed:
+      "API Key 无效、已失效，或没有使用当前模型的权限。请在设置中更新 Key 或模型。"
+    case .quotaExceeded:
+      "API Key 的余额或可用额度不足。请在服务商后台充值，或更换 API Key。"
+    case .rateLimited:
+      "翻译请求过于频繁，服务暂时限流。请稍候再试。"
+    case .serviceUnavailable:
+      "翻译服务暂时不可用。请稍后重试。"
+    }
+  }
 }
 
 @MainActor

@@ -150,7 +150,7 @@ final class OpenAIChatTranslationClient {
 
     let (data, response) = try await httpClient.data(for: urlRequest)
     guard (200..<300).contains(response.statusCode) else {
-      throw TranslationError.serviceUnavailable
+      throw Self.translationError(for: response, responseData: data)
     }
     guard
       let completion = try? JSONDecoder().decode(OpenAIChatResponse.self, from: data),
@@ -160,6 +160,47 @@ final class OpenAIChatTranslationClient {
       throw TranslationError.invalidResponse
     }
     return content
+  }
+
+  private static func translationError(
+    for response: HTTPURLResponse,
+    responseData: Data
+  ) -> TranslationError {
+    switch response.statusCode {
+    case 400, 404, 405, 422:
+      .invalidRequest
+    case 401, 403:
+      .authenticationFailed
+    case 402:
+      .quotaExceeded
+    case 408, 504:
+      .timedOut
+    case 413:
+      .inputTooLong
+    case 429:
+      responseIndicatesExhaustedQuota(responseData) ? .quotaExceeded : .rateLimited
+    case 500..<600:
+      .serviceUnavailable
+    default:
+      .serviceUnavailable
+    }
+  }
+
+  private static func responseIndicatesExhaustedQuota(_ data: Data) -> Bool {
+    guard let responseText = String(data: data, encoding: .utf8)?.lowercased() else {
+      return false
+    }
+
+    let quotaMarkers = [
+      "insufficient_quota",
+      "insufficient balance",
+      "insufficient_balance",
+      "quota exceeded",
+      "credit exhausted",
+      "余额不足",
+      "额度不足",
+    ]
+    return quotaMarkers.contains { responseText.contains($0) }
   }
 
   private static func containsHanCharacter(_ text: String) -> Bool {

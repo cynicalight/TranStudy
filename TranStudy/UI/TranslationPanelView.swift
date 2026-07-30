@@ -110,11 +110,10 @@ struct TranslationPanelView: View {
         Text("翻译失败")
           .font(.title3.weight(.semibold))
         Text(
-          shell.translationError == .inputTooLong
-            ? LocalizedStringKey(
-              "内容超过约 12000 字符或 token 预算，请缩短后重试。"
-            )
-            : LocalizedStringKey("请检查翻译服务设置和网络，然后重试。")
+          shell.localized(
+            shell.translationError?.userFacingMessageKey
+              ?? "请检查翻译服务设置和网络，然后重试。"
+          )
         )
         .foregroundStyle(.secondary)
       }

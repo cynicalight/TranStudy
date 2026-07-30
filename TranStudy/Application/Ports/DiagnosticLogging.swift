@@ -12,6 +12,11 @@ enum DiagnosticStage: String, Codable, Sendable {
 
 enum DiagnosticErrorType: String, Codable, Sendable {
   case configuration
+  case authentication
+  case quota
+  case rateLimited
+  case requestRejected
+  case timeout
   case network
   case invalidResponse
   case storage

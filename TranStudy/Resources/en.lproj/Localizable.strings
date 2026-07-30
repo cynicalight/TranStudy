@@ -215,6 +215,15 @@
 "翻译失败" = "Translation Failed";
 "内容超过约 12000 字符或 token 预算，请缩短后重试。" = "The content exceeds about 12,000 characters or the token budget. Shorten it and try again.";
 "请检查翻译服务设置和网络，然后重试。" = "Check the translation service settings and network, then try again.";
+"尚未配置此翻译服务的 API Key。请到“设置 > 翻译服务”完成配置。" = "No API key is configured for this translation service. Complete setup in Settings > Translation Service.";
+"翻译请求超时。请检查网络后重试。" = "The translation request timed out. Check your network and try again.";
+"无法连接到翻译服务。请检查网络、代理或服务地址。" = "Could not connect to the translation service. Check your network, proxy, or service URL.";
+"翻译服务返回的内容格式不符合预期。请重试；若持续发生，请更换模型或导出诊断日志。" = "The translation service returned an unexpected response format. Try again; if it continues, change the model or export diagnostics.";
+"翻译服务拒绝了请求。请检查服务地址、模型名称和输入内容。" = "The translation service rejected the request. Check the service URL, model name, and input.";
+"API Key 无效、已失效，或没有使用当前模型的权限。请在设置中更新 Key 或模型。" = "The API key is invalid, expired, or lacks permission for the current model. Update the key or model in Settings.";
+"API Key 的余额或可用额度不足。请在服务商后台充值，或更换 API Key。" = "The API key has insufficient balance or quota. Add credit with the provider or use a different API key.";
+"翻译请求过于频繁，服务暂时限流。请稍候再试。" = "Translation requests are being rate-limited. Please wait a moment and try again.";
+"翻译服务暂时不可用。请稍后重试。" = "The translation service is temporarily unavailable. Please try again later.";
 "英文原文" = "English Source";
 "原文" = "Source";
 "原文音标" = "Source Pronunciation";
