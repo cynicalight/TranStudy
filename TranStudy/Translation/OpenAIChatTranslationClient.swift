@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @MainActor
 final class OpenAIChatTranslationClient {
@@ -26,9 +27,19 @@ final class OpenAIChatTranslationClient {
   }
 
   func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+    let userContent = request.promptContent
+    #if DEBUG
+      if request.kind == .contextualSelection {
+        Self.translationContextDebugLog(
+          "llm.target_sentence",
+          content: request.targetSentence ?? "<unavailable>"
+        )
+        Self.translationContextDebugLog("llm.user_content", content: userContent)
+      }
+    #endif
     let content = try await completionContent(
       systemPrompt: Self.systemPrompt(for: request.chineseWritingSystem),
-      userContent: request.promptContent,
+      userContent: userContent,
       exampleMessages: Self.wordOrPhraseExampleMessages(
         for: request.chineseWritingSystem
       ),
@@ -386,6 +397,31 @@ final class OpenAIChatTranslationClient {
       nonempty(value) == nil ? fieldName : nil
     }
   }
+
+  private static func translationContextDebugLog(
+    _ label: String,
+    content: @autoclosure () -> String
+  ) {
+    #if DEBUG
+      let content = content()
+      translationContextLogger.debug(
+        "[TranslationContextDebug] \(label, privacy: .public).begin"
+      )
+      translationContextLogger.debug(
+        "[TranslationContextDebug] \(content, privacy: .public)"
+      )
+      translationContextLogger.debug(
+        "[TranslationContextDebug] \(label, privacy: .public).end"
+      )
+    #endif
+  }
+
+  #if DEBUG
+    private static let translationContextLogger = Logger(
+      subsystem: Bundle.main.bundleIdentifier ?? "com.cynicalight.TranStudy",
+      category: "TranslationContext"
+    )
+  #endif
 
   private static func invalidWordResponse(
     _ failure: TranslationResponseValidationFailure,

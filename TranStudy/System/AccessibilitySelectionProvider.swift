@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import Carbon
 import Foundation
+import OSLog
 
 @MainActor
 final class AccessibilitySelectionProvider: SelectionProviding {
@@ -315,10 +316,15 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       selectionDebugLog("selection context failed: document text unavailable")
       return nil
     }
+    Self.translationContextDebugLog("ax.document.raw", content: documentText)
 
     let context = SelectionSentenceContext.extract(
       from: documentText,
       selectedRange: selectedRange
+    )
+    Self.translationContextDebugLog(
+      "local.context.target",
+      content: context?.targetSentence ?? "<unavailable>"
     )
     selectionDebugLog(
       context == nil
@@ -356,6 +362,10 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     else {
       return nil
     }
+    Self.translationContextDebugLog(
+      "ax.sentence.initial.raw",
+      content: rawString(for: initialTargetRange, in: element) ?? "<unavailable>"
+    )
 
     var targetRange = initialTargetRange
     var targetSentence = initialTargetSentence
@@ -377,6 +387,10 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       if let extendedSentence = string(for: extendedRange, in: element) {
         targetRange = extendedRange
         targetSentence = extendedSentence
+        Self.translationContextDebugLog(
+          "ax.sentence.extended.raw",
+          content: rawString(for: extendedRange, in: element) ?? "<unavailable>"
+        )
       }
     }
 
@@ -405,6 +419,10 @@ final class AccessibilitySelectionProvider: SelectionProviding {
         )
       }
 
+    Self.translationContextDebugLog(
+      "ax.context.target",
+      content: targetSentence
+    )
     return SelectionSentenceContext(
       targetSentence: targetSentence,
       previousSentence: previousSentence,
@@ -436,12 +454,22 @@ final class AccessibilitySelectionProvider: SelectionProviding {
         kAXParagraphTextMarkerRangeForTextMarkerParameterizedAttribute as CFString,
         parameter: selectionStart,
         from: element
-      ),
-      let paragraphText = rawString(for: paragraphRange, in: element),
-      let selectedText = rawString(for: selectedRange, in: element)
+      )
     else {
+      Self.translationContextDebugLog("ax.paragraph.raw", content: "<unavailable>")
       return nil
     }
+    guard let paragraphText = rawString(for: paragraphRange, in: element) else {
+      Self.translationContextDebugLog("ax.paragraph.raw", content: "<unavailable>")
+      return nil
+    }
+    Self.translationContextDebugLog("ax.paragraph.raw", content: paragraphText)
+
+    guard let selectedText = rawString(for: selectedRange, in: element) else {
+      Self.translationContextDebugLog("ax.selection.raw", content: "<unavailable>")
+      return nil
+    }
+    Self.translationContextDebugLog("ax.selection.raw", content: selectedText)
 
     let paragraphStart = AXTextMarkerRangeCopyStartMarker(paragraphRange)
     let prefixText: String
@@ -455,13 +483,18 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       prefixText = value
     }
 
-    return SelectionSentenceContext.extract(
+    let context = SelectionSentenceContext.extract(
       from: paragraphText,
       selectedRange: CFRange(
         location: (prefixText as NSString).length,
         length: (selectedText as NSString).length
       )
     )
+    Self.translationContextDebugLog(
+      "local.context.target",
+      content: context?.targetSentence ?? "<unavailable>"
+    )
+    return context
   }
 
   private func selectedRange(in element: AXUIElement) -> CFRange? {
@@ -611,6 +644,31 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       from: element
     ) as? String
   }
+
+  private static func translationContextDebugLog(
+    _ label: String,
+    content: @autoclosure () -> String
+  ) {
+    #if DEBUG
+      let content = content()
+      translationContextLogger.debug(
+        "[TranslationContextDebug] \(label, privacy: .public).begin"
+      )
+      translationContextLogger.debug(
+        "[TranslationContextDebug] \(content, privacy: .public)"
+      )
+      translationContextLogger.debug(
+        "[TranslationContextDebug] \(label, privacy: .public).end"
+      )
+    #endif
+  }
+
+  #if DEBUG
+    private static let translationContextLogger = Logger(
+      subsystem: Bundle.main.bundleIdentifier ?? "com.cynicalight.TranStudy",
+      category: "TranslationContext"
+    )
+  #endif
 
   private func copyParameterizedAttribute(
     _ attribute: CFString,
