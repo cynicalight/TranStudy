@@ -341,7 +341,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     if let context = webParagraphSelectionContext(
       selectedRange: selectedRange,
       in: element
-    ) {
+    ), !Self.endsAtUnclosedOpeningDoubleQuote(context.targetSentence) {
       return context
     }
 
@@ -361,9 +361,14 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     var targetSentence = initialTargetSentence
     let initialTargetEnd = AXTextMarkerRangeCopyEndMarker(initialTargetRange)
     if Self.endsAtUnclosedOpeningDoubleQuote(initialTargetSentence),
+      let continuationMarker = textMarkerParameterizedAttribute(
+        kAXNextTextMarkerForTextMarkerParameterizedAttribute as CFString,
+        parameter: initialTargetEnd,
+        from: element
+      ),
       let extendedEnd = textMarkerParameterizedAttribute(
         kAXNextSentenceEndTextMarkerForTextMarkerParameterizedAttribute as CFString,
-        parameter: initialTargetEnd,
+        parameter: continuationMarker,
         from: element
       )
     {
