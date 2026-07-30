@@ -31,19 +31,10 @@ final class AccessibilitySelectionProvider: SelectionProviding {
 
   init(
     configurationStore: any SelectionConfigurationStoring =
-      UserDefaultsSelectionConfigurationStore(),
-    requestAccess: Bool = true
+      UserDefaultsSelectionConfigurationStore()
   ) {
     self.configurationStore = configurationStore
-    guard requestAccess else {
-      selectionDebugLog("AX provider initialized without requesting access")
-      return
-    }
-
-    let trusted = AXIsProcessTrustedWithOptions(
-      ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-    )
-    selectionDebugLog("AX provider initialized: trusted=\(trusted)")
+    selectionDebugLog("AX provider initialized")
   }
 
   func beginMouseSelectionGesture() {

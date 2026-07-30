@@ -306,8 +306,13 @@ private struct DraftField: View {
       Text(LocalizedStringKey(title))
         .font(.caption)
         .foregroundStyle(.secondary)
-      TextField(LocalizedStringKey(title), text: $text, axis: axis)
-        .lineLimit(axis == .vertical ? 2...4 : 1...1)
+      if axis == .vertical {
+        TextField(LocalizedStringKey(title), text: $text, axis: axis)
+          .lineLimit(2...)
+      } else {
+        TextField(LocalizedStringKey(title), text: $text, axis: axis)
+          .lineLimit(1)
+      }
     }
   }
 }
