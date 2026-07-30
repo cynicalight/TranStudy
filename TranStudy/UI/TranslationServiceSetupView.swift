@@ -39,9 +39,11 @@ struct TranslationServiceSetupView: View {
           .buttonStyle(.borderedProminent)
           .disabled(!canTestConnection)
 
-          connectionStatus
         }
       }
+
+        connectionStatus
+
 
       Label(
         "连接成功后才会写入 macOS Keychain，不会进入学习数据库、缓存或日志。",
