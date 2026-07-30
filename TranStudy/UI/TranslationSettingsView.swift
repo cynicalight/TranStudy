@@ -149,6 +149,26 @@ struct TranslationSettingsView: View {
         }
 
         Section {
+          Toggle(
+            "自动检查更新",
+            isOn: Binding(
+              get: { shell.automaticallyChecksForUpdates },
+              set: { shell.setAutomaticallyChecksForUpdates($0) }
+            )
+          )
+
+          Button {
+            shell.checkForUpdates()
+          } label: {
+            Label("检查更新…", systemImage: "arrow.triangle.2.circlepath")
+          }
+        } header: {
+          Label("软件更新", systemImage: "shippingbox")
+        } footer: {
+          Text("自动检查最多每周一次；发现更新后仍由你确认下载和安装，TranStudy 不会静默强制更新。")
+        }
+
+        Section {
           CenteredLabeledContent("翻译剪贴板") {
             Picker(
               "翻译剪贴板快捷键",

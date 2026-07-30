@@ -25,6 +25,7 @@
           accessibilityAuthorization: PreviewAccessibilityAuthorizer(),
           reviewReminderConfigurationStore: PreviewReviewReminderConfigurationStore(),
           loginItem: PreviewLoginItemController(),
+          updates: PreviewUpdateChecker(),
           speech: PreviewSpeechPlayer(),
           languageAndSpeechPreferencesStore: PreviewLanguageAndSpeechPreferencesStore(),
           panelPositionStore: PreviewPanelPositionStore(),
@@ -112,6 +113,14 @@
     }
 
     func save(_ configuration: ReviewReminderConfiguration) {}
+  }
+
+  @MainActor
+  private final class PreviewUpdateChecker: UpdateChecking {
+    var automaticallyChecksForUpdates = false
+    let canCheckForUpdates = true
+
+    func checkForUpdates() {}
   }
 
   @MainActor

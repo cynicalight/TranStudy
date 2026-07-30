@@ -15,6 +15,7 @@ struct ApplicationEnvironment {
   let accessibilityAuthorization: any AccessibilityAuthorizing
   let reviewReminderConfigurationStore: any ReviewReminderConfigurationStoring
   let loginItem: any LoginItemControlling
+  let updates: any UpdateChecking
   let speech: any SpeechPlaying
   let languageAndSpeechPreferencesStore: any LanguageAndSpeechPreferencesStoring
   let panelPositionStore: any TranslationPanelPositionStoring
@@ -54,6 +55,7 @@ extension ApplicationEnvironment {
       accessibilityAuthorization: SystemAccessibilityAuthorizer(),
       reviewReminderConfigurationStore: UserDefaultsReviewReminderConfigurationStore(),
       loginItem: SystemLoginItemController(),
+      updates: SystemUpdateChecker(),
       speech: SystemSpeechPlayer(),
       languageAndSpeechPreferencesStore: UserDefaultsLanguageAndSpeechPreferencesStore(),
       panelPositionStore: UserDefaultsTranslationPanelPositionStore(),

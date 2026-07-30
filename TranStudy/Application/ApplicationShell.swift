@@ -80,6 +80,7 @@ final class ApplicationShell {
   private(set) var selectedReviewRating: ReviewRating?
   private(set) var reviewReminderConfiguration: ReviewReminderConfiguration
   private(set) var isLaunchAtLoginEnabled: Bool
+  private(set) var automaticallyChecksForUpdates: Bool
   private(set) var pendingLearningMerge: LearningMergeSummary?
   private(set) var pendingLibraryMerge: LearningMergeSummary?
   private(set) var pendingLibraryDeletion: LearningItem?
@@ -131,6 +132,10 @@ final class ApplicationShell {
     environment.speech.availableVoices
   }
 
+  var canCheckForUpdates: Bool {
+    environment.updates.canCheckForUpdates
+  }
+
   var missingPreparationCapabilities: [PreparationCapability] {
     var capabilities: [PreparationCapability] = []
     if accessibilityAuthorizationStatus != .authorized {
@@ -163,6 +168,7 @@ final class ApplicationShell {
     languageAndSpeechPreferences = environment.languageAndSpeechPreferencesStore.load()
     reviewReminderConfiguration = environment.reviewReminderConfigurationStore.load()
     isLaunchAtLoginEnabled = environment.loginItem.isEnabled
+    automaticallyChecksForUpdates = environment.updates.automaticallyChecksForUpdates
   }
 
   func refreshPreparationStatus() async {
@@ -334,6 +340,18 @@ final class ApplicationShell {
       // Keep the system-reported state when registration is rejected.
     }
     isLaunchAtLoginEnabled = environment.loginItem.isEnabled
+  }
+
+  func setAutomaticallyChecksForUpdates(_ isEnabled: Bool) {
+    environment.updates.automaticallyChecksForUpdates = isEnabled
+    automaticallyChecksForUpdates = environment.updates.automaticallyChecksForUpdates
+  }
+
+  func checkForUpdates() {
+    guard environment.updates.canCheckForUpdates else {
+      return
+    }
+    environment.updates.checkForUpdates()
   }
 
   func setInterfaceLanguage(_ language: InterfaceLanguage) {

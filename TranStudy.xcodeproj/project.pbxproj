@@ -42,6 +42,7 @@
 		4523BC113F86F61BFFEFE392 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2803330DBDEA51E97533D14 /* AppLocalization.swift */; };
 		45AD6E5D2E067FE51C723B4D /* ApplicationShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC58A44C46D02F739F637EEF /* ApplicationShell.swift */; };
 		47FECDCE68B419E03245C4A0 /* ConfiguredTranslationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840AC99294DED14888CA4322 /* ConfiguredTranslationServiceTests.swift */; };
+		4B412C92C935E46F0BF7420D /* UpdateChecking.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4EB3FDCA26C888758B2612B /* UpdateChecking.swift */; };
 		4F0360E5D629952A4BF60F8A /* ConfiguredTranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E74E0B6A188D1D0D69EAD122 /* ConfiguredTranslationService.swift */; };
 		55143423C0937B57109AC6B7 /* LearningCustomExampleRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0BF09CC14F614FF2F26142 /* LearningCustomExampleRecord.swift */; };
 		584A63660E7D0058D8011979 /* KeychainAPIKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93491B3DF2455B2CED6EB38E /* KeychainAPIKeyStore.swift */; };
@@ -83,6 +84,8 @@
 		A17C70D4400CC2C0841F8DCC /* SystemAccessibilityAuthorizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0385CAB2D40DE27E96DA6336 /* SystemAccessibilityAuthorizer.swift */; };
 		A1EE03E0CFFCA2BFDD311541 /* LearningStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF1A6468F5A38FB8643441B /* LearningStoring.swift */; };
 		A1F4BDF8283277A2439906C1 /* UserDefaultsPreparationStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED465FA4FA58F7386460CBE /* UserDefaultsPreparationStateStore.swift */; };
+		A551A9D557CDF6AAD5541542 /* SystemUpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E53CB8B638AB399CF642CA /* SystemUpdateChecker.swift */; };
+		A58C2D5BD0E45599281AB9F3 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2ABBA5A350DF7E525851BA1B /* Sparkle */; };
 		A6F15399CA10D794D7B5B072 /* AccessibilityAuthorizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA5D2DF706CCBFEC0F010A86 /* AccessibilityAuthorizing.swift */; };
 		A76D820347D2D2AFEC2890B9 /* LearningRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E8389C189D488477B36DB5 /* LearningRecord.swift */; };
 		AC3279EDA5FAB648208A92A9 /* DiagnosticLogStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEE85F9735809ED9CD92FA0 /* DiagnosticLogStoreTests.swift */; };
@@ -161,6 +164,7 @@
 		3B9AD4FA6759148ACAC9F430 /* SwiftDataLearningStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLearningStore.swift; sourceTree = "<group>"; };
 		41B966A1D5F567119371D2A6 /* TranslationPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationPanelController.swift; sourceTree = "<group>"; };
 		424286180F77266E10247C2D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		43E53CB8B638AB399CF642CA /* SystemUpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUpdateChecker.swift; sourceTree = "<group>"; };
 		47B05F425B1609D79265A448 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		48241DB06ACAAE69985BD80E /* APIKeyStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyStoring.swift; sourceTree = "<group>"; };
 		4D3DF5A919583DACB3C3F2C6 /* ApplicationShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationShellTests.swift; sourceTree = "<group>"; };
@@ -237,12 +241,25 @@
 		EAD0603928223B27E98B195D /* TranslationDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationDraft.swift; sourceTree = "<group>"; };
 		EFDDAB013A94CD551A257935 /* TranslationProviderConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviderConfigurationTests.swift; sourceTree = "<group>"; };
 		F045DE99B91697C02E17E20B /* HTTPDataLoading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPDataLoading.swift; sourceTree = "<group>"; };
+		F1B3241C16E983ECB719770B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F3AF1E9DF32FA8F069DFE556 /* OpenAIChatTranslationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIChatTranslationClient.swift; sourceTree = "<group>"; };
+		F4EB3FDCA26C888758B2612B /* UpdateChecking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecking.swift; sourceTree = "<group>"; };
 		F9B35707F44F4914981DD282 /* NormalizedCanonicalForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NormalizedCanonicalForm.swift; sourceTree = "<group>"; };
 		FA42154046F39513A93E8B44 /* InitialPreparationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitialPreparationView.swift; sourceTree = "<group>"; };
 		FC301A9843F17C3F82994E40 /* LanguageAndSpeechPreferencesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageAndSpeechPreferencesStoreTests.swift; sourceTree = "<group>"; };
 		FDF1A6468F5A38FB8643441B /* LearningStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningStoring.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DB65441EB57E6C663F40CACB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A58C2D5BD0E45599281AB9F3 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		22668E3E000D812ED4EA464B /* Application */ = {
@@ -295,6 +312,7 @@
 				C8BE5C0264C96192636A7296 /* TranslationProviderConfigurationStoring.swift */,
 				5B52673DF7E3FC2AA53FED9A /* TranslationProviding.swift */,
 				9F2BD06914FCAEF21362D3BA /* TranslationShortcutStoring.swift */,
+				F4EB3FDCA26C888758B2612B /* UpdateChecking.swift */,
 			);
 			path = Ports;
 			sourceTree = "<group>";
@@ -310,6 +328,7 @@
 		5C976C5596D908AEE1B6A0F2 /* TranStudy */ = {
 			isa = PBXGroup;
 			children = (
+				F1B3241C16E983ECB719770B /* Info.plist */,
 				571B54B2E6D38AF604F0A9CF /* TranStudyApp.swift */,
 				22668E3E000D812ED4EA464B /* Application */,
 				E5EBE485BC9A818288E94473 /* Persistence */,
@@ -359,6 +378,7 @@
 				24E8EFBBBE46D8EE3E8A3EFA /* SystemReviewNotifier.swift */,
 				17DC4D9CDBDF6CD4445B1596 /* SystemSelectionEventMonitor.swift */,
 				0D753284A34D16933C313ACD /* SystemSpeechPlayer.swift */,
+				43E53CB8B638AB399CF642CA /* SystemUpdateChecker.swift */,
 				8FA5B6BED7A5892CBEF9C48E /* TranStudyApplicationDelegate.swift */,
 			);
 			path = System;
@@ -451,6 +471,7 @@
 			buildPhases = (
 				EE9FBBAF81FE2C1B8926CFC5 /* Sources */,
 				577CFA7D839CEA1FE62DC42B /* Resources */,
+				DB65441EB57E6C663F40CACB /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -458,6 +479,7 @@
 			);
 			name = TranStudy;
 			packageProductDependencies = (
+				2ABBA5A350DF7E525851BA1B /* Sparkle */,
 			);
 			productName = TranStudy;
 			productReference = 7182470FA15D1C73F5FD1C5B /* TranStudy.app */;
@@ -507,6 +529,9 @@
 			);
 			mainGroup = FA667EFA89E9E0413DB35D47;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9C1B7124C241805778603485 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C7F55275FCDAE3176D36D7EB /* Products */;
 			projectDirPath = "";
@@ -621,6 +646,7 @@
 				BBAB3FF1E0F52DFA2ED70554 /* SystemReviewNotifier.swift in Sources */,
 				1FB354F789FB9A3F5034C349 /* SystemSelectionEventMonitor.swift in Sources */,
 				E1D909B06294062EFA7FF5A7 /* SystemSpeechPlayer.swift in Sources */,
+				A551A9D557CDF6AAD5541542 /* SystemUpdateChecker.swift in Sources */,
 				1002003979B8288719372594 /* TodayReviewView.swift in Sources */,
 				B285870C915EA43E0DF6CFD6 /* TranStudyApp.swift in Sources */,
 				28418C46789B0B7AB5722AE6 /* TranStudyApplicationDelegate.swift in Sources */,
@@ -641,6 +667,7 @@
 				13E2910289DCDD3E9A651B6B /* TranslationShortcutStoring.swift in Sources */,
 				018DEF4BD8371867B9948186 /* TranslationTextNormalizer.swift in Sources */,
 				CC4CFB5B0FD46AA01BB62F7D /* URLSessionHTTPClient.swift in Sources */,
+				4B412C92C935E46F0BF7420D /* UpdateChecking.swift in Sources */,
 				329386AC006DB02F7AD0CAFF /* UserDefaultsLanguageAndSpeechPreferencesStore.swift in Sources */,
 				A1F4BDF8283277A2439906C1 /* UserDefaultsPreparationStateStore.swift in Sources */,
 				B2C27B8FF85F6DDA62E9D246 /* UserDefaultsReviewReminderConfigurationStore.swift in Sources */,
@@ -682,14 +709,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8HC6J9LU7U;
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = TranStudy;
+				INFOPLIST_FILE = TranStudy/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.cynicalight.TranStudy;
 				PRODUCT_NAME = TranStudy;
 				SDKROOT = macosx;
@@ -782,14 +810,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8HC6J9LU7U;
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = TranStudy;
+				INFOPLIST_FILE = TranStudy/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.cynicalight.TranStudy;
 				PRODUCT_NAME = TranStudy;
 				SDKROOT = macosx;
@@ -900,6 +929,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9C1B7124C241805778603485 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2ABBA5A350DF7E525851BA1B /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9C1B7124C241805778603485 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 25EF6250CCACA8AA5A0EDAF3 /* Project object */;
 }

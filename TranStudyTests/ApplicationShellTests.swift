@@ -6,6 +6,27 @@ import Testing
 
 @MainActor
 struct ApplicationShellTests {
+  @Test("update checks stay user-controlled and manual checks require availability")
+  func updateChecksStayUserControlled() {
+    let updates = TestUpdateChecker()
+    let shell = ApplicationShell(
+      environment: .test(updates: updates)
+    )
+
+    #expect(!shell.automaticallyChecksForUpdates)
+
+    shell.setAutomaticallyChecksForUpdates(true)
+    #expect(shell.automaticallyChecksForUpdates)
+    #expect(updates.automaticallyChecksForUpdates)
+
+    shell.checkForUpdates()
+    #expect(updates.checkCount == 1)
+
+    updates.canCheckForUpdates = false
+    shell.checkForUpdates()
+    #expect(updates.checkCount == 1)
+  }
+
   @Test("writing system is persisted and attached to new translation requests")
   func writingSystemPersistsAndAppliesToNewTranslations() async throws {
     let preferencesStore = TestLanguageAndSpeechPreferencesStore()
@@ -1415,6 +1436,7 @@ extension ApplicationEnvironment {
     reminderConfigurationStore: TestReviewReminderConfigurationStore =
       TestReviewReminderConfigurationStore(),
     loginItem: TestLoginItemController = TestLoginItemController(),
+    updates: TestUpdateChecker = TestUpdateChecker(),
     speech: any SpeechPlaying = TestSpeechPlayer(),
     languageAndSpeechPreferencesStore: TestLanguageAndSpeechPreferencesStore =
       TestLanguageAndSpeechPreferencesStore(),
@@ -1442,6 +1464,7 @@ extension ApplicationEnvironment {
       accessibilityAuthorization: accessibility,
       reviewReminderConfigurationStore: reminderConfigurationStore,
       loginItem: loginItem,
+      updates: updates,
       speech: speech,
       languageAndSpeechPreferencesStore: languageAndSpeechPreferencesStore,
       panelPositionStore: panelPositionStore,
@@ -1451,6 +1474,17 @@ extension ApplicationEnvironment {
       sentenceCardConfigurationStore: sentenceCardConfigurationStore,
       preparationStateStore: preparationStateStore
     )
+  }
+}
+
+@MainActor
+private final class TestUpdateChecker: UpdateChecking {
+  var automaticallyChecksForUpdates = false
+  var canCheckForUpdates = true
+  private(set) var checkCount = 0
+
+  func checkForUpdates() {
+    checkCount += 1
   }
 }
 

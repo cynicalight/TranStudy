@@ -12,18 +12,42 @@ settings:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.4
+
 targets:
   TranStudy:
     type: application
     platform: macOS
     sources:
       - path: TranStudy
+    dependencies:
+      - package: Sparkle
+    info:
+      path: TranStudy/Info.plist
+      properties:
+        CFBundleDisplayName: TranStudy
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        SUFeedURL: https://github.com/cynicalight/TranStudy/releases/latest/download/appcast.xml
+        SUPublicEDKey: "e0FYHC/ETQiiTfpRq8QHxRleYusmX6weOrlLmY7Xpow="
+        SUEnableAutomaticChecks: false
+        SUScheduledCheckInterval: 604800
+        SUAutomaticallyUpdate: false
+        SUAllowsAutomaticUpdates: false
+        SUVerifyUpdateBeforeExtraction: true
+        SURequireSignedFeed: true
+        SUSignedFeedFailureExpirationInterval: 0
+        SUEnableSystemProfiling: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cynicalight.TranStudy
         PRODUCT_NAME: TranStudy
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: TranStudy
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 8HC6J9LU7U

@@ -84,6 +84,12 @@ struct TranStudyApp: App {
     }
     .defaultSize(width: 940, height: 640)
     .commands {
+      CommandGroup(after: .appInfo) {
+        Button(shell.localized("检查更新…")) {
+          shell.checkForUpdates()
+        }
+      }
+
       CommandMenu(shell.localized("翻译")) {
         Button(shell.localized("翻译剪贴板")) {
           coordinator.presentClipboardTranslation()
