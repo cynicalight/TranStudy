@@ -408,14 +408,14 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     if let context = webIndexedSelectionContext(
       selectedRange: selectedRange,
       in: element
-    ), !Self.endsAtUnclosedOpeningDoubleQuote(context.targetSentence) {
+    ), !Self.endsAtUnclosedOpeningDoubleQuote(context.context.targetSentence) {
       return context
     }
 
     if let context = webParagraphSelectionContext(
       selectedRange: selectedRange,
       in: element
-    ), !Self.endsAtUnclosedOpeningDoubleQuote(context.targetSentence) {
+    ), !Self.endsAtUnclosedOpeningDoubleQuote(context.context.targetSentence) {
       return context
     }
 
