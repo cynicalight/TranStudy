@@ -58,11 +58,11 @@ struct OpenAICompatibleTranslationProviderTests {
       JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
     )
     let messages = try #require(body["messages"] as? [[String: String]])
+    let systemPrompt = try #require(messages.first?["content"])
     #expect(
-      messages.first?["content"]?.contains(
-        "Use Traditional Chinese characters for every Chinese output field."
-      ) == true
-    )
+      systemPrompt.contains("Use Traditional Chinese characters for every Chinese output field."))
+    #expect(systemPrompt.contains("first non-whitespace character must be `{`"))
+    #expect(systemPrompt.contains("Never use a Markdown code fence"))
   }
 
   @Test("custom provider uses its configured endpoint model and API key")
@@ -223,6 +223,50 @@ struct OpenAICompatibleTranslationProviderTests {
 
     #expect(result.exampleSentence == "She ran home.")
     #expect(result.sentenceTranslation == "她跑回了家。")
+  }
+
+  @Test("code-fenced JSON response is accepted")
+  func codeFencedJSONResponseIsAccepted() async throws {
+    let responseContent = try JSONSerialization.data(
+      withJSONObject: [
+        "input_kind": "word_or_phrase",
+        "source_text": "ran",
+        "canonical_form": "run",
+        "pronunciation": "/ræn/",
+        "part_of_speech": "verb",
+        "contextual_meaning": "奔跑",
+        "example_sentence": "She ran home.",
+        "sentence_translation": "她跑回了家。",
+      ],
+      options: [.sortedKeys]
+    )
+    let fencedContent =
+      "```json\n\(try #require(String(data: responseContent, encoding: .utf8)))\n```"
+    let responseBody = try JSONSerialization.data(
+      withJSONObject: [
+        "choices": [
+          [
+            "message": [
+              "content": fencedContent
+            ]
+          ]
+        ]
+      ]
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
+    )
+
+    let result = try await provider.translate(TranslationRequest(sourceText: "ran"))
+
+    #expect(result.canonicalForm == "run")
   }
 
   @Test("Mandarin pinyin is rejected as an invalid English pronunciation")

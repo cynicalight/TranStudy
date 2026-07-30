@@ -33,7 +33,7 @@ final class OpenAIChatTranslationClient {
       timeoutInterval: 30
     )
     guard
-      let contentData = content.data(using: .utf8),
+      let contentData = Self.jsonData(from: content),
       let payload = try? JSONDecoder().decode(OpenAITranslationPayload.self, from: contentData),
       payload.inputKind == .wordOrPhrase,
       payload.sourceText == request.sourceText,
@@ -101,7 +101,7 @@ final class OpenAIChatTranslationClient {
       timeoutInterval: 60
     )
     guard
-      let contentData = content.data(using: .utf8),
+      let contentData = Self.jsonData(from: content),
       let payload = try? JSONDecoder().decode(OpenAILongTextPayload.self, from: contentData),
       payload.inputKind == .longText,
       payload.sourceText == sourceText,
@@ -160,6 +160,30 @@ final class OpenAIChatTranslationClient {
       throw TranslationError.invalidResponse
     }
     return content
+  }
+
+  private static func jsonData(from content: String) -> Data? {
+    let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmedContent.hasPrefix("```") else {
+      return trimmedContent.data(using: .utf8)
+    }
+    guard
+      let firstLineBreak = trimmedContent.firstIndex(of: "\n"),
+      trimmedContent.hasSuffix("```")
+    else {
+      return nil
+    }
+
+    let fencedJSON = trimmedContent[
+      trimmedContent.index(
+        after: firstLineBreak)..<trimmedContent.index(
+          trimmedContent.endIndex,
+          offsetBy: -3
+        )
+    ]
+    return String(fencedJSON)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .data(using: .utf8)
   }
 
   private static func translationError(
@@ -238,10 +262,13 @@ final class OpenAIChatTranslationClient {
     Return one JSON object only, with exactly these string fields:
     input_kind, source_text, canonical_form, pronunciation, part_of_speech,
     contextual_meaning, example_sentence, sentence_translation.
+    The first non-whitespace character must be `{` and the last must be `}`.
+    Never use a Markdown code fence, and do not add prose before or after the JSON object.
     Set input_kind to "word_or_phrase" only for a word or short phrase. Set it to
     "long_text" for a sentence or paragraph.
     Follow these language and meaning requirements exactly:
-    - source_text: the exact supplied English text, unchanged.
+    - source_text: copy the exact supplied English text unchanged, including its casing,
+      punctuation, and whitespace. Never correct or normalize it.
     - canonical_form: its English dictionary lemma, never a Chinese translation.
     - pronunciation: slash-delimited IPA for the exact English source_text form, never
       Mandarin pinyin.
@@ -263,6 +290,8 @@ final class OpenAIChatTranslationClient {
     \(writingSystem.promptInstruction)
     Preserve paragraph breaks and meaning. Return one JSON object only with exactly these
     string fields: input_kind, source_text, translation.
+    The first non-whitespace character must be `{` and the last must be `}`.
+    Never use a Markdown code fence, and do not add prose before or after the JSON object.
     Set input_kind to "long_text". Set source_text to the exact supplied English text,
     unchanged. Set translation to the complete Chinese translation. Do not summarize,
     omit content, add commentary, or include markdown outside the JSON object.

@@ -1,9 +1,6 @@
 import Foundation
 
 func selectionDebugLog(_ message: @autoclosure () -> String) {
-  #if DEBUG
-    print("[SelectionDebug] \(message())")
-  #endif
 }
 
 enum SelectionInputEvent: Equatable, Sendable {
