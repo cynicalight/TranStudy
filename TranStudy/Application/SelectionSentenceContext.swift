@@ -55,7 +55,7 @@ struct SelectionSentenceContext: Equatable {
     }
 
     let targetSentence = sentences[targetIndex]
-    let previousSentence =
+    let previousSentence: String? =
       if targetIndex > 0,
         sentences[targetIndex - 1].lineRange == targetSentence.lineRange
       {
@@ -63,7 +63,7 @@ struct SelectionSentenceContext: Equatable {
       } else {
         nil
       }
-    let nextSentence =
+    let nextSentence: String? =
       if targetIndex + 1 < sentences.count,
         sentences[targetIndex + 1].lineRange == targetSentence.lineRange
       {
