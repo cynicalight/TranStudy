@@ -338,16 +338,41 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       return nil
     }
 
+    if let context = webParagraphSelectionContext(
+      selectedRange: selectedRange,
+      in: element
+    ) {
+      return context
+    }
+
     let selectionStart = AXTextMarkerRangeCopyStartMarker(selectedRange)
     guard
-      let targetRange = textMarkerRangeParameterizedAttribute(
+      let initialTargetRange = textMarkerRangeParameterizedAttribute(
         kAXSentenceTextMarkerRangeForTextMarkerParameterizedAttribute as CFString,
         parameter: selectionStart,
         from: element
       ),
-      let targetSentence = string(for: targetRange, in: element)
+      let initialTargetSentence = string(for: initialTargetRange, in: element)
     else {
       return nil
+    }
+
+    var targetRange = initialTargetRange
+    var targetSentence = initialTargetSentence
+    let initialTargetEnd = AXTextMarkerRangeCopyEndMarker(initialTargetRange)
+    if Self.endsAtUnclosedOpeningDoubleQuote(initialTargetSentence),
+      let extendedEnd = textMarkerParameterizedAttribute(
+        kAXNextSentenceEndTextMarkerForTextMarkerParameterizedAttribute as CFString,
+        parameter: initialTargetEnd,
+        from: element
+      )
+    {
+      let initialTargetStart = AXTextMarkerRangeCopyStartMarker(initialTargetRange)
+      let extendedRange = AXTextMarkerRangeCreate(nil, initialTargetStart, extendedEnd)
+      if let extendedSentence = string(for: extendedRange, in: element) {
+        targetRange = extendedRange
+        targetSentence = extendedSentence
+      }
     }
 
     let targetStart = AXTextMarkerRangeCopyStartMarker(targetRange)
@@ -379,6 +404,58 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       targetSentence: targetSentence,
       previousSentence: previousSentence,
       nextSentence: nextSentence
+    )
+  }
+
+  private static func endsAtUnclosedOpeningDoubleQuote(_ text: String) -> Bool {
+    let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let lastCharacter = trimmedText.last else {
+      return false
+    }
+    if lastCharacter == "“" {
+      return true
+    }
+    guard lastCharacter == "\"" else {
+      return false
+    }
+    return trimmedText.filter { $0 == "\"" }.count.isMultiple(of: 2) == false
+  }
+
+  private func webParagraphSelectionContext(
+    selectedRange: AXTextMarkerRange,
+    in element: AXUIElement
+  ) -> SelectionSentenceContext? {
+    let selectionStart = AXTextMarkerRangeCopyStartMarker(selectedRange)
+    guard
+      let paragraphRange = textMarkerRangeParameterizedAttribute(
+        kAXParagraphTextMarkerRangeForTextMarkerParameterizedAttribute as CFString,
+        parameter: selectionStart,
+        from: element
+      ),
+      let paragraphText = rawString(for: paragraphRange, in: element),
+      let selectedText = rawString(for: selectedRange, in: element)
+    else {
+      return nil
+    }
+
+    let paragraphStart = AXTextMarkerRangeCopyStartMarker(paragraphRange)
+    let prefixText: String
+    if CFEqual(paragraphStart, selectionStart) {
+      prefixText = ""
+    } else {
+      let prefixRange = AXTextMarkerRangeCreate(nil, paragraphStart, selectionStart)
+      guard let value = rawString(for: prefixRange, in: element) else {
+        return nil
+      }
+      prefixText = value
+    }
+
+    return SelectionSentenceContext.extract(
+      from: paragraphText,
+      selectedRange: CFRange(
+        location: (prefixText as NSString).length,
+        length: (selectedText as NSString).length
+      )
     )
   }
 
@@ -512,17 +589,22 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     for range: AXTextMarkerRange,
     in element: AXUIElement
   ) -> String? {
-    guard
-      let value = copyParameterizedAttribute(
-        kAXStringForTextMarkerRangeParameterizedAttribute as CFString,
-        parameter: range,
-        from: element
-      ) as? String
-    else {
+    guard let value = rawString(for: range, in: element) else {
       return nil
     }
     let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return text.isEmpty ? nil : text
+  }
+
+  private func rawString(
+    for range: AXTextMarkerRange,
+    in element: AXUIElement
+  ) -> String? {
+    copyParameterizedAttribute(
+      kAXStringForTextMarkerRangeParameterizedAttribute as CFString,
+      parameter: range,
+      from: element
+    ) as? String
   }
 
   private func copyParameterizedAttribute(
