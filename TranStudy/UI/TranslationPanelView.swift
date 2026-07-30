@@ -214,7 +214,7 @@ struct TranslationPanelView: View {
 
       HStack(alignment: .bottom, spacing: 8) {
         DraftField(
-          title: "英文例句",
+          title: "例句",
           text: binding(\.exampleSentence),
           axis: .vertical
         )
@@ -225,7 +225,7 @@ struct TranslationPanelView: View {
       }
 
       DraftField(
-        title: "例句中文翻译",
+        title: "例句翻译",
         text: binding(\.sentenceTranslation),
         axis: .vertical
       )

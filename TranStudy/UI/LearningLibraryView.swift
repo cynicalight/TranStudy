@@ -29,7 +29,7 @@ struct LearningLibraryView: View {
         reduceMotion ? nil : .easeInOut(duration: 0.2),
         value: shell.isLibrarySelecting
       )
-      .padding(.horizontal, 12)
+      .padding(.horizontal, 20)
 
       Divider()
 
@@ -41,6 +41,7 @@ struct LearningLibraryView: View {
             .contentShape(.rect)
         }
         .listStyle(.inset)
+        .padding(.horizontal, 12)
       }
     }
     .task {
@@ -582,7 +583,7 @@ private struct LearningItemEditorView: View {
 
         Section {
           if item.kind == .word {
-            TextField("英文例句", text: $exampleSentence, axis: .vertical)
+            TextField("例句", text: $exampleSentence, axis: .vertical)
           }
           TextField("中文翻译", text: $sentenceTranslation, axis: .vertical)
         } header: {
@@ -607,7 +608,7 @@ private struct LearningItemEditorView: View {
           ForEach($customExamples) { $example in
             VStack(alignment: .leading, spacing: 8) {
               HStack {
-                TextField("英文例句", text: $example.englishText, axis: .vertical)
+                TextField("例句", text: $example.englishText, axis: .vertical)
                 Button(role: .destructive) {
                   customExamples.removeAll { $0.id == example.id }
                 } label: {

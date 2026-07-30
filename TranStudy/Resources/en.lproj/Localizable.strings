@@ -167,7 +167,7 @@
 "释义" = "Meaning";
 "主要例句" = "Primary Example";
 "句子翻译" = "Sentence Translation";
-"英文例句" = "English Example";
+"例句" = "Example";
 "中文翻译（可选）" = "Chinese Translation (Optional)";
 "个人笔记" = "Personal Notes";
 "删除自定义例句" = "Delete Custom Example";
@@ -220,7 +220,7 @@
 "原文音标" = "Source Pronunciation";
 "词典原形" = "Dictionary Form";
 "语境释义" = "Contextual Meaning";
-"例句中文翻译" = "Example Translation";
+"例句翻译" = "Example Translation";
 "修改会自动保存到本次草稿" = "Changes are saved automatically to this draft";
 "加入学习" = "Add to Learning";
 "合并到已有词条？" = "Merge Into Existing Entry?";
