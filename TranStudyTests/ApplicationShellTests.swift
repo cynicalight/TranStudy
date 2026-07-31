@@ -289,6 +289,7 @@ struct ApplicationShellTests {
   @Test("only joining learning persists the edited session draft")
   func onlyJoiningLearningPersistsEditedSessionDraft() async throws {
     let learningStore = TestLearningStore()
+    let diagnostics = TestDiagnosticLogger()
     let shell = ApplicationShell(
       environment: .test(
         clipboard: TestClipboardReader(text: "ran"),
@@ -302,7 +303,8 @@ struct ApplicationShellTests {
             exampleSentence: "She ran home.",
             sentenceTranslation: "她跑回了家。"
           )),
-        learningStore: learningStore
+        learningStore: learningStore,
+        diagnostics: diagnostics
       ))
 
     shell.prepareTranslationPresentation(sourceApplicationName: "Safari")
@@ -329,6 +331,37 @@ struct ApplicationShellTests {
           createdAt: Date(timeIntervalSince1970: 1_234)
         ))
     #expect(shell.translationDraft == nil)
+    #expect(diagnostics.events.map(\.stage) == [.learningAdditionStarted, .learningAdditionSucceeded])
+  }
+
+  @Test("a failed learning addition keeps the draft, reports the error, and records bounded diagnostics")
+  func failedLearningAdditionIsReportedAndDiagnosed() async {
+    let diagnostics = TestDiagnosticLogger()
+    let learningStore = TestLearningStore(additionError: .updateFailed)
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "ran"),
+        translation: TestTranslationProvider(
+          result: TranslationResult(
+            sourceText: "ran",
+            canonicalForm: "run",
+            pronunciation: "/ræn/",
+            partOfSpeech: "verb",
+            contextualMeaning: "跑",
+            exampleSentence: "She ran home.",
+            sentenceTranslation: "她跑回了家。"
+          )),
+        learningStore: learningStore,
+        diagnostics: diagnostics
+      ))
+
+    await shell.translateClipboard()
+    await shell.addCurrentDraftToLearning()
+
+    #expect(shell.translationDraft != nil)
+    #expect(shell.learningAdditionErrorMessage == "学习数据无法保存，请重试。")
+    #expect(diagnostics.events.map(\.stage) == [.learningAdditionStarted, .learningAdditionFailed])
+    #expect(diagnostics.events.last?.errorType == .storage)
   }
 
   @Test("correcting a canonical form to an existing word requires merge confirmation")
@@ -377,6 +410,46 @@ struct ApplicationShellTests {
     #expect(learningStore.lastAddition?.draft.canonicalForm == "run")
     #expect(shell.pendingLearningMerge == nil)
     #expect(shell.translationDraft == nil)
+  }
+
+  @Test("a failed confirmed merge closes the merge prompt and retains the draft")
+  func failedConfirmedLearningMergeIsReported() async {
+    let diagnostics = TestDiagnosticLogger()
+    let learningStore = TestLearningStore(
+      mergeSummary: LearningMergeSummary(
+        existingItemID: UUID(),
+        canonicalForm: "run",
+        existingEncounterCount: 2,
+        incomingSourceText: "ran"
+      ),
+      additionError: .updateFailed
+    )
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "ran"),
+        translation: TestTranslationProvider(
+          result: TranslationResult(
+            sourceText: "ran",
+            canonicalForm: "ran",
+            pronunciation: "/ræn/",
+            partOfSpeech: "verb",
+            contextualMeaning: "跑",
+            exampleSentence: "She ran home.",
+            sentenceTranslation: "她跑回了家。"
+          )),
+        learningStore: learningStore,
+        diagnostics: diagnostics
+      ))
+
+    await shell.translateClipboard()
+    shell.translationDraft?.canonicalForm = "run"
+    await shell.addCurrentDraftToLearning()
+    await shell.confirmPendingLearningMerge()
+
+    #expect(shell.pendingLearningMerge == nil)
+    #expect(shell.translationDraft != nil)
+    #expect(shell.learningAdditionErrorMessage == "学习数据无法保存，请重试。")
+    #expect(diagnostics.events.map(\.stage) == [.learningAdditionStarted, .learningAdditionFailed])
   }
 
   @Test("a successful selected-provider connection saves the API key")
@@ -1448,14 +1521,15 @@ extension ApplicationEnvironment {
     shortcutStore: TestTranslationShortcutStore = TestTranslationShortcutStore(),
     sentenceCardConfigurationStore: TestSentenceCardConfigurationStore =
       TestSentenceCardConfigurationStore(),
-    preparationStateStore: TestPreparationStateStore = TestPreparationStateStore()
+    preparationStateStore: TestPreparationStateStore = TestPreparationStateStore(),
+    diagnostics: any DiagnosticLogging = TestDiagnosticLogger()
   ) -> ApplicationEnvironment {
     ApplicationEnvironment(
       selection: TestSelectionProvider(),
       clipboard: clipboard,
       translation: translation,
       translationCache: InMemoryTranslationCacheStore(),
-      diagnostics: TestDiagnosticLogger(),
+      diagnostics: diagnostics,
       learningStore: learningStore,
       apiKeyStore: apiKeyStore,
       connectionTester: connectionTester,
@@ -1489,7 +1563,18 @@ private final class TestUpdateChecker: UpdateChecking {
 }
 
 @MainActor
-private struct TestDiagnosticLogger: DiagnosticLogging {}
+private final class TestDiagnosticLogger: DiagnosticLogging {
+  private(set) var events: [(stage: DiagnosticStage, errorType: DiagnosticErrorType?)] = []
+
+  func record(
+    stage: DiagnosticStage,
+    sourceApplicationIdentifier: String?,
+    errorType: DiagnosticErrorType?,
+    durationMilliseconds: Int?
+  ) {
+    events.append((stage, errorType))
+  }
+}
 
 private final class TestSentenceCardConfigurationStore:
   SentenceCardConfigurationStoring
@@ -1643,6 +1728,7 @@ private final class TestLearningStore: LearningStoring {
   private let storedMergeSummary: LearningMergeSummary?
   private var canonicalUpdateResults: [LearningCanonicalUpdateResult]
   private let detailsUpdateError: TestLearningStoreError?
+  private let additionError: TestLearningStoreError?
 
   init(
     summary: LearningSummary = LearningSummary(
@@ -1656,7 +1742,8 @@ private final class TestLearningStore: LearningStoring {
     pendingDeletion: PendingLearningDeletion? = nil,
     mergeSummary: LearningMergeSummary? = nil,
     canonicalUpdateResults: [LearningCanonicalUpdateResult] = [],
-    detailsUpdateError: TestLearningStoreError? = nil
+    detailsUpdateError: TestLearningStoreError? = nil,
+    additionError: TestLearningStoreError? = nil
   ) {
     storedSummary = summary
     storedItems = items
@@ -1666,6 +1753,7 @@ private final class TestLearningStore: LearningStoring {
     storedMergeSummary = mergeSummary
     self.canonicalUpdateResults = canonicalUpdateResults
     self.detailsUpdateError = detailsUpdateError
+    self.additionError = additionError
   }
 
   func summary(at date: Date) async throws -> LearningSummary {
@@ -1673,6 +1761,9 @@ private final class TestLearningStore: LearningStoring {
   }
 
   func add(_ addition: LearningAddition) async throws {
+    if let additionError {
+      throw additionError
+    }
     lastAddition = addition
   }
 

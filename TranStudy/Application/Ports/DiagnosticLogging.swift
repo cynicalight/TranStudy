@@ -4,6 +4,9 @@ enum DiagnosticStage: String, Codable, Sendable {
   case translationStarted
   case translationSucceeded
   case translationFailed
+  case learningAdditionStarted
+  case learningAdditionSucceeded
+  case learningAdditionFailed
   case learningDataExported
   case learningDataImported
   case learningDataCleared

@@ -29,6 +29,16 @@ struct TranslationPanelView: View {
     }
     .onExitCommand(perform: onDismiss)
     .alert(
+      "无法加入学习",
+      isPresented: learningAdditionErrorBinding
+    ) {
+      Button("好", role: .cancel) {
+        shell.clearLearningAdditionError()
+      }
+    } message: {
+      Text(shell.learningAdditionErrorMessage ?? "")
+    }
+    .alert(
       "合并到已有词条？",
       isPresented: pendingMergeBinding,
       presenting: shell.pendingLearningMerge
@@ -278,6 +288,17 @@ struct TranslationPanelView: View {
     Binding(
       get: { shell.pendingLearningMerge != nil },
       set: { _ in }
+    )
+  }
+
+  private var learningAdditionErrorBinding: Binding<Bool> {
+    Binding(
+      get: { shell.learningAdditionErrorMessage != nil },
+      set: { isPresented in
+        if !isPresented {
+          shell.clearLearningAdditionError()
+        }
+      }
     )
   }
 }

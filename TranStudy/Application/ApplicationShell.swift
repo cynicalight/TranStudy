@@ -82,6 +82,7 @@ final class ApplicationShell {
   private(set) var isLaunchAtLoginEnabled: Bool
   private(set) var automaticallyChecksForUpdates: Bool
   private(set) var pendingLearningMerge: LearningMergeSummary?
+  private(set) var learningAdditionErrorMessage: String?
   private(set) var pendingLibraryMerge: LearningMergeSummary?
   private(set) var pendingLibraryDeletion: LearningItem?
   private(set) var translationPanelPosition: TranslationPanelPosition
@@ -807,6 +808,8 @@ final class ApplicationShell {
       return
     }
 
+    learningAdditionErrorMessage = nil
+
     selectionDebugLog(
       "add to learning started: sourceApp=\(translationSourceApplicationName) canonicalLength=\(translationDraft.canonicalForm.count)"
     )
@@ -820,19 +823,19 @@ final class ApplicationShell {
       let correctedCanonicalForm =
         NormalizedCanonicalForm(translationDraft.canonicalForm)
         != NormalizedCanonicalForm(translationSuggestedCanonicalForm)
-      if correctedCanonicalForm,
-        let mergeSummary = try await environment.learningStore.mergeSummary(for: addition)
-      {
-        pendingLearningMerge = mergeSummary
-        pendingLearningAddition = addition
-        selectionDebugLog("add to learning paused: merge confirmation required")
-        return
+      if correctedCanonicalForm {
+        if let mergeSummary = try await environment.learningStore.mergeSummary(for: addition) {
+          pendingLearningMerge = mergeSummary
+          pendingLearningAddition = addition
+          selectionDebugLog("add to learning paused: merge confirmation required")
+          return
+        }
       }
 
       try await persistLearningAddition(addition)
     } catch {
       selectionDebugLog("add to learning failed: errorType=\(String(reflecting: type(of: error)))")
-      // The translation panel keeps the draft available when persistence fails.
+      handleLearningAdditionFailure()
     }
   }
 
@@ -841,16 +844,22 @@ final class ApplicationShell {
       return
     }
 
+    learningAdditionErrorMessage = nil
+
     do {
       try await persistLearningAddition(pendingLearningAddition)
     } catch {
-      // The translation panel keeps the draft and merge summary available on failure.
+      handleLearningAdditionFailure()
     }
   }
 
   func cancelPendingLearningMerge() {
     pendingLearningMerge = nil
     pendingLearningAddition = nil
+  }
+
+  func clearLearningAdditionError() {
+    learningAdditionErrorMessage = nil
   }
 
   func refreshLibrary() async {
@@ -1409,7 +1418,17 @@ final class ApplicationShell {
   }
 
   private func persistLearningAddition(_ addition: LearningAddition) async throws {
+    let startedAt = Date()
+    environment.diagnostics.record(
+      stage: .learningAdditionStarted,
+      sourceApplicationIdentifier: translationSourceApplicationIdentifier
+    )
     try await environment.learningStore.add(addition)
+    environment.diagnostics.record(
+      stage: .learningAdditionSucceeded,
+      sourceApplicationIdentifier: translationSourceApplicationIdentifier,
+      durationMilliseconds: Int(Date().timeIntervalSince(startedAt) * 1_000)
+    )
     selectionDebugLog("add to learning persisted")
     translationDraft = nil
     translationSuggestedCanonicalForm = ""
@@ -1419,5 +1438,16 @@ final class ApplicationShell {
     translationStatus = .idle
     await refreshTodayReview()
     await refreshLibrary()
+  }
+
+  private func handleLearningAdditionFailure() {
+    environment.diagnostics.record(
+      stage: .learningAdditionFailed,
+      sourceApplicationIdentifier: translationSourceApplicationIdentifier,
+      errorType: .storage
+    )
+    pendingLearningMerge = nil
+    pendingLearningAddition = nil
+    learningAdditionErrorMessage = "学习数据无法保存，请重试。"
   }
 }
