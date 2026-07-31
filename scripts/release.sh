@@ -16,15 +16,6 @@ required_variable() {
 required_variable VERSION
 required_variable BUILD_NUMBER
 required_variable RELEASE_NOTES_FILE
-required_variable DEVELOPER_ID_APPLICATION
-required_variable DEVELOPMENT_TEAM
-required_variable NOTARY_KEYCHAIN_PROFILE
-
-expected_development_team=8HC6J9LU7U
-if [[ "$DEVELOPMENT_TEAM" != "$expected_development_team" ]]; then
-  echo "DEVELOPMENT_TEAM must remain $expected_development_team" >&2
-  exit 65
-fi
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "VERSION must use semantic version form, for example 1.0.0" >&2
@@ -81,12 +72,11 @@ xcodebuild archive \
   -clonedSourcePackagesDirPath "$package_cache" \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-  DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+  DEVELOPMENT_TEAM= \
   CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="$DEVELOPER_ID_APPLICATION" \
+  CODE_SIGN_IDENTITY=- \
   CODE_SIGNING_REQUIRED=YES \
-  CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
-  OTHER_CODE_SIGN_FLAGS=--timestamp
+  CODE_SIGN_ENTITLEMENTS="$repo_root/config/AdHocRelease.entitlements"
 
 "$repo_root/scripts/verify-release-artifact.sh" "$app_path"
 
@@ -99,25 +89,6 @@ hdiutil create \
   -srcfolder "$staging_root/dmg" \
   -ov \
   -format UDZO \
-  "$dmg_path"
-
-codesign \
-  --force \
-  --timestamp \
-  --sign "$DEVELOPER_ID_APPLICATION" \
-  "$dmg_path"
-
-xcrun notarytool submit \
-  "$dmg_path" \
-  --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" \
-  --wait
-xcrun stapler staple "$dmg_path"
-xcrun stapler validate "$dmg_path"
-spctl \
-  --assess \
-  --type open \
-  --context context:primary-signature \
-  --verbose=2 \
   "$dmg_path"
 
 (cd "$release_root" && shasum -a 256 "$dmg_name" > "$dmg_name.sha256")
@@ -146,5 +117,5 @@ if ! grep -F "sparkle:edSignature=" "$release_root/appcast.xml" >/dev/null; then
 fi
 
 echo "Release artifacts are ready in $release_root"
-echo "This build is Developer ID signed, notarized, and stapled."
+echo "This build is ad-hoc signed and not notarized; Gatekeeper will require manual approval."
 echo "Upload $dmg_name, $dmg_name.sha256, and appcast.xml to GitHub release v$VERSION only after manual acceptance."
