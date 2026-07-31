@@ -15,7 +15,7 @@
 
 ## 中文
 
-TranStudy 是一款原生 macOS 语境翻译与间隔复习应用。它把你在阅读中遇到的单词、短语和句子，从一次临时翻译变成可以持续积累和复习的学习内容。
+TranStudy 是一款原生 macOS 语境翻译与间隔复习应用。它把你在阅读中**遇到**的单词、短语和句子，从一次临时翻译变成可以持续积累和复习的学习内容。
 
 ### 下载与安装
 
@@ -27,11 +27,20 @@ TranStudy 是一款原生 macOS 语境翻译与间隔复习应用。它把你在
 
 在支持直接划词的应用中，用鼠标选中单词、短语或句子后，TranStudy 会在选区旁显示轻量的翻译图标。点击图标后，应用才会读取选区和必要的上下文并请求翻译。
 
+<img width="939" height="241" alt="image" src="https://github.com/user-attachments/assets/34f25e07-5fa3-45ef-b5db-269201a0a3ed" />
+
+
 如果当前应用或内容无法显示翻译图标，先复制需要翻译的文字，再按默认全局快捷键 F5，即可强制翻译剪贴板内容。你可以在设置中修改这个快捷键，也可以在应用内翻译长文本。
+
+<img width="536" height="397" alt="image" src="https://github.com/user-attachments/assets/8c7329a5-8931-43e8-9391-ec322e0d26a8" />
+
 
 ### 不只翻译单词，也保留遇见它的语境
 
-划词翻译不会把选中的生词孤立处理：TranStudy 会自动识别它所在的完整句子，并在可用时带上前后句作为翻译上下文。选择“加入学习”后，应用会保留你当时看到的原始句子及其译文，作为该生词的真实遇见记录，方便你在之后的复习中回到当时的语境。
+划词翻译不会把选中的生词孤立处理：TranStudy 会**自动识别**它所在的完整句子，并在可用时**带上前后句作为翻译上下文**。选择“加入学习”后，应用会保留你当时看到的原始句子及其译文，作为该生词的真实遇见记录，方便你在之后的复习中回到当时的语境。
+
+<img width="536" height="540" alt="image" src="https://github.com/user-attachments/assets/6e797735-8420-478e-8791-85564dd089f5" />
+
 
 ### 从翻译到学习
 
@@ -87,11 +96,19 @@ On first launch, TranStudy guides you through the Accessibility permission used 
 
 In apps that support direct selection translation, select a word, phrase, or sentence with the mouse and TranStudy shows a lightweight translation icon beside it. The app reads the selection and necessary context only after you click that icon.
 
+<img width="939" height="241" alt="image" src="https://github.com/user-attachments/assets/34f25e07-5fa3-45ef-b5db-269201a0a3ed" />
+
 If the icon cannot appear in the current app or content, copy the text you want to translate and press the default global shortcut, F5, to force a translation of the clipboard. You can change this shortcut in Settings or translate longer passages inside the app.
+
+<img width="536" height="397" alt="image" src="https://github.com/user-attachments/assets/8c7329a5-8931-43e8-9391-ec322e0d26a8" />
+
 
 ### More than a definition: retain the context in which you met a word
 
-TranStudy does not treat a selected word in isolation. It identifies the complete sentence containing it and, when available, includes the surrounding sentences as translation context. When you choose “Add to Learning,” the original sentence you saw and its translation are retained as a real encounter record for that word, so later reviews can bring you back to that context.
+TranStudy does not treat a selected word in isolation. It **identifies the complete sentence containing it** and, when available, **includes the surrounding sentences as translation context**. When you choose “Add to Learning,” the original sentence you saw and its translation are retained as a real encounter record for that word, so later reviews can bring you back to that context.
+
+<img width="536" height="540" alt="image" src="https://github.com/user-attachments/assets/6e797735-8420-478e-8791-85564dd089f5" />
+
 
 ### Turn translations into learning
 
