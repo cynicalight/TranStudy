@@ -9,6 +9,7 @@ fi
 
 app_path=$1
 info_plist="$app_path/Contents/Info.plist"
+expected_development_team=8HC6J9LU7U
 
 if [[ ! -f "$info_plist" ]]; then
   echo "missing app Info.plist: $info_plist" >&2
@@ -46,25 +47,34 @@ if [[ ! -d "$app_path/Contents/Frameworks/Sparkle.framework" ]]; then
 fi
 
 signature_details=$(codesign --display --verbose=4 "$app_path" 2>&1)
-if ! grep -F "Signature=adhoc" <<<"$signature_details" >/dev/null; then
-  echo "app is not ad-hoc signed" >&2
+if grep -F "Signature=adhoc" <<<"$signature_details" >/dev/null; then
+  echo "release app must not use an ad-hoc signature" >&2
+  exit 65
+fi
+if ! grep -F "Authority=Developer ID Application:" <<<"$signature_details" >/dev/null; then
+  echo "release app must be signed with a Developer ID Application certificate" >&2
+  exit 65
+fi
+if ! grep -F "TeamIdentifier=$expected_development_team" <<<"$signature_details" >/dev/null
+then
+  echo "release app must be signed by Team ID $expected_development_team" >&2
+  exit 65
+fi
+if ! grep -E 'flags=.*runtime' <<<"$signature_details" >/dev/null; then
+  echo "release app must enable Hardened Runtime" >&2
+  exit 65
+fi
+if codesign --display --entitlements :- "$app_path" 2>&1 |
+  grep -F "com.apple.security.cs.disable-library-validation" >/dev/null
+then
+  echo "release app must not disable library validation" >&2
+  exit 65
+fi
+designated_requirement=$(codesign -d -r- "$app_path" 2>&1)
+if grep -F "cdhash" <<<"$designated_requirement" >/dev/null; then
+  echo "release app has a build-specific designated requirement" >&2
   exit 65
 fi
 
-if grep -E 'flags=.*runtime' <<<"$signature_details" >/dev/null; then
-  normalized_entitlements=$(
-    codesign --display --entitlements :- "$app_path" 2>&1 |
-      tr -d '[:space:]'
-  )
-  if ! grep -F \
-    '<key>com.apple.security.cs.disable-library-validation</key><true/>' \
-    <<<"$normalized_entitlements" >/dev/null
-  then
-    echo \
-      "ad-hoc hardened runtime must disable library validation so Sparkle can load without a Team ID" \
-      >&2
-    exit 65
-  fi
-fi
-
+codesign --verify --deep --strict --verbose=2 "$app_path"
 echo "Release configuration is valid."

@@ -52,7 +52,7 @@ TranStudy 根据学习记录安排每日复习。卡片会先邀请你回忆，�
 
 ### 隐私
 
-API 密钥保存在 macOS 钥匙串中，学习记录保存在这台 Mac 上。TranStudy 只会把你明确请求翻译的文字发送给当前选择的翻译服务，不会在请求失败后自动转发给其他服务。密码框、受保护内容和无法确认安全属性的输入区域不会显示划词翻译入口。
+API 密钥保存在 macOS 钥匙串中，学习记录固定保存在这台 Mac 的 `~/Library/Application Support/TranStudy/learning.store`。升级时会沿用这个数据库；从旧版本首次升级时，TranStudy 会复制旧数据库但保留原文件作为回退。TranStudy 只会把你明确请求翻译的文字发送给当前选择的翻译服务，不会在请求失败后自动转发给其他服务。密码框、受保护内容和无法确认安全属性的输入区域不会显示划词翻译入口。
 
 ### 从源码构建
 
@@ -120,7 +120,7 @@ TranStudy schedules daily reviews from your learning history. Each card asks you
 
 ### Privacy
 
-API keys are stored in the macOS Keychain, and learning records remain on this Mac. TranStudy sends only text you explicitly ask to translate to the currently selected provider and never forwards it to another provider after a failure. Password fields, protected content, and inputs whose security cannot be verified never show the selection-translation entry point.
+API keys are stored in the macOS Keychain. Learning records remain on this Mac at `~/Library/Application Support/TranStudy/learning.store`. Updates reuse this database; on the first upgrade from an older version, TranStudy copies the legacy database while leaving the original file in place as a fallback. TranStudy sends only text you explicitly ask to translate to the selected translation service and never forwards a failed request to another service automatically. Selection translation is unavailable in password fields, protected content, and inputs whose security properties cannot be confirmed.
 
 ### Build from source
 

@@ -23,6 +23,7 @@ fi
 version=$1
 release_notes_input=${2:-}
 tag="v$version"
+expected_development_team=8HC6J9LU7U
 
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "VERSION must use semantic version form, for example 1.0.0" >&2
@@ -49,12 +50,43 @@ if [[ -n "$release_notes_input" ]]; then
   fi
 fi
 
-for command_name in git gh xcodegen xcodebuild hdiutil codesign shasum perl; do
+for command_name in git gh xcodegen xcodebuild hdiutil codesign shasum perl security xcrun spctl
+do
   if ! command -v "$command_name" >/dev/null; then
     echo "required command is unavailable: $command_name" >&2
     exit 69
   fi
 done
+
+for variable_name in DEVELOPER_ID_APPLICATION DEVELOPMENT_TEAM NOTARY_KEYCHAIN_PROFILE
+do
+  if [[ -z "${!variable_name:-}" ]]; then
+    echo "missing required environment variable: $variable_name" >&2
+    exit 64
+  fi
+done
+
+if [[ "$DEVELOPER_ID_APPLICATION" != "Developer ID Application:"* ]]; then
+  echo "DEVELOPER_ID_APPLICATION must name a Developer ID Application certificate" >&2
+  exit 65
+fi
+if [[ "$DEVELOPMENT_TEAM" != "$expected_development_team" ]]; then
+  echo "DEVELOPMENT_TEAM must remain $expected_development_team" >&2
+  exit 65
+fi
+if [[ "$DEVELOPER_ID_APPLICATION" != *"($DEVELOPMENT_TEAM)" ]]; then
+  echo "Developer ID certificate does not match DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM" >&2
+  exit 65
+fi
+if ! security find-identity -v -p codesigning |
+  grep -F "\"$DEVELOPER_ID_APPLICATION\"" >/dev/null
+then
+  echo "Developer ID signing identity is unavailable: $DEVELOPER_ID_APPLICATION" >&2
+  exit 69
+fi
+xcrun notarytool history \
+  --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" \
+  >/dev/null
 
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "publishing requires a clean Git worktree" >&2
@@ -200,15 +232,18 @@ else
 fi
 
 {
-  printf '\n\n## Installation note\n\n'
+  printf '\n\n## Distribution\n\n'
   printf '%s\n' \
-    'This build is ad-hoc signed and is not notarized by Apple. On first launch, Control-click TranStudy in Finder, choose Open, and confirm Open. If macOS still blocks it, open System Settings → Privacy & Security and choose Open Anyway.'
+    'This build is signed with Developer ID and notarized by Apple.'
 } >>"$temporary_notes_file"
 release_notes_file=$temporary_notes_file
 
 VERSION="$version" \
 BUILD_NUMBER="$build_number" \
 RELEASE_NOTES_FILE="$release_notes_file" \
+DEVELOPER_ID_APPLICATION="$DEVELOPER_ID_APPLICATION" \
+DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+NOTARY_KEYCHAIN_PROFILE="$NOTARY_KEYCHAIN_PROFILE" \
 "$repo_root/scripts/release.sh"
 
 dmg_path="$release_root/TranStudy-$version.dmg"

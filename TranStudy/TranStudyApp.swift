@@ -11,11 +11,14 @@ struct TranStudyApp: App {
 
   init() {
     do {
+      let learningStoreURL = try LearningStoreLocation.preparePersistentStoreURL()
+      let learningStoreConfiguration = ModelConfiguration(url: learningStoreURL)
       let container = try ModelContainer(
         for: LearningRecord.self,
         LearningEncounterRecord.self,
         ReviewEventRecord.self,
-        LearningCustomExampleRecord.self
+        LearningCustomExampleRecord.self,
+        configurations: learningStoreConfiguration
       )
       let learningStore = SwiftDataLearningStore(container: container)
       let keychainAPIKeyStore = KeychainAPIKeyStore()

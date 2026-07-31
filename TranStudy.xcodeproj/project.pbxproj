@@ -68,6 +68,7 @@
 		7CC518EB0F1D77B98C07E3B8 /* UserDefaultsTranslationShortcutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53117D8CA78643C2E15E1ABC /* UserDefaultsTranslationShortcutStore.swift */; };
 		8156F0FBB03325CB554344A3 /* ReviewNotifying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85F0ABB45046E453F49E09F0 /* ReviewNotifying.swift */; };
 		833F58D6913BBE884FB2F816 /* TranStudyMenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C57CF853032E50F7585A2C /* TranStudyMenuBarView.swift */; };
+		837A3D7CE7D992EB6D87BE3A /* LearningStoreLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46BE6F842A400F7C618766A7 /* LearningStoreLocationTests.swift */; };
 		860F99390DBEE14A5C589220 /* SelectionControlPrivacyPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CDE06FF6539F55A85447EE /* SelectionControlPrivacyPolicyTests.swift */; };
 		88821573FEF25770D94B02B0 /* TranslationProviderConfigurationStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8BE5C0264C96192636A7296 /* TranslationProviderConfigurationStoring.swift */; };
 		8B6979F4F5A3A20BA36794BA /* DeepSeekTranslationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B090391F21377B9C6570B1 /* DeepSeekTranslationProvider.swift */; };
@@ -93,6 +94,7 @@
 		B285870C915EA43E0DF6CFD6 /* TranStudyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571B54B2E6D38AF604F0A9CF /* TranStudyApp.swift */; };
 		B2C27B8FF85F6DDA62E9D246 /* UserDefaultsReviewReminderConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1093EEE58D21A15DBE04BED3 /* UserDefaultsReviewReminderConfigurationStore.swift */; };
 		B505F81E9E4C381CA14257CB /* SystemLoginItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD86F07513671D7779208523 /* SystemLoginItemController.swift */; };
+		B55E59D42C66F3A600843EC8 /* LearningStoreLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B595ED56E0BC50B34B32B21F /* LearningStoreLocation.swift */; };
 		B64A33485150F63433B22B49 /* LoginItemControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE5A9F38FC1A60D1EDB9DEB /* LoginItemControlling.swift */; };
 		B673B7C619B55B391532CE34 /* UserDefaultsSelectionConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750FA4507656C9EEDC4A7999 /* UserDefaultsSelectionConfigurationStore.swift */; };
 		B8CB94CCB664DFF18D8F5E41 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 81A266B23E770317BA37F1EC /* Assets.xcassets */; };
@@ -166,6 +168,7 @@
 		41B966A1D5F567119371D2A6 /* TranslationPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationPanelController.swift; sourceTree = "<group>"; };
 		424286180F77266E10247C2D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		43E53CB8B638AB399CF642CA /* SystemUpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemUpdateChecker.swift; sourceTree = "<group>"; };
+		46BE6F842A400F7C618766A7 /* LearningStoreLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningStoreLocationTests.swift; sourceTree = "<group>"; };
 		47B05F425B1609D79265A448 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		48241DB06ACAAE69985BD80E /* APIKeyStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyStoring.swift; sourceTree = "<group>"; };
 		4D3DF5A919583DACB3C3F2C6 /* ApplicationShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationShellTests.swift; sourceTree = "<group>"; };
@@ -216,6 +219,7 @@
 		B0BDB21DE5F588FBC1EFD744 /* DebugEnvironmentAPIKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugEnvironmentAPIKeyStore.swift; sourceTree = "<group>"; };
 		B2C57CF853032E50F7585A2C /* TranStudyMenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranStudyMenuBarView.swift; sourceTree = "<group>"; };
 		B2D7D4A04CAA11570C8CADBA /* InMemoryTranslationCacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryTranslationCacheStore.swift; sourceTree = "<group>"; };
+		B595ED56E0BC50B34B32B21F /* LearningStoreLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningStoreLocation.swift; sourceTree = "<group>"; };
 		B78F39F9180371FA772AB600 /* ReviewReminderScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewReminderScheduleTests.swift; sourceTree = "<group>"; };
 		B98CE2679ABF75913F452472 /* DailyReviewQueueBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyReviewQueueBuilderTests.swift; sourceTree = "<group>"; };
 		B9BE4EAE91AC635283C63A56 /* LearningDataArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDataArchiveTests.swift; sourceTree = "<group>"; };
@@ -355,6 +359,7 @@
 				4EEE85F9735809ED9CD92FA0 /* DiagnosticLogStoreTests.swift */,
 				FC301A9843F17C3F82994E40 /* LanguageAndSpeechPreferencesStoreTests.swift */,
 				B9BE4EAE91AC635283C63A56 /* LearningDataArchiveTests.swift */,
+				46BE6F842A400F7C618766A7 /* LearningStoreLocationTests.swift */,
 				1D681D142094206B09400C9F /* OpenAICompatibleTranslationProviderTests.swift */,
 				0E6A2510EA1EBFD2CD7850E8 /* ReviewReminderConfigurationStoreTests.swift */,
 				00DF6DAE5933C308DFECC564 /* ReviewReminderMonitorTests.swift */,
@@ -442,6 +447,7 @@
 				AF0BF09CC14F614FF2F26142 /* LearningCustomExampleRecord.swift */,
 				0107B42BEC4FF8B96FE60E43 /* LearningEncounterRecord.swift */,
 				84E8389C189D488477B36DB5 /* LearningRecord.swift */,
+				B595ED56E0BC50B34B32B21F /* LearningStoreLocation.swift */,
 				29D89020FC50C5D7B244ADBA /* ReviewEventRecord.swift */,
 				3B9AD4FA6759148ACAC9F430 /* SwiftDataLearningStore.swift */,
 				AA038E623D46BF1FBE2876E2 /* UserDefaultsLanguageAndSpeechPreferencesStore.swift */,
@@ -572,6 +578,7 @@
 				AC3279EDA5FAB648208A92A9 /* DiagnosticLogStoreTests.swift in Sources */,
 				28368906A01C219296FE0F54 /* LanguageAndSpeechPreferencesStoreTests.swift in Sources */,
 				F1757EADD0F88274F57BA1A1 /* LearningDataArchiveTests.swift in Sources */,
+				837A3D7CE7D992EB6D87BE3A /* LearningStoreLocationTests.swift in Sources */,
 				6D9AC012DA735C61A1420CF4 /* OpenAICompatibleTranslationProviderTests.swift in Sources */,
 				C2BC3AA1DAD8ECEA07500E91 /* ReviewReminderConfigurationStoreTests.swift in Sources */,
 				5EC6737A5DF63A0B1DE00146 /* ReviewReminderMonitorTests.swift in Sources */,
@@ -621,6 +628,7 @@
 				AE362D87A755D987E198302D /* LearningEncounterRecord.swift in Sources */,
 				CFCB5C16A568BA97C7B592F5 /* LearningLibraryView.swift in Sources */,
 				A76D820347D2D2AFEC2890B9 /* LearningRecord.swift in Sources */,
+				B55E59D42C66F3A600843EC8 /* LearningStoreLocation.swift in Sources */,
 				A1EE03E0CFFCA2BFDD311541 /* LearningStoring.swift in Sources */,
 				B64A33485150F63433B22B49 /* LoginItemControlling.swift in Sources */,
 				5E04BA3FB10AD85ABC18B555 /* LongTextTranslationView.swift in Sources */,
