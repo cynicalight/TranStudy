@@ -21,7 +21,7 @@ TranStudy 是一款原生 macOS 语境翻译与间隔复习应用。它把你在
 
 前往 [GitHub Releases](https://github.com/cynicalight/TranStudy/releases)，在最新版本的 Assets 中下载以 `.dmg` 结尾的安装包。打开 DMG 后，将 TranStudy 拖入“应用程序”文件夹，然后从“应用程序”中启动。TranStudy 需要 macOS 14 或更高版本。
 
-首次启动时，应用会引导你配置划词所需的辅助功能权限、翻译服务和可选的复习通知。你可以使用 DeepSeek，或填写自定义地址和模型来连接 OpenAI 兼容接口。
+首次启动时，应用会引导你配置划词所需的辅助功能权限、翻译服务和可选的复习通知。你可以使用 DeepSeek，或填写自定义地址和模型来连接 OpenAI 兼容接口。推荐使用 [DeepSeek-V4-Flash](https://platform.deepseek.com/)，经济实惠且效果出色。
 
 ### 两种划词翻译方式
 
@@ -90,7 +90,7 @@ TranStudy is a native macOS app for contextual translation and spaced-repetition
 
 Visit [GitHub Releases](https://github.com/cynicalight/TranStudy/releases) and download the `.dmg` file from the Assets section of the latest release. Open the DMG, drag TranStudy into the Applications folder, and launch it from Applications. TranStudy requires macOS 14 or later.
 
-On first launch, TranStudy guides you through the Accessibility permission used for selection translation, translation-service configuration, and optional review notifications. You can use DeepSeek or connect to an OpenAI-compatible endpoint with a custom base URL and model.
+On first launch, TranStudy guides you through the Accessibility permission used for selection translation, translation-service configuration, and optional review notifications. You can use DeepSeek or connect to an OpenAI-compatible endpoint with a custom base URL and model. We recommend [DeepSeek-V4-Flash](https://platform.deepseek.com/) for its strong quality-to-cost ratio.
 
 ### Two ways to translate selected text
 
