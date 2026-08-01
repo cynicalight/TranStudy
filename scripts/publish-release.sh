@@ -202,7 +202,7 @@ fi
 {
   printf '\n\n## Installation note\n\n'
   printf '%s\n' \
-    'This build is ad-hoc signed and is not notarized by Apple. On first launch, Control-click TranStudy in Finder, choose Open, and confirm Open. If macOS still blocks it, open System Settings → Privacy & Security and choose Open Anyway.'
+    'This build uses TranStudy’s fixed self-signed identity and is not notarized by Apple. On first launch, Control-click TranStudy in Finder, choose Open, and confirm Open. If macOS still blocks it, open System Settings → Privacy & Security and choose Open Anyway.'
 } >>"$temporary_notes_file"
 release_notes_file=$temporary_notes_file
 

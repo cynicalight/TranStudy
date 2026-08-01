@@ -1,12 +1,14 @@
 # Releasing TranStudy
 
-TranStudy is distributed as a macOS 14+ DMG through GitHub Releases. GitHub distribution does not require an Apple Developer Program membership, so release builds are ad-hoc signed and are not notarized by Apple. The stable bundle identifier remains `com.cynicalight.TranStudy`. Sparkle 2.9.4 checks the HTTPS appcast at most once per week only when the user enables automatic checks. Automatic downloads and installations are disabled at the framework configuration level, so every update requires an explicit user decision.
+TranStudy is distributed as a macOS 14+ DMG through GitHub Releases. GitHub distribution does not require an Apple Developer Program membership. Releases use the fixed self-signed identity `TranStudy GitHub Release` and are not notarized by Apple. The bundle identifier remains `com.cynicalight.TranStudy`, and the release certificate SHA-1 fingerprint remains `D8877EB8F9C65B7D6D2EEA6E96A7C41C8AF2CB0A`. Sparkle 2.9.4 checks the HTTPS appcast at most once per week only when the user enables automatic checks. Automatic downloads and installations are disabled at the framework configuration level, so every update requires an explicit user decision.
 
 ## One-time preparation
 
 The Sparkle private EdDSA key is stored only in the login keychain; its public key is `e0FYHC/ETQiiTfpRq8QHxRleYusmX6weOrlLmY7Xpow=`. Back up the private key to protected offline storage with Sparkle’s `generate_keys -x` command, then remove the exported file from the working machine after confirming the backup.
 
 The private Sparkle key must never be committed, uploaded as a release asset, or stored on the web server that hosts GitHub Releases.
+
+The `TranStudy GitHub Release` private key lives in the developer's login keychain, with a password-protected `.p12` backup stored outside the repository. The public certificate is embedded in signed releases, and its fingerprint in `config/GitHubReleaseSigning.sh` is safe to commit. Users do not install or maintain the private key. The fixed public fingerprint prevents accidental releases with a different identity.
 
 ## Build the DMG
 
@@ -19,7 +21,7 @@ RELEASE_NOTES_FILE='/absolute/path/to/release-notes.md' \
 scripts/release.sh
 ```
 
-The script refuses to overwrite an existing release directory. It archives with the requested marketing version and monotonically increasing build number, verifies the embedded update policy and Sparkle framework, applies an ad-hoc code signature, creates a drag-to-Applications DMG and SHA-256 checksum, and creates an `appcast.xml` whose update enclosure is signed with Sparkle’s EdDSA key. Because ad-hoc signatures do not share an Apple Team ID with Sparkle, the release archive keeps Hardened Runtime enabled but disables Library Validation so macOS can load the embedded framework. The script does not create or upload a GitHub Release.
+The script refuses to overwrite an existing release directory. It archives with the requested marketing version and monotonically increasing build number, signs the app with the fixed self-signed identity, verifies the embedded update policy, Sparkle framework, certificate fingerprint, and designated requirement, creates a drag-to-Applications DMG and SHA-256 checksum, and creates an `appcast.xml` whose update enclosure is signed with Sparkle’s EdDSA key. The release keeps Hardened Runtime enabled but disables Library Validation so macOS can load the separately signed Sparkle framework. The script does not create or upload a GitHub Release.
 
 ## Build and publish automatically
 
@@ -60,4 +62,4 @@ gh release create "v<VERSION>" \
   --notes-file "build/releases/<VERSION>/TranStudy-<VERSION>.md"
 ```
 
-Do not publish the release until the DMG and `appcast.xml` are both present, because the stable feed URL resolves to the latest release asset. Preserve the `.xcarchive`, dSYMs, release notes, checksum, and acceptance record. Ad-hoc signatures identify only one build, so macOS may require users to grant privacy permissions again after an update; eliminating that limitation requires a stable signing identity and is separate from publishing through GitHub.
+Do not publish the release until the DMG and `appcast.xml` are both present, because the stable feed URL resolves to the latest release asset. Preserve the `.xcarchive`, dSYMs, release notes, checksum, and acceptance record. The first update from an older ad-hoc build to the fixed self-signed identity may require privacy permissions to be granted once more. Later releases must keep the same certificate, bundle identifier, and designated requirement.

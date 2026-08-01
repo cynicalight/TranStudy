@@ -76,8 +76,9 @@ xcodebuild archive \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY=- \
   CODE_SIGNING_REQUIRED=YES \
-  CODE_SIGN_ENTITLEMENTS="$repo_root/config/AdHocRelease.entitlements"
+  CODE_SIGN_ENTITLEMENTS="$repo_root/config/GitHubRelease.entitlements"
 
+"$repo_root/scripts/sign-release-artifact.sh" "$app_path"
 "$repo_root/scripts/verify-release-artifact.sh" "$app_path"
 
 mkdir -p "$staging_root/dmg"
@@ -117,5 +118,5 @@ if ! grep -F "sparkle:edSignature=" "$release_root/appcast.xml" >/dev/null; then
 fi
 
 echo "Release artifacts are ready in $release_root"
-echo "This build is ad-hoc signed and not notarized; Gatekeeper will require manual approval."
+echo "This build uses the fixed TranStudy self-signed identity and is not notarized."
 echo "Upload $dmg_name, $dmg_name.sha256, and appcast.xml to GitHub release v$VERSION only after manual acceptance."
