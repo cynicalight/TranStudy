@@ -258,9 +258,8 @@ struct TranslationPanelView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .contentShape(.capsule)
-            .adaptiveTintedGlassCapsule()
         }
-        .buttonStyle(.plain)
+        .adaptiveTintedGlassButton()
         .disabled(
           shell.translationDraft?.canonicalForm
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true

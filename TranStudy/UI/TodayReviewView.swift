@@ -62,9 +62,8 @@ struct TodayReviewView: View {
               .padding(.vertical, 10)
               .frame(maxWidth: .infinity, minHeight: 64)
               .contentShape(.capsule)
-              .adaptiveTintedGlassCapsule()
           }
-          .buttonStyle(.plain)
+          .adaptiveTintedGlassButton()
           .disabled(shell.currentReviewItem == nil && !shell.hasMoreReviewBatches)
         }
         .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)

@@ -174,6 +174,12 @@ extension View {
   ) -> some View {
     modifier(AdaptiveGlassModifier(shape: Capsule(), tint: tint))
   }
+
+  func adaptiveTintedGlassButton(
+    tint: Color = TranStudyDesign.accentColor
+  ) -> some View {
+    modifier(AdaptiveTintedGlassButtonModifier(tint: tint))
+  }
 }
 
 private struct ContentSurfaceModifier: ViewModifier {
@@ -225,6 +231,26 @@ private struct AdaptiveGlassModifier<GlassShape: Shape>: ViewModifier {
           shape
             .stroke(.separator.opacity(0.35), lineWidth: 1)
         }
+    }
+  }
+}
+
+private struct AdaptiveTintedGlassButtonModifier: ViewModifier {
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+  let tint: Color
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if !reduceTransparency, #available(macOS 26, *) {
+      content
+        .buttonStyle(.glassProminent)
+        .tint(tint)
+        .buttonBorderShape(.capsule)
+    } else {
+      content
+        .buttonStyle(.plain)
+        .adaptiveTintedGlassCapsule(tint: tint)
     }
   }
 }
