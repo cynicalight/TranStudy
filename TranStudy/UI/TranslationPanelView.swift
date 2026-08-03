@@ -254,19 +254,21 @@ struct TranslationPanelView: View {
         } label: {
           Label("加入学习", systemImage: "plus")
             .font(.body.weight(.semibold))
-            .foregroundStyle(TranStudyDesign.accentForegroundColor)
+            .foregroundStyle(isAddToLearningDisabled ? .black : .white)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .contentShape(.capsule)
         }
         .adaptiveTintedGlassButton()
-        .disabled(
-          shell.translationDraft?.canonicalForm
-            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
-        )
+        .disabled(isAddToLearningDisabled)
       }
     }
     .padding(4)
+  }
+
+  private var isAddToLearningDisabled: Bool {
+    shell.translationDraft?.canonicalForm
+      .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
   }
 
   private func binding(_ keyPath: WritableKeyPath<TranslationDraft, String>) -> Binding<String> {
