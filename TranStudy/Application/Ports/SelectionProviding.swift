@@ -21,6 +21,7 @@ struct SelectionSnapshot: Equatable, Sendable {
   let targetSentence: String?
   let previousSentence: String?
   let nextSentence: String?
+  let wordContext: SelectionWordContext?
   let screenPosition: CGPoint
   let sourceApplicationName: String
   let sourceApplicationIdentifier: String?
@@ -30,6 +31,7 @@ struct SelectionSnapshot: Equatable, Sendable {
     targetSentence: String?,
     previousSentence: String?,
     nextSentence: String?,
+    wordContext: SelectionWordContext? = nil,
     screenPosition: CGPoint,
     sourceApplicationName: String,
     sourceApplicationIdentifier: String? = nil
@@ -38,16 +40,21 @@ struct SelectionSnapshot: Equatable, Sendable {
     self.targetSentence = targetSentence
     self.previousSentence = previousSentence
     self.nextSentence = nextSentence
+    self.wordContext = wordContext
     self.screenPosition = screenPosition
     self.sourceApplicationName = sourceApplicationName
     self.sourceApplicationIdentifier = sourceApplicationIdentifier
   }
 
   var hasContext: Bool {
-    targetSentence?.isEmpty == false
+    wordContext != nil || targetSentence?.isEmpty == false
   }
 
   var translationContext: String? {
+    if let wordContext {
+      return wordContext.promptText
+    }
+
     guard let targetSentence, !targetSentence.isEmpty else {
       return nil
     }

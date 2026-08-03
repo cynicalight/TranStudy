@@ -22,8 +22,12 @@ final class AccessibilitySelectionProvider: SelectionProviding {
   }
 
   private struct SelectionContextCapture {
-    let context: SelectionSentenceContext
-    let sourceParagraphText: String
+    let sentenceContext: SelectionSentenceContext?
+    let wordContext: SelectionWordContext
+
+    var sourceWordWindowText: String {
+      wordContext.combinedText
+    }
   }
 
   private struct SelectionFingerprint: Equatable {
@@ -98,20 +102,21 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       selectionDebugLog("snapshot failed: sentence context unavailable")
       return nil
     }
-    let context = contextCapture.context
+    let context = contextCapture.sentenceContext
     Self.translationContextDebugLog("selected_text", content: selectedText)
     Self.translationContextDebugLog(
       "source_paragraph_text",
-      content: contextCapture.sourceParagraphText
+      content: contextCapture.sourceWordWindowText
     )
     selectionDebugLog(
-      "snapshot context captured: targetLength=\(context.targetSentence.count) previous=\(context.previousSentence != nil) next=\(context.nextSentence != nil)"
+      "snapshot context captured: targetLength=\(context?.targetSentence.count ?? 0) previous=\(context?.previousSentence != nil) next=\(context?.nextSentence != nil) beforeWordContextLength=\(contextCapture.wordContext.precedingText.count) afterWordContextLength=\(contextCapture.wordContext.followingText.count)"
     )
     return SelectionSnapshot(
       selectedText: selectedText,
-      targetSentence: context.targetSentence,
-      previousSentence: context.previousSentence,
-      nextSentence: context.nextSentence,
+      targetSentence: context?.targetSentence,
+      previousSentence: context?.previousSentence,
+      nextSentence: context?.nextSentence,
+      wordContext: contextCapture.wordContext,
       screenPosition: candidatePosition,
       sourceApplicationName: sourceApplicationName(for: activeSelection.application),
       sourceApplicationIdentifier: activeSelection.application.bundleIdentifier
@@ -382,17 +387,26 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       selectionDebugLog("selection context failed: document text unavailable")
       return nil
     }
-    guard let context = SelectionSentenceContext.extract(
-      from: documentText,
-      selectedRange: selectedRange
-    ) else {
-      selectionDebugLog("selection context failed: sentence extraction returned nil")
+    guard
+      let wordContext = SelectionWordContext.extract(
+        from: documentText,
+        selectedRange: selectedRange
+      )
+    else {
+      selectionDebugLog("selection context failed: 50-word window extraction returned nil")
       return nil
     }
+    let sentenceContext = SelectionSentenceContext.extract(
+      from: documentText,
+      selectedRange: selectedRange
+    )
     selectionDebugLog(
       "selection context captured with AX range attributes"
     )
-    return SelectionContextCapture(context: context, sourceParagraphText: documentText)
+    return SelectionContextCapture(
+      sentenceContext: sentenceContext,
+      wordContext: wordContext
+    )
   }
 
   private func webSelectionContext(in element: AXUIElement) -> SelectionContextCapture? {
@@ -404,12 +418,19 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     else {
       return nil
     }
+    guard let wordContext = webWordContext(selectedRange: selectedRange, in: element) else {
+      selectionDebugLog("selection context failed: AX 50-word window unavailable")
+      return nil
+    }
 
-    if let context = webParagraphSelectionContext(
+    if let sentenceContext = webParagraphSentenceContext(
       selectedRange: selectedRange,
       in: element
-    ), !Self.endsAtUnclosedOpeningDoubleQuote(context.context.targetSentence) {
-      return context
+    ), !Self.endsAtUnclosedOpeningDoubleQuote(sentenceContext.targetSentence) {
+      return SelectionContextCapture(
+        sentenceContext: sentenceContext,
+        wordContext: wordContext
+      )
     }
 
     let selectionStart = AXTextMarkerRangeCopyStartMarker(selectedRange)
@@ -421,7 +442,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       ),
       let initialTargetSentence = string(for: initialTargetRange, in: element)
     else {
-      return nil
+      return SelectionContextCapture(sentenceContext: nil, wordContext: wordContext)
     }
     var targetRange = initialTargetRange
     var targetSentence = initialTargetSentence
@@ -472,12 +493,82 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       }
 
     return SelectionContextCapture(
-      context: SelectionSentenceContext(
+      sentenceContext: SelectionSentenceContext(
         targetSentence: targetSentence,
         previousSentence: previousSentence,
         nextSentence: nextSentence
       ),
-      sourceParagraphText: targetSentence
+      wordContext: wordContext
+    )
+  }
+
+  private func webWordContext(
+    selectedRange: AXTextMarkerRange,
+    in element: AXUIElement
+  ) -> SelectionWordContext? {
+    let selectionStart = AXTextMarkerRangeCopyStartMarker(selectedRange)
+    let selectionEnd = AXTextMarkerRangeCopyEndMarker(selectedRange)
+    var contextStart = selectionStart
+    var contextEnd = selectionEnd
+
+    for _ in 0..<SelectionWordContext.surroundingWordLimit {
+      guard
+        let previousWordStart = textMarkerParameterizedAttribute(
+          kAXPreviousWordStartTextMarkerForTextMarkerParameterizedAttribute as CFString,
+          parameter: contextStart,
+          from: element
+        ),
+        !CFEqual(previousWordStart, contextStart)
+      else {
+        break
+      }
+      contextStart = previousWordStart
+    }
+
+    for _ in 0..<SelectionWordContext.surroundingWordLimit {
+      guard
+        let nextWordEnd = textMarkerParameterizedAttribute(
+          kAXNextWordEndTextMarkerForTextMarkerParameterizedAttribute as CFString,
+          parameter: contextEnd,
+          from: element
+        ),
+        !CFEqual(nextWordEnd, contextEnd)
+      else {
+        break
+      }
+      contextEnd = nextWordEnd
+    }
+
+    let precedingText: String
+    if CFEqual(contextStart, selectionStart) {
+      precedingText = ""
+    } else {
+      let precedingRange = AXTextMarkerRangeCreate(nil, contextStart, selectionStart)
+      guard let text = rawString(for: precedingRange, in: element) else {
+        return nil
+      }
+      precedingText = text
+    }
+
+    guard let selectedText = rawString(for: selectedRange, in: element) else {
+      return nil
+    }
+
+    let followingText: String
+    if CFEqual(selectionEnd, contextEnd) {
+      followingText = ""
+    } else {
+      let followingRange = AXTextMarkerRangeCreate(nil, selectionEnd, contextEnd)
+      guard let text = rawString(for: followingRange, in: element) else {
+        return nil
+      }
+      followingText = text
+    }
+
+    return SelectionWordContext(
+      precedingText: precedingText,
+      selectedText: selectedText,
+      followingText: followingText
     )
   }
 
@@ -495,10 +586,10 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     return trimmedText.filter { $0 == "\"" }.count.isMultiple(of: 2) == false
   }
 
-  private func webParagraphSelectionContext(
+  private func webParagraphSentenceContext(
     selectedRange: AXTextMarkerRange,
     in element: AXUIElement
-  ) -> SelectionContextCapture? {
+  ) -> SelectionSentenceContext? {
     let selectionStart = AXTextMarkerRangeCopyStartMarker(selectedRange)
     guard
       let paragraphRange = textMarkerRangeParameterizedAttribute(
@@ -529,16 +620,18 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       prefixText = value
     }
 
-    guard let context = SelectionSentenceContext.extract(
-      from: paragraphText,
-      selectedRange: CFRange(
-        location: (prefixText as NSString).length,
-        length: (selectedText as NSString).length
+    guard
+      let context = SelectionSentenceContext.extract(
+        from: paragraphText,
+        selectedRange: CFRange(
+          location: (prefixText as NSString).length,
+          length: (selectedText as NSString).length
+        )
       )
-    ) else {
+    else {
       return nil
     }
-    return SelectionContextCapture(context: context, sourceParagraphText: paragraphText)
+    return context
   }
 
   private func selectedRange(in element: AXUIElement) -> CFRange? {

@@ -28,14 +28,6 @@ final class OpenAIChatTranslationClient {
 
   func translate(_ request: TranslationRequest) async throws -> TranslationResult {
     let userContent = request.promptContent
-    #if DEBUG
-      if request.kind == .contextualSelection {
-        Self.translationContextDebugLog(
-          "llm.target_sentence",
-          content: request.targetSentence ?? "<unavailable>"
-        )
-      }
-    #endif
     let content = try await completionContent(
       systemPrompt: Self.systemPrompt(for: request.chineseWritingSystem),
       userContent: userContent,
@@ -106,7 +98,6 @@ final class OpenAIChatTranslationClient {
     let exampleSentence = TranslationTextNormalizer.cleanExampleSentenceBoundaries(
       in: exampleAndTranslation.exampleSentence
     )
-
     guard
       Self.containsLatinLetter(canonicalForm),
       !Self.containsHanCharacter(canonicalForm),
@@ -132,6 +123,34 @@ final class OpenAIChatTranslationClient {
         request: request
       )
     }
+    if let selectionWordContext = request.selectionWordContext {
+      let normalizedContext = Self.normalizedEnglishIdentity(
+        selectionWordContext.combinedText
+      )
+      let normalizedSelectedText = Self.normalizedEnglishIdentity(
+        selectionWordContext.selectedText
+      )
+      let normalizedExampleSentence = Self.normalizedEnglishIdentity(exampleSentence)
+      guard
+        normalizedContext.contains(normalizedExampleSentence),
+        normalizedExampleSentence.contains(normalizedSelectedText)
+      else {
+        throw Self.invalidWordResponse(
+          .invalidEnglishContent,
+          check: "exampleSentenceDoesNotMatchSelectionContext",
+          content: content,
+          request: request
+        )
+      }
+    }
+    #if DEBUG
+      if request.kind == .contextualSelection {
+        Self.translationContextDebugLog(
+          "llm.target_sentence",
+          content: exampleSentence
+        )
+      }
+    #endif
 
     return TranslationResult(
       sourceText: request.sourceText,
@@ -351,6 +370,7 @@ final class OpenAIChatTranslationClient {
         options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
         locale: Locale(identifier: "en_US_POSIX")
       )
+      .lowercased(with: Locale(identifier: "en_US_POSIX"))
       .split(whereSeparator: \.isWhitespace)
       .joined(separator: " ")
   }
@@ -444,7 +464,9 @@ final class OpenAIChatTranslationClient {
       Mandarin pinyin.
     - part_of_speech: the English part-of-speech name.
     - contextual_meaning: the Chinese meaning of source_text in context.
-    - example_sentence: a natural English sentence containing the source word or phrase.
+    - example_sentence: for a contextual selection, copy the complete original sentence
+      containing the selected occurrence from the supplied context; otherwise provide a natural
+      English sentence containing the source word or phrase.
     - sentence_translation: the Chinese translation of example_sentence.
     Use an empty pronunciation only when it is genuinely unavailable. Never reverse English
     source fields and Chinese translation fields. Do not include markdown or explanations

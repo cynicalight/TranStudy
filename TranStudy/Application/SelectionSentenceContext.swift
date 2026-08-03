@@ -1,5 +1,80 @@
 import Foundation
 
+struct SelectionWordContext: Codable, Equatable, Hashable, Sendable {
+  static let surroundingWordLimit = 50
+
+  let precedingText: String
+  let selectedText: String
+  let followingText: String
+
+  var combinedText: String {
+    precedingText + selectedText + followingText
+  }
+
+  var promptText: String {
+    [
+      "Text before the selected occurrence (up to 50 words):\n\(precedingText)",
+      "Selected occurrence:\n\(selectedText)",
+      "Text after the selected occurrence (up to 50 words):\n\(followingText)",
+    ].joined(separator: "\n\n")
+  }
+
+  static func extract(
+    from documentText: String,
+    selectedRange: CFRange,
+    surroundingWordLimit: Int = surroundingWordLimit
+  ) -> SelectionWordContext? {
+    let nsDocument = documentText as NSString
+    guard
+      surroundingWordLimit >= 0,
+      selectedRange.location >= 0,
+      selectedRange.location <= nsDocument.length,
+      selectedRange.length > 0,
+      selectedRange.length <= nsDocument.length - selectedRange.location
+    else {
+      return nil
+    }
+
+    let selectionEnd = selectedRange.location + selectedRange.length
+    var precedingWordRanges: [NSRange] = []
+    var followingWordRanges: [NSRange] = []
+    documentText.enumerateSubstrings(
+      in: documentText.startIndex..<documentText.endIndex,
+      options: [.byWords, .substringNotRequired]
+    ) { _, substringRange, _, _ in
+      let wordRange = NSRange(substringRange, in: documentText)
+      if NSMaxRange(wordRange) <= selectedRange.location {
+        precedingWordRanges.append(wordRange)
+      } else if wordRange.location >= selectionEnd {
+        followingWordRanges.append(wordRange)
+      }
+    }
+
+    let contextStart =
+      precedingWordRanges.count > surroundingWordLimit
+      ? precedingWordRanges[precedingWordRanges.count - surroundingWordLimit].location
+      : 0
+    let contextEnd =
+      followingWordRanges.count > surroundingWordLimit
+      ? followingWordRanges[surroundingWordLimit].location
+      : nsDocument.length
+
+    return SelectionWordContext(
+      precedingText: nsDocument.substring(
+        with: NSRange(
+          location: contextStart,
+          length: selectedRange.location - contextStart
+        )),
+      selectedText: nsDocument.substring(
+        with: NSRange(location: selectedRange.location, length: selectedRange.length)
+      ),
+      followingText: nsDocument.substring(
+        with: NSRange(location: selectionEnd, length: contextEnd - selectionEnd)
+      )
+    )
+  }
+}
+
 struct SelectionSentenceContext: Equatable {
   let targetSentence: String
   let previousSentence: String?

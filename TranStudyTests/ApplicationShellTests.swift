@@ -159,7 +159,7 @@ struct ApplicationShellTests {
     #expect(shell.translationDraft?.sentenceTranslation == "团队在挫折后 依然保持韧性。")
   }
 
-  @Test("a captured mouse selection translates with its surrounding context")
+  @Test("a captured mouse selection lets the model resolve a truncated local sentence")
   func capturedMouseSelectionTranslatesWithContext() async throws {
     let translator = TestTranslationProvider(
       result: TranslationResult(
@@ -174,11 +174,17 @@ struct ApplicationShellTests {
     let shell = ApplicationShell(
       environment: .test(translation: translator)
     )
+    let wordContext = SelectionWordContext(
+      precedingText: "It was getting late. She ",
+      selectedText: "ran",
+      followingText: " home. Her mother smiled."
+    )
     let snapshot = SelectionSnapshot(
       selectedText: "ran",
-      targetSentence: "She ran home.",
-      previousSentence: "It was getting late.",
-      nextSentence: "Her mother smiled.",
+      targetSentence: "ran",
+      previousSentence: nil,
+      nextSentence: nil,
+      wordContext: wordContext,
       screenPosition: CGPoint(x: 640, y: 420),
       sourceApplicationName: "Safari"
     )
@@ -189,18 +195,14 @@ struct ApplicationShellTests {
       translator.lastRequest
         == TranslationRequest(
           sourceText: "ran",
-          context: """
-            Previous sentence:
-            It was getting late.
-
-            Target sentence:
-            She ran home.
-
-            Next sentence:
-            Her mother smiled.
-            """,
+          context: [
+            "Text before the selected occurrence (up to 50 words):\nIt was getting late. She ",
+            "Selected occurrence:\nran",
+            "Text after the selected occurrence (up to 50 words):\n home. Her mother smiled.",
+          ].joined(separator: "\n\n"),
           kind: .contextualSelection,
-          targetSentence: "She ran home."
+          targetSentence: "ran",
+          selectionWordContext: wordContext
         ))
     #expect(shell.translationSourceText == "ran")
     #expect(shell.translationDraft?.exampleSentence == "She ran home.")
@@ -331,10 +333,13 @@ struct ApplicationShellTests {
           createdAt: Date(timeIntervalSince1970: 1_234)
         ))
     #expect(shell.translationDraft == nil)
-    #expect(diagnostics.events.map(\.stage) == [.learningAdditionStarted, .learningAdditionSucceeded])
+    #expect(
+      diagnostics.events.map(\.stage) == [.learningAdditionStarted, .learningAdditionSucceeded])
   }
 
-  @Test("a failed learning addition keeps the draft, reports the error, and records bounded diagnostics")
+  @Test(
+    "a failed learning addition keeps the draft, reports the error, and records bounded diagnostics"
+  )
   func failedLearningAdditionIsReportedAndDiagnosed() async {
     let diagnostics = TestDiagnosticLogger()
     let learningStore = TestLearningStore(additionError: .updateFailed)

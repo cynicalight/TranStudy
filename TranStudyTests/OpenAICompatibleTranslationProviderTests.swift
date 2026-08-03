@@ -109,13 +109,23 @@ struct OpenAICompatibleTranslationProviderTests {
       apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
       httpClient: httpClient
     )
+    let homeContext = SelectionWordContext(
+      precedingText: "She ",
+      selectedText: "ran",
+      followingText: " home."
+    )
 
     let result = try await provider.translate(
       TranslationRequest(
         sourceText: "ran",
-        context: "She ran home.",
+        context: [
+          "Text before the selected occurrence (up to 50 words):\nShe ",
+          "Selected occurrence:\nran",
+          "Text after the selected occurrence (up to 50 words):\n home.",
+        ].joined(separator: "\n\n"),
         kind: .contextualSelection,
-        targetSentence: "She ran home."
+        targetSentence: "ran",
+        selectionWordContext: homeContext
       )
     )
 
@@ -128,10 +138,16 @@ struct OpenAICompatibleTranslationProviderTests {
     )
     #expect(body["model"] as? String == "example-model")
     let messages = try #require(body["messages"] as? [[String: String]])
+    let systemPrompt = try #require(messages.first?["content"])
     let userMessage = try #require(messages.last?["content"])
-    #expect(userMessage.contains("ran"))
-    #expect(userMessage.contains("She ran home."))
-    #expect(userMessage.contains("Return this exact target sentence unchanged"))
+    #expect(userMessage.contains("Text before the selected occurrence (up to 50 words):\nShe "))
+    #expect(userMessage.contains("Selected occurrence:\nran"))
+    #expect(userMessage.contains("Text after the selected occurrence (up to 50 words):\n home."))
+    #expect(userMessage.contains("Extract the complete original sentence"))
+    #expect(userMessage.contains("only a potentially incomplete hint:\nran"))
+    #expect(userMessage.contains("Formatting boundaries"))
+    #expect(!userMessage.contains("Return this exact target sentence unchanged"))
+    #expect(systemPrompt.contains("copy the complete original sentence"))
     #expect(result.canonicalForm == "run")
 
     let correctedContextResult = try await provider.translate(
@@ -139,20 +155,28 @@ struct OpenAICompatibleTranslationProviderTests {
         sourceText: "ran",
         context: "She  ran home.",
         kind: .contextualSelection,
-        targetSentence: "She  ran home."
+        selectionWordContext: SelectionWordContext(
+          precedingText: "She  ",
+          selectedText: "ran",
+          followingText: " home."
+        )
       ))
     #expect(correctedContextResult.exampleSentence == "She ran home.")
     #expect(correctedContextResult.sentenceTranslation == "她跑回了家。")
 
-    let differentContextResult = try await provider.translate(
-      TranslationRequest(
-        sourceText: "ran",
-        context: "They ran away.",
-        kind: .contextualSelection,
-        targetSentence: "They ran away."
-      ))
-    #expect(differentContextResult.exampleSentence == "She ran home.")
-    #expect(differentContextResult.sentenceTranslation == "她跑回了家。")
+    await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+      try await provider.translate(
+        TranslationRequest(
+          sourceText: "ran",
+          context: "They ran away.",
+          kind: .contextualSelection,
+          selectionWordContext: SelectionWordContext(
+            precedingText: "They ",
+            selectedText: "ran",
+            followingText: " away."
+          )
+        ))
+    }
   }
 
   @Test("recoverable source spelling drift does not replace the requested text")

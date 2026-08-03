@@ -9,6 +9,7 @@ struct TranslationRequest: Codable, Equatable, Hashable, Sendable {
   let context: String?
   let kind: TranslationRequestKind
   let targetSentence: String?
+  let selectionWordContext: SelectionWordContext?
   let chineseWritingSystem: ChineseWritingSystem
 
   init(
@@ -16,12 +17,14 @@ struct TranslationRequest: Codable, Equatable, Hashable, Sendable {
     context: String? = nil,
     kind: TranslationRequestKind = .wordOrPhrase,
     targetSentence: String? = nil,
+    selectionWordContext: SelectionWordContext? = nil,
     chineseWritingSystem: ChineseWritingSystem = .simplified
   ) {
     self.sourceText = sourceText
     self.context = context
     self.kind = kind
     self.targetSentence = targetSentence
+    self.selectionWordContext = selectionWordContext
     self.chineseWritingSystem = chineseWritingSystem
   }
 
@@ -37,14 +40,24 @@ struct TranslationRequest: Codable, Equatable, Hashable, Sendable {
       Context:
       \(context)
       """
-    if kind == .contextualSelection, let targetSentence {
+    if kind == .contextualSelection {
+      if let targetSentence {
+        content += """
+
+
+          The locally detected sentence below is only a potentially incomplete hint:
+          \(targetSentence)
+          """
+      }
+
       content += """
 
 
-        Return this exact target sentence unchanged as example_sentence:
-        \(targetSentence)
-        Translate that exact sentence as sentence_translation. Use adjacent sentences only to
-        disambiguate the target text; do not return either adjacent sentence as learning content.
+        Extract the complete original sentence containing the selected occurrence from Context.
+        Formatting boundaries such as italics, links, bold text, or inline elements are not
+        sentence boundaries. Rejoin text across those boundaries when it belongs to the same
+        sentence. Copy that complete sentence exactly as example_sentence, without the Context
+        labels, and translate it as sentence_translation.
         """
     }
     return content

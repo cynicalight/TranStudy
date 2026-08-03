@@ -451,7 +451,8 @@ final class ApplicationShell {
             sourceText: sourceText,
             context: selection.translationContext,
             kind: .contextualSelection,
-            targetSentence: selection.targetSentence
+            targetSentence: selection.targetSentence,
+            selectionWordContext: selection.wordContext
           ))
       } else {
         await translate(TranslationRequest(sourceText: sourceText))
@@ -467,6 +468,7 @@ final class ApplicationShell {
       context: request.context,
       kind: request.kind,
       targetSentence: request.targetSentence,
+      selectionWordContext: request.selectionWordContext,
       chineseWritingSystem: chineseWritingSystem
     )
     let translationID = UUID()
