@@ -92,7 +92,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
   private func showPanel() {
     if let panel {
       applyCurrentSizing(to: panel)
-      panel.orderFrontRegardless()
+      presentAsKey(panel)
       return
     }
 
@@ -103,7 +103,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         width: TranslationPanelMetrics.width,
         height: TranslationPanelMetrics.defaultHeight
       ),
-      styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
+      styleMask: [.titled, .closable, .fullSizeContentView],
       backing: .buffered,
       defer: false
     )
@@ -112,7 +112,6 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     panel.isFloatingPanel = true
     panel.level = .floating
     panel.hidesOnDeactivate = false
-    panel.becomesKeyOnlyIfNeeded = true
     panel.isReleasedWhenClosed = false
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
@@ -154,7 +153,12 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     applyCurrentSizing(to: panel)
 
     self.panel = panel
-    panel.orderFrontRegardless()
+    presentAsKey(panel)
+  }
+
+  private func presentAsKey(_ panel: NSPanel) {
+    NSApp.activate(ignoringOtherApps: true)
+    panel.makeKeyAndOrderFront(nil)
   }
 
   private func translateLongTextSelection(_ selectedRange: NSRange) {

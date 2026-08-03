@@ -257,6 +257,7 @@ struct TranslationPanelView: View {
             .foregroundStyle(TranStudyDesign.accentForegroundColor)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
+            .contentShape(.capsule)
             .adaptiveTintedGlassCapsule()
         }
         .buttonStyle(.plain)

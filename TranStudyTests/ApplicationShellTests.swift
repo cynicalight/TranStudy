@@ -1369,8 +1369,8 @@ struct ApplicationShellTests {
     #expect(shell.translationStatus == .idle)
   }
 
-  @Test("translation panel floats without activating TranStudy")
-  func translationPanelDoesNotActivateApplication() async {
+  @Test("translation panel becomes key when shown")
+  func translationPanelBecomesKeyWhenShown() async {
     let shell = ApplicationShell(environment: .test())
     let controller = TranslationPanelController(shell: shell)
     NSApp.deactivate()
@@ -1384,8 +1384,9 @@ struct ApplicationShellTests {
       .compactMap { $0 as? NSPanel }
       .first { $0.delegate === controller }
 
-    #expect(NSApp.isActive == false)
-    #expect(panel?.styleMask.contains(.nonactivatingPanel) == true)
+    #expect(NSApp.isActive == true)
+    #expect(panel?.isKeyWindow == true)
+    #expect(panel?.styleMask.contains(.nonactivatingPanel) == false)
     #expect(panel?.hidesOnDeactivate == false)
     controller.dismiss()
   }
