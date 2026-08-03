@@ -6,7 +6,7 @@ struct LongTextTranslationView: View {
   let shell: ApplicationShell
   let result: LongTextTranslationResult
   let onTranslateSelection: (NSRange) -> Void
-  let onAddSentence: (NSRange) -> Void
+  let onAddSentence: () -> Void
   private let tokens: [LongTextWordToken]
   @State private var selectedTokenRange: ClosedRange<Int>?
   @State private var sourceContentHeight: CGFloat = 32
@@ -16,7 +16,7 @@ struct LongTextTranslationView: View {
     shell: ApplicationShell,
     result: LongTextTranslationResult,
     onTranslateSelection: @escaping (NSRange) -> Void,
-    onAddSentence: @escaping (NSRange) -> Void
+    onAddSentence: @escaping () -> Void
   ) {
     self.shell = shell
     self.result = result
@@ -82,17 +82,17 @@ struct LongTextTranslationView: View {
         Spacer()
         if shell.isSentenceCardsEnabled {
           Button {
-            onAddSentence(selectedRange)
+            onAddSentence()
           } label: {
             if shell.isAddingSentenceCard {
               ProgressView()
                 .controlSize(.small)
             } else {
-              Label("加入所在句", systemImage: "quote.bubble")
+              Label("学习句子", systemImage: "quote.bubble")
             }
           }
           .buttonStyle(.bordered)
-          .disabled(!shell.canAddLongTextSentence(selectedRange))
+          .disabled(!shell.canAddLongTextSentence)
         }
         Button {
           onTranslateSelection(selectedRange)
@@ -149,9 +149,6 @@ struct LongTextTranslationView: View {
     .padding(4)
     .onChange(of: result.sourceText) {
       selectedTokenRange = nil
-    }
-    .onChange(of: selectedTokenRange) {
-      shell.clearSentenceCardAdditionStatus()
     }
   }
 
@@ -357,7 +354,7 @@ private struct WordCapsuleFlowLayout: Layout {
         translatedText: "团队在遭遇挫折后依然保持韧性。他们继续不断进步。"
       ),
       onTranslateSelection: { _ in },
-      onAddSentence: { _ in }
+      onAddSentence: {}
     )
     .padding()
     .frame(width: 500)

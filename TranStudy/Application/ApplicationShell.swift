@@ -675,16 +675,13 @@ final class ApplicationShell {
     longTextSelectionRequest(for: selectedRange) != nil
   }
 
-  func canAddLongTextSentence(_ selectedRange: NSRange) -> Bool {
+  var canAddLongTextSentence: Bool {
     isSentenceCardsEnabled && !isAddingSentenceCard
-      && longTextSentence(for: selectedRange) != nil
+      && sentenceCardDraftForCurrentLongText != nil
   }
 
-  func addLongTextSentence(_ selectedRange: NSRange) async {
-    guard
-      canAddLongTextSentence(selectedRange),
-      let sentence = longTextSentence(for: selectedRange)
-    else {
+  func addLongTextSentence() async {
+    guard canAddLongTextSentence, let draft = sentenceCardDraftForCurrentLongText else {
       return
     }
 
@@ -695,19 +692,6 @@ final class ApplicationShell {
     }
 
     do {
-      let result = try await environment.translation.translateLongText(
-        sentence,
-        chineseWritingSystem: chineseWritingSystem
-      )
-      let draft = TranslationDraft(
-        sourceText: sentence,
-        canonicalForm: sentence,
-        pronunciation: "",
-        partOfSpeech: "",
-        contextualMeaning: "",
-        exampleSentence: sentence,
-        sentenceTranslation: result.translatedText
-      )
       try await environment.learningStore.add(
         LearningAddition(
           kind: .sentence,
@@ -726,27 +710,33 @@ final class ApplicationShell {
     }
   }
 
-  private func longTextSentence(for selectedRange: NSRange) -> String? {
-    guard let longTextTranslation else {
+  private var sentenceCardDraftForCurrentLongText: TranslationDraft? {
+    guard let result = longTextTranslation else {
       return nil
     }
-    let source = longTextTranslation.sourceText as NSString
+    let source = result.sourceText as NSString
     guard
-      selectedRange.location >= 0,
-      selectedRange.length > 0,
-      selectedRange.location <= source.length,
-      selectedRange.length <= source.length - selectedRange.location,
+      source.length > 0,
       let context = SelectionSentenceContext.extract(
-        from: longTextTranslation.sourceText,
-        selectedRange: CFRange(
-          location: selectedRange.location,
-          length: selectedRange.length
-        )
+        from: result.sourceText,
+        selectedRange: CFRange(location: 0, length: source.length)
       )
     else {
       return nil
     }
-    return TranslationTextNormalizer.collapseWhitespace(in: context.targetSentence)
+    let sentence = TranslationTextNormalizer.collapseWhitespace(in: context.targetSentence)
+    guard sentence == TranslationTextNormalizer.collapseWhitespace(in: result.sourceText) else {
+      return nil
+    }
+    return TranslationDraft(
+      sourceText: sentence,
+      canonicalForm: sentence,
+      pronunciation: "",
+      partOfSpeech: "",
+      contextualMeaning: "",
+      exampleSentence: sentence,
+      sentenceTranslation: result.translatedText
+    )
   }
 
   private func longTextSelectionRequest(for selectedRange: NSRange) -> TranslationRequest? {

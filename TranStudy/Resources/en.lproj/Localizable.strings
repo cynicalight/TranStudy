@@ -99,7 +99,7 @@
 "快捷键" = "Keyboard Shortcut";
 "默认使用 F5。修改后会立即更新全局快捷键。" = "F5 is used by default. Changes update the global shortcut immediately.";
 "允许加入句子卡" = "Allow Adding Sentence Cards";
-"开启后，长文本结果会显示“加入所在句”。翻译成功本身不会自动保存。" = "When enabled, long-text results show “Add Sentence.” A successful translation is never saved automatically.";
+"开启后，长文本结果会显示“学习句子”。翻译成功本身不会自动保存。" = "When enabled, long-text results show “Learn Sentence.” A successful translation is never saved automatically.";
 "启用全局划词" = "Enable Global Selection";
 "排除应用" = "Excluded Apps";
 "添加运行中的应用" = "Add Running App";
@@ -243,7 +243,7 @@
 "“%@”将合并到“%@”。合并后会保留双方的释义、例句和全部语境。" = "“%@” will be merged into “%@.” Meanings, examples, and all contexts from both entries will be kept.";
 "选择 %@" = "Select %@";
 "取消选择 %@" = "Deselect %@";
-"加入所在句" = "Add Sentence";
+"学习句子" = "Learn Sentence";
 "学习选中词" = "Learn Selected Word";
 "翻译选中文本" = "Translate Selected Text";
 "已加入句子卡" = "Added to Sentence Cards";

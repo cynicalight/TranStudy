@@ -210,7 +210,7 @@ struct TranslationSettingsView: View {
         } header: {
           Label("句子卡", systemImage: "text.quote")
         } footer: {
-          Text("开启后，长文本结果会显示“加入所在句”。翻译成功本身不会自动保存。")
+          Text("开启后，长文本结果会显示“学习句子”。翻译成功本身不会自动保存。")
         }
 
         Section {

@@ -1227,20 +1227,15 @@ struct ApplicationShellTests {
     #expect(translator.lastRequest?.targetSentence == expectedSentence)
   }
 
-  @Test("enabled sentence cards are added only after the explicit sentence action")
-  func sentenceCardsRequireExplicitLongTextAction() async {
-    let source = "She ran home. They stayed outside."
+  @Test("enabled sentence cards can learn the current sentence without a word selection")
+  func sentenceCardsDoNotRequireAWordSelection() async {
     let sentence = "She ran home."
-    let selectedRange = (source as NSString).range(of: "ran")
     let translator = SentenceCardTranslationProvider(
-      translations: [
-        source: "她跑回了家。他们待在外面。",
-        sentence: "她跑回了家。",
-      ])
+      translations: [sentence: "她跑回了家。"])
     let learningStore = TestLearningStore()
     let shell = ApplicationShell(
       environment: .test(
-        clipboard: TestClipboardReader(text: source),
+        clipboard: TestClipboardReader(text: sentence),
         translation: translator,
         learningStore: learningStore,
         sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(
@@ -1251,11 +1246,11 @@ struct ApplicationShellTests {
     await shell.translateClipboard()
 
     #expect(learningStore.lastAddition == nil)
-    #expect(shell.canAddLongTextSentence(selectedRange))
+    #expect(shell.canAddLongTextSentence)
 
-    await shell.addLongTextSentence(selectedRange)
+    await shell.addLongTextSentence()
 
-    #expect(translator.translatedSources == [source, sentence])
+    #expect(translator.translatedSources == [sentence])
     #expect(
       learningStore.lastAddition
         == LearningAddition(
@@ -1279,43 +1274,64 @@ struct ApplicationShellTests {
     #expect(shell.sentenceCardAdditionStatus == nil)
   }
 
-  @Test("sentence cards reject a selection that crosses sentence boundaries")
-  func sentenceCardsRejectCrossSentenceSelection() async {
-    let source = "She ran home. They stayed outside."
-    let selectedRange = (source as NSString).range(of: "home. They")
+  @Test("disabled sentence cards cannot learn the current sentence")
+  func disabledSentenceCardsCannotLearnTheCurrentSentence() async {
+    let source = "She ran home."
     let shell = ApplicationShell(
       environment: .test(
         clipboard: TestClipboardReader(text: source),
         translation: SentenceCardTranslationProvider(
-          translations: [source: "她跑回了家。他们待在外面。"]
+          translations: [source: "她跑回了家。"]
         ),
-        sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(
-          isEnabled: true
-        )
+        sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(isEnabled: false)
       ))
 
     await shell.translateClipboard()
 
-    #expect(!shell.canAddLongTextSentence(selectedRange))
+    #expect(!shell.canAddLongTextSentence)
   }
 
-  @Test("sentence card addition exposes translation failure")
-  func sentenceCardAdditionExposesTranslationFailure() async {
+  @Test("multiple sentences are not stored together as one sentence card")
+  func multipleSentencesDoNotBecomeOneSentenceCard() async {
     let source = "She ran home. They stayed outside."
-    let selectedRange = (source as NSString).range(of: "ran")
+    let learningStore = TestLearningStore()
     let shell = ApplicationShell(
       environment: .test(
         clipboard: TestClipboardReader(text: source),
         translation: SentenceCardTranslationProvider(
           translations: [source: "她跑回了家。他们待在外面。"]
         ),
+        learningStore: learningStore,
         sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(
           isEnabled: true
         )
       ))
 
     await shell.translateClipboard()
-    await shell.addLongTextSentence(selectedRange)
+
+    #expect(!shell.canAddLongTextSentence)
+    await shell.addLongTextSentence()
+    #expect(learningStore.lastAddition == nil)
+  }
+
+  @Test("sentence card addition exposes storage failure")
+  func sentenceCardAdditionExposesStorageFailure() async {
+    let source = "She ran home."
+    let learningStore = TestLearningStore(additionError: .updateFailed)
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: source),
+        translation: SentenceCardTranslationProvider(
+          translations: [source: "她跑回了家。"]
+        ),
+        learningStore: learningStore,
+        sentenceCardConfigurationStore: TestSentenceCardConfigurationStore(
+          isEnabled: true
+        )
+      ))
+
+    await shell.translateClipboard()
+    await shell.addLongTextSentence()
 
     #expect(shell.sentenceCardAdditionStatus == .failed)
   }

@@ -9,7 +9,7 @@ struct TranslationPanelView: View {
   @Bindable var shell: ApplicationShell
   let onDismiss: () -> Void
   let onTranslateLongTextSelection: (NSRange) -> Void
-  let onAddLongTextSentence: (NSRange) -> Void
+  let onAddLongTextSentence: () -> Void
   var onContentSizeChange: (CGSize, Bool) -> Void = { _, _ in }
   @State private var longTextLoadingContentHeight: CGFloat = 24
 

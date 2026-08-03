@@ -83,7 +83,7 @@
         shell: shell,
         onDismiss: {},
         onTranslateLongTextSelection: { _ in },
-        onAddLongTextSentence: { _ in }
+        onAddLongTextSentence: {}
       )
       .frame(height: 470)
       .task {
