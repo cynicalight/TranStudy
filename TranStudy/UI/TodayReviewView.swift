@@ -57,11 +57,12 @@ struct TodayReviewView: View {
               }
           } label: {
             Label("开始复习", systemImage: "play.fill")
-              .font(.body.weight(.semibold))
-              .foregroundStyle(TranStudyDesign.accentForegroundColor)
+              .font(.title3.weight(.semibold))
+              .foregroundStyle(.white)
               .padding(.vertical, 10)
-              .frame(maxWidth: .infinity)
-              .adaptiveTintedGlass(cornerRadius: 12)
+              .frame(maxWidth: .infinity, minHeight: 64)
+              .contentShape(.capsule)
+              .adaptiveTintedGlassCapsule()
           }
           .buttonStyle(.plain)
           .disabled(shell.currentReviewItem == nil && !shell.hasMoreReviewBatches)
