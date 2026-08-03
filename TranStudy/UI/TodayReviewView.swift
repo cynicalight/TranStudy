@@ -58,19 +58,23 @@ struct TodayReviewView: View {
           } label: {
             Label("开始复习", systemImage: "play.fill")
               .font(.title3.weight(.semibold))
-              .foregroundStyle(.white)
+              .foregroundStyle(isStartReviewDisabled ? .black : .white)
               .padding(.vertical, 10)
               .frame(maxWidth: .infinity, minHeight: 64)
               .contentShape(.capsule)
           }
           .adaptiveTintedGlassButton()
-          .disabled(shell.currentReviewItem == nil && !shell.hasMoreReviewBatches)
+          .disabled(isStartReviewDisabled)
         }
         .frame(maxWidth: TranStudyDesign.pageWidth, alignment: .leading)
         .padding(32)
         .frame(maxWidth: .infinity, alignment: .top)
       }
     }
+  }
+
+  private var isStartReviewDisabled: Bool {
+    shell.currentReviewItem == nil && !shell.hasMoreReviewBatches
   }
 }
 
