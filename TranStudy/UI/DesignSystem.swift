@@ -213,7 +213,7 @@ private struct AdaptiveGlassModifier<GlassShape: Shape>: ViewModifier {
         }
     } else if #available(macOS 26, *), let tint {
       content
-        .glassEffect(.regular.tint(tint), in: shape)
+        .glassEffect(.regular.tint(tint).interactive(), in: shape)
     } else if #available(macOS 26, *) {
       content
         .glassEffect(.regular, in: shape)
