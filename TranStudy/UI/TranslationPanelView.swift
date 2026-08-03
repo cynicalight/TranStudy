@@ -171,7 +171,7 @@ struct TranslationPanelView: View {
   }
 
   private var fitsPanelHeightToContent: Bool {
-    shell.isLongTextTranslationPresentation
+    shell.isLongTextTranslationPresentation || shell.translationDraft != nil
   }
 
   private func longTextBlockHeight(for contentHeight: CGFloat) -> CGFloat {
