@@ -46,8 +46,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cynicalight.TranStudy
         PRODUCT_NAME: TranStudy
-        MARKETING_VERSION: 1.0.6
-        CURRENT_PROJECT_VERSION: 7
+        MARKETING_VERSION: 1.0.7
+        CURRENT_PROJECT_VERSION: 8
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 8HC6J9LU7U
