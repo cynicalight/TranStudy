@@ -173,6 +173,7 @@ private struct ReviewSessionView: View {
                 }
               } label: {
                 Text(LocalizedStringKey(rating.title))
+                  .font(.title3.weight(.semibold))
                   .frame(maxWidth: .infinity, minHeight: 64)
               }
               .buttonStyle(.bordered)
@@ -187,7 +188,8 @@ private struct ReviewSessionView: View {
             shell.advanceToNextReview()
           } label: {
             Label("下一个", systemImage: "arrow.right")
-              .frame(maxWidth: .infinity)
+              .font(.title3.weight(.semibold))
+              .frame(maxWidth: .infinity, minHeight: 64)
           }
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
