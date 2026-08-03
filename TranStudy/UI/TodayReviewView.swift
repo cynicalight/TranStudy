@@ -173,7 +173,7 @@ private struct ReviewSessionView: View {
                 }
               } label: {
                 Text(LocalizedStringKey(rating.title))
-                  .frame(maxWidth: .infinity)
+                  .frame(maxWidth: .infinity, minHeight: 64)
               }
               .buttonStyle(.bordered)
               .controlSize(.large)
@@ -406,6 +406,7 @@ private struct ReviewFlipCard<Front: View, Back: View>: View {
       }
     }
     .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
+    .shadow(color: .black.opacity(0.12), radius: 18)
     .animation(isFlipped ? flipAnimation : nil, value: isFlipped)
   }
 
