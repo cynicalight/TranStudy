@@ -103,7 +103,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         width: TranslationPanelMetrics.width,
         height: TranslationPanelMetrics.defaultHeight
       ),
-      styleMask: [.titled, .closable, .fullSizeContentView],
+      styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
       backing: .buffered,
       defer: false
     )
@@ -113,7 +113,11 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
     panel.level = .floating
     panel.hidesOnDeactivate = false
     panel.isReleasedWhenClosed = false
-    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    panel.collectionBehavior = [
+      .canJoinAllSpaces,
+      .fullScreenAuxiliary,
+      .canJoinAllApplications,
+    ]
     panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
     panel.standardWindowButton(.zoomButton)?.isHidden = true
     panel.delegate = self
@@ -157,7 +161,6 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
   }
 
   private func presentAsKey(_ panel: NSPanel) {
-    NSApp.activate(ignoringOtherApps: true)
     panel.makeKeyAndOrderFront(nil)
   }
 
