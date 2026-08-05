@@ -490,7 +490,7 @@ struct SwiftDataLearningStoreTests {
     #expect(mergedItem.sentenceTranslation == "她回家了。")
     #expect(summary.wordCount == 0)
     #expect(summary.sentenceCount == 2)
-    #expect(review.intervalDays == 5)
+    #expect(review.intervalDays == 3)
   }
 
   @Test("joined learning survives reopening the SwiftData store")
@@ -970,7 +970,7 @@ struct SwiftDataLearningStoreTests {
       rating: .remembered,
       reviewedAt: resetAt
     )
-    #expect(result.intervalDays == 3)
+    #expect(result.intervalDays == 1)
   }
 
   private func addRun(
@@ -1030,8 +1030,8 @@ struct SwiftDataLearningStoreTests {
     #expect(reloadedItems.first?.nextReviewAt == joinedAt)
   }
 
-  @Test("four review ratings persist adaptive intervals and remove cards from today's queue")
-  func reviewRatingsPersistAdaptiveIntervals() async throws {
+  @Test("first review ratings schedule their reinforcement steps")
+  func firstReviewRatingsScheduleReinforcementSteps() async throws {
     let directory = FileManager.default.temporaryDirectory
       .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let databaseURL = directory.appending(path: "TranStudy.store")
@@ -1044,10 +1044,10 @@ struct SwiftDataLearningStoreTests {
     }
     let reviewDate = Date(timeIntervalSince1970: 100_000)
     let expectations: [(String, ReviewRating, Double)] = [
-      ("forget", .forgot, 1),
-      ("hard", .hard, 2),
-      ("remember", .remembered, 3),
-      ("easy", .easy, 5),
+      ("forget", .forgot, 0),
+      ("hard", .hard, 0),
+      ("remember", .remembered, 1),
+      ("easy", .easy, 3),
     ]
 
     do {
@@ -1086,8 +1086,11 @@ struct SwiftDataLearningStoreTests {
         )
       }
 
-      #expect(try await store.summary(at: reviewDate).dueCount == 0)
-      #expect(try await store.dueItems(at: reviewDate).isEmpty)
+      #expect(try await store.summary(at: reviewDate).dueCount == 2)
+      #expect(
+        Set(try await store.dueItems(at: reviewDate).map(\.canonicalForm))
+          == ["forget", "hard"]
+      )
     }
 
     let reopenedContainer = try makeContainer(at: databaseURL)
@@ -1101,6 +1104,165 @@ struct SwiftDataLearningStoreTests {
       #expect(history.map(\.rating) == [rating])
       #expect(history.map(\.reviewedAt) == [reviewDate])
     }
+
+    let hardItem = try #require(items.first(where: { $0.canonicalForm == "hard" }))
+    let hardNextDay = try await reopenedStore.recordReview(
+      itemID: hardItem.id,
+      rating: .remembered,
+      reviewedAt: reviewDate.addingTimeInterval(3_600)
+    )
+    #expect(hardNextDay.intervalDays == 1)
+  }
+
+  @Test("forgotten cards repeat today, then daily until recalled")
+  func forgottenCardsRepeatTodayThenDailyUntilRecalled() async throws {
+    let store = try makeInMemoryStore()
+    let firstReviewAt = Date(timeIntervalSince1970: 100_000)
+    let item = try await addRun(to: store, createdAt: firstReviewAt)
+
+    let sameDay = try await store.recordReview(
+      itemID: item.id,
+      rating: .forgot,
+      reviewedAt: firstReviewAt
+    )
+    let nextDay = try await store.recordReview(
+      itemID: item.id,
+      rating: .forgot,
+      reviewedAt: firstReviewAt.addingTimeInterval(3_600)
+    )
+    let followingDay = try await store.recordReview(
+      itemID: item.id,
+      rating: .forgot,
+      reviewedAt: nextDay.nextReviewAt
+    )
+    let recalled = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: followingDay.nextReviewAt
+    )
+
+    #expect(sameDay.nextReviewAt == firstReviewAt)
+    #expect(nextDay.intervalDays == 1)
+    #expect(followingDay.intervalDays == 1)
+    #expect(recalled.intervalDays == 3)
+  }
+
+  @Test("hard cards repeat today and tomorrow before using the adaptive interval")
+  func hardCardsRepeatTodayAndTomorrowBeforeAdaptiveInterval() async throws {
+    let store = try makeInMemoryStore()
+    let firstReviewAt = Date(timeIntervalSince1970: 100_000)
+    let item = try await addRun(to: store, createdAt: firstReviewAt)
+
+    let sameDay = try await store.recordReview(
+      itemID: item.id,
+      rating: .hard,
+      reviewedAt: firstReviewAt
+    )
+    let nextDay = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstReviewAt.addingTimeInterval(3_600)
+    )
+    let adaptive = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: nextDay.nextReviewAt
+    )
+
+    #expect(sameDay.nextReviewAt == firstReviewAt)
+    #expect(nextDay.intervalDays == 1)
+    #expect(adaptive.intervalDays == 3)
+  }
+
+  @Test("forgetting a hard card during today's reinforcement repeats it today")
+  func forgettingHardCardDuringSameDayReinforcementRepeatsToday() async throws {
+    let store = try makeInMemoryStore()
+    let firstReviewAt = Date(timeIntervalSince1970: 100_000)
+    let item = try await addRun(to: store, createdAt: firstReviewAt)
+    _ = try await store.recordReview(
+      itemID: item.id,
+      rating: .hard,
+      reviewedAt: firstReviewAt
+    )
+    let forgotAt = firstReviewAt.addingTimeInterval(3_600)
+
+    let repeatedReview = try await store.recordReview(
+      itemID: item.id,
+      rating: .forgot,
+      reviewedAt: forgotAt
+    )
+
+    #expect(repeatedReview.intervalDays == 0)
+    #expect(repeatedReview.nextReviewAt == forgotAt)
+  }
+
+  @Test("remembered and easy cards get one short reinforcement before adaptive intervals")
+  func rememberedAndEasyCardsGetOneShortReinforcement() async throws {
+    let firstReviewAt = Date(timeIntervalSince1970: 100_000)
+
+    let rememberedStore = try makeInMemoryStore()
+    let rememberedItem = try await addRun(to: rememberedStore, createdAt: firstReviewAt)
+    let rememberedStep = try await rememberedStore.recordReview(
+      itemID: rememberedItem.id,
+      rating: .remembered,
+      reviewedAt: firstReviewAt
+    )
+    let rememberedAdaptive = try await rememberedStore.recordReview(
+      itemID: rememberedItem.id,
+      rating: .remembered,
+      reviewedAt: rememberedStep.nextReviewAt
+    )
+
+    let easyStore = try makeInMemoryStore()
+    let easyItem = try await addRun(to: easyStore, createdAt: firstReviewAt)
+    let easyStep = try await easyStore.recordReview(
+      itemID: easyItem.id,
+      rating: .easy,
+      reviewedAt: firstReviewAt
+    )
+    let easyAdaptive = try await easyStore.recordReview(
+      itemID: easyItem.id,
+      rating: .easy,
+      reviewedAt: easyStep.nextReviewAt
+    )
+
+    #expect(rememberedStep.intervalDays == 1)
+    #expect(rememberedAdaptive.intervalDays == 3)
+    #expect(easyStep.intervalDays == 3)
+    #expect(easyAdaptive.intervalDays == 5)
+  }
+
+  @Test("short reinforcement steps preserve the growing adaptive interval")
+  func reinforcementStepsPreserveGrowingAdaptiveInterval() async throws {
+    let store = try makeInMemoryStore()
+    let firstReviewAt = Date(timeIntervalSince1970: 100_000)
+    let item = try await addRun(to: store, createdAt: firstReviewAt)
+
+    let firstStep = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstReviewAt
+    )
+    let firstAdaptive = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstStep.nextReviewAt
+    )
+    let secondStep = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstAdaptive.nextReviewAt
+    )
+    let secondAdaptive = try await store.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: secondStep.nextReviewAt
+    )
+
+    #expect(firstStep.intervalDays == 1)
+    #expect(firstAdaptive.intervalDays == 3)
+    #expect(secondStep.intervalDays == 1)
+    #expect(secondAdaptive.intervalDays == 8)
   }
 
   @Test("summary reports today's reviews and a consecutive-day learning streak")
@@ -1335,7 +1497,7 @@ struct SwiftDataLearningStoreTests {
 
     #expect(mergedItem.nextReviewAt == urgentResult.nextReviewAt)
     #expect(history.map(\.rating) == [.easy, .hard])
-    #expect(nextResult.intervalDays == 5)
+    #expect(nextResult.intervalDays == 1)
   }
 
   private func makeContainer(at url: URL) throws -> ModelContainer {

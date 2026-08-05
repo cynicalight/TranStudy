@@ -25,6 +25,8 @@ final class LearningRecord {
   var reviewEase: Double = 2.5
   var reviewCount: Int = 0
   var lapseCount: Int = 0
+  var reviewPhaseRawValue: String = ReviewPhase.normal.rawValue
+  var reviewBaseIntervalDays: Double?
   @Relationship(deleteRule: .cascade, inverse: \LearningEncounterRecord.learningRecord)
   var encounters: [LearningEncounterRecord] = []
   @Relationship(deleteRule: .cascade, inverse: \ReviewEventRecord.learningRecord)
@@ -65,5 +67,10 @@ final class LearningRecord {
     lastEncounteredAt = createdAt
     self.nextReviewAt = nextReviewAt
     self.isPaused = isPaused
+  }
+
+  var reviewPhase: ReviewPhase {
+    get { ReviewPhase(rawValue: reviewPhaseRawValue) ?? .normal }
+    set { reviewPhaseRawValue = newValue.rawValue }
   }
 }

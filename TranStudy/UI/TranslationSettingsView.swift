@@ -182,7 +182,6 @@ struct TranslationSettingsView: View {
                   .tag(shortcut)
               }
             }
-            .frame(width: 140)
           }
 
           if case .failed(let shortcut) = shell.translationShortcutRegistrationStatus {

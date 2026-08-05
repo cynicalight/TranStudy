@@ -38,6 +38,8 @@ struct LearningDataArchive: Codable, Equatable, Sendable {
     let reviewEase: Double
     let reviewCount: Int
     let lapseCount: Int
+    var reviewPhase: ReviewPhase? = nil
+    var reviewBaseIntervalDays: Double? = nil
     let encounters: [Encounter]
     let customExamples: [CustomExample]
     let reviewEvents: [ReviewEvent]

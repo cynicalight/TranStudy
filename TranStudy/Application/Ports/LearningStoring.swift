@@ -116,6 +116,16 @@ enum ReviewRating: String, CaseIterable, Codable, Equatable, Hashable, Sendable 
   case easy
 }
 
+enum ReviewPhase: String, Codable, Equatable, Sendable {
+  case normal
+  case forgotSameDay
+  case forgotDaily
+  case hardSameDay
+  case hardNextDay
+  case rememberedNextDay
+  case easyThirdDay
+}
+
 struct LearningReviewResult: Equatable, Sendable {
   let itemID: UUID
   let rating: ReviewRating

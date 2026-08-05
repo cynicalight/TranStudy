@@ -29,6 +29,13 @@ final class SwiftDataLearningStore: LearningStoring {
     let chineseTranslation: String
   }
 
+  private struct ReviewSchedule {
+    let intervalDays: Double
+    let baseIntervalDays: Double
+    let ease: Double
+    let phase: ReviewPhase
+  }
+
   private let context: ModelContext
   private let calendar: Calendar
 
@@ -90,8 +97,9 @@ final class SwiftDataLearningStore: LearningStoring {
     let previousReviewAt = record.reviewEvents.map(\.reviewedAt).max()
     let schedule = nextSchedule(
       rating: rating,
-      currentIntervalDays: max(1, record.reviewIntervalDays),
-      currentEase: record.reviewEase
+      currentIntervalDays: record.reviewBaseIntervalDays ?? max(1, record.reviewIntervalDays),
+      currentEase: record.reviewEase,
+      currentPhase: record.reviewPhase
     )
     let nextReviewAt = date(
       byAddingDays: Int(schedule.intervalDays),
@@ -100,6 +108,8 @@ final class SwiftDataLearningStore: LearningStoring {
     record.nextReviewAt = nextReviewAt
     record.reviewIntervalDays = schedule.intervalDays
     record.reviewEase = schedule.ease
+    record.reviewPhase = schedule.phase
+    record.reviewBaseIntervalDays = schedule.baseIntervalDays
     record.reviewCount += 1
     if rating == .forgot {
       record.lapseCount += 1
@@ -484,6 +494,8 @@ final class SwiftDataLearningStore: LearningStoring {
     record.reviewEase = 2.5
     record.reviewCount = 0
     record.lapseCount = 0
+    record.reviewPhase = .normal
+    record.reviewBaseIntervalDays = 1
     try saveOrRollback()
   }
 
@@ -512,6 +524,8 @@ final class SwiftDataLearningStore: LearningStoring {
           reviewEase: record.reviewEase,
           reviewCount: record.reviewCount,
           lapseCount: record.lapseCount,
+          reviewPhase: record.reviewPhase,
+          reviewBaseIntervalDays: record.reviewBaseIntervalDays,
           encounters: encounterItems(for: record).map {
             LearningDataArchive.Encounter(
               id: $0.id,
@@ -633,6 +647,8 @@ final class SwiftDataLearningStore: LearningStoring {
     record.reviewEase = item.reviewEase
     record.reviewCount = item.reviewCount
     record.lapseCount = item.lapseCount
+    record.reviewPhase = item.reviewPhase ?? .normal
+    record.reviewBaseIntervalDays = item.reviewBaseIntervalDays ?? item.reviewIntervalDays
     record.encounters = uniqueEncounters(item.encounters).map(makeEncounter(from:))
     record.customExamples = uniqueExamples(item.customExamples).enumerated().map {
       index, example in
@@ -697,6 +713,8 @@ final class SwiftDataLearningStore: LearningStoring {
     if useImportedSchedule {
       record.reviewIntervalDays = item.reviewIntervalDays
       record.reviewEase = item.reviewEase
+      record.reviewPhase = item.reviewPhase ?? .normal
+      record.reviewBaseIntervalDays = item.reviewBaseIntervalDays ?? item.reviewIntervalDays
     }
     record.nextReviewAt = earlierDate(record.nextReviewAt, item.nextReviewAt)
     record.isPaused = record.isPaused && item.isPaused
@@ -925,18 +943,151 @@ final class SwiftDataLearningStore: LearningStoring {
   private func nextSchedule(
     rating: ReviewRating,
     currentIntervalDays: Double,
+    currentEase: Double,
+    currentPhase: ReviewPhase
+  ) -> ReviewSchedule {
+    switch currentPhase {
+    case .normal:
+      return reinforcementSchedule(
+        rating: rating,
+        currentIntervalDays: currentIntervalDays,
+        currentEase: currentEase
+      )
+    case .forgotSameDay, .forgotDaily:
+      if rating == .forgot {
+        return ReviewSchedule(
+          intervalDays: 1,
+          baseIntervalDays: 1,
+          ease: adjustedEase(for: rating, currentEase: currentEase),
+          phase: .forgotDaily
+        )
+      }
+      return adaptiveSchedule(
+        rating: rating,
+        currentIntervalDays: currentIntervalDays,
+        currentEase: currentEase
+      )
+    case .hardSameDay:
+      if rating == .forgot {
+        return ReviewSchedule(
+          intervalDays: 0,
+          baseIntervalDays: 1,
+          ease: adjustedEase(for: rating, currentEase: currentEase),
+          phase: .forgotSameDay
+        )
+      }
+      return ReviewSchedule(
+        intervalDays: 1,
+        baseIntervalDays: currentIntervalDays,
+        ease: adjustedEase(for: rating, currentEase: currentEase),
+        phase: .hardNextDay
+      )
+    case .hardNextDay, .rememberedNextDay, .easyThirdDay:
+      if rating == .forgot {
+        return ReviewSchedule(
+          intervalDays: 0,
+          baseIntervalDays: 1,
+          ease: adjustedEase(for: rating, currentEase: currentEase),
+          phase: .forgotSameDay
+        )
+      }
+      return adaptiveSchedule(
+        rating: rating,
+        currentIntervalDays: currentIntervalDays,
+        currentEase: currentEase
+      )
+    }
+  }
+
+  private func reinforcementSchedule(
+    rating: ReviewRating,
+    currentIntervalDays: Double,
     currentEase: Double
-  ) -> (intervalDays: Double, ease: Double) {
+  ) -> ReviewSchedule {
+    let ease = adjustedEase(for: rating, currentEase: currentEase)
     switch rating {
     case .forgot:
-      return (1, max(1.3, currentEase - 0.2))
+      return ReviewSchedule(
+        intervalDays: 0,
+        baseIntervalDays: 1,
+        ease: ease,
+        phase: .forgotSameDay
+      )
     case .hard:
-      return (max(2, ceil(currentIntervalDays * 1.2)), max(1.3, currentEase - 0.15))
+      return ReviewSchedule(
+        intervalDays: 0,
+        baseIntervalDays: currentIntervalDays,
+        ease: ease,
+        phase: .hardSameDay
+      )
     case .remembered:
-      return (max(3, ceil(currentIntervalDays * currentEase)), currentEase)
+      return ReviewSchedule(
+        intervalDays: 1,
+        baseIntervalDays: currentIntervalDays,
+        ease: ease,
+        phase: .rememberedNextDay
+      )
     case .easy:
-      let nextEase = currentEase + 0.15
-      return (max(5, ceil(currentIntervalDays * (nextEase + 1))), nextEase)
+      return ReviewSchedule(
+        intervalDays: 3,
+        baseIntervalDays: currentIntervalDays,
+        ease: ease,
+        phase: .easyThirdDay
+      )
+    }
+  }
+
+  private func adaptiveSchedule(
+    rating: ReviewRating,
+    currentIntervalDays: Double,
+    currentEase: Double
+  ) -> ReviewSchedule {
+    let ease = adjustedEase(for: rating, currentEase: currentEase)
+    switch rating {
+    case .forgot:
+      return ReviewSchedule(
+        intervalDays: 0,
+        baseIntervalDays: 1,
+        ease: ease,
+        phase: .forgotSameDay
+      )
+    case .hard:
+      let intervalDays = max(2, ceil(currentIntervalDays * 1.2))
+      return ReviewSchedule(
+        intervalDays: intervalDays,
+        baseIntervalDays: intervalDays,
+        ease: ease,
+        phase: .normal
+      )
+    case .remembered:
+      let intervalDays = max(3, ceil(currentIntervalDays * currentEase))
+      return ReviewSchedule(
+        intervalDays: intervalDays,
+        baseIntervalDays: intervalDays,
+        ease: ease,
+        phase: .normal
+      )
+    case .easy:
+      let intervalDays = max(5, ceil(currentIntervalDays * (ease + 1)))
+      return ReviewSchedule(
+        intervalDays: intervalDays,
+        baseIntervalDays: intervalDays,
+        ease: ease,
+        phase: .normal
+      )
+    }
+  }
+
+  private func adjustedEase(for rating: ReviewRating, currentEase: Double) -> Double {
+    switch rating {
+    case .forgot:
+      max(1.3, currentEase - 0.2)
+    case .hard:
+      max(1.3, currentEase - 0.15)
+    case .remembered:
+      currentEase
+    case .easy:
+      currentEase + 0.15
     }
   }
 
@@ -1087,6 +1238,9 @@ final class SwiftDataLearningStore: LearningStoring {
     if useSourceSchedule {
       targetRecord.reviewIntervalDays = sourceRecord.reviewIntervalDays
       targetRecord.reviewEase = sourceRecord.reviewEase
+      targetRecord.reviewPhase = sourceRecord.reviewPhase
+      targetRecord.reviewBaseIntervalDays =
+        sourceRecord.reviewBaseIntervalDays ?? sourceRecord.reviewIntervalDays
     }
     targetRecord.reviewCount += sourceRecord.reviewCount
     targetRecord.lapseCount += sourceRecord.lapseCount

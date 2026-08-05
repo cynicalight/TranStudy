@@ -23,6 +23,54 @@ struct LearningDataArchiveTests {
     #expect(item.reviewCount == 1)
   }
 
+  @Test("export and import preserve an unfinished reinforcement step")
+  func exportAndImportPreserveReinforcementStep() async throws {
+    let (sourceStore, _) = try makeStore()
+    let firstReviewAt = Date(timeIntervalSince1970: 1_000)
+    try await sourceStore.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "ran",
+          canonicalForm: "run",
+          pronunciation: "/ræn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑",
+          exampleSentence: "She ran home.",
+          sentenceTranslation: "她跑回了家。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: firstReviewAt
+      )
+    )
+    let item = try #require(try await sourceStore.items().first)
+    let firstStep = try await sourceStore.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstReviewAt
+    )
+    let firstAdaptive = try await sourceStore.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstStep.nextReviewAt
+    )
+    let secondStep = try await sourceStore.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: firstAdaptive.nextReviewAt
+    )
+    let archive = try await sourceStore.exportArchive(exportedAt: firstReviewAt)
+
+    let (restoredStore, _) = try makeStore()
+    _ = try await restoredStore.importArchive(archive)
+    let nextReview = try await restoredStore.recordReview(
+      itemID: item.id,
+      rating: .remembered,
+      reviewedAt: secondStep.nextReviewAt
+    )
+
+    #expect(nextReview.intervalDays == 8)
+  }
+
   @Test("importing the same archive twice does not duplicate nested data")
   func repeatedImportIsIdempotent() async throws {
     let (store, _) = try makeStore()

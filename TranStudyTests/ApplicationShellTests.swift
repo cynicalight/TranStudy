@@ -896,6 +896,27 @@ struct ApplicationShellTests {
     #expect(shell.selectedReviewRating == nil)
   }
 
+  @Test("a card scheduled again today returns to the end of the current review batch")
+  func sameDayReviewReturnsToCurrentBatch() async {
+    let item = makeLearningItem(
+      id: UUID(),
+      canonicalForm: "run",
+      nextReviewAt: Date(timeIntervalSince1970: -100)
+    )
+    let learningStore = TestLearningStore(
+      dueItems: [item],
+      reviewResultIntervalDays: 0
+    )
+    let shell = ApplicationShell(environment: .test(learningStore: learningStore))
+
+    await shell.refreshTodayReview()
+    await shell.rateCurrentReview(.forgot)
+    shell.advanceToNextReview()
+
+    #expect(shell.currentReviewItem == item)
+    #expect(shell.selectedReviewRating == nil)
+  }
+
   @Test("daily review advances through complete twenty-card batches")
   func dailyReviewUsesTwentyCardBatches() async {
     let dueItems = (0..<45).map { index in
@@ -1752,6 +1773,7 @@ private final class TestLearningStore: LearningStoring {
   private var canonicalUpdateResults: [LearningCanonicalUpdateResult]
   private let detailsUpdateError: TestLearningStoreError?
   private let additionError: TestLearningStoreError?
+  private let reviewResultIntervalDays: Double
 
   init(
     summary: LearningSummary = LearningSummary(
@@ -1766,7 +1788,8 @@ private final class TestLearningStore: LearningStoring {
     mergeSummary: LearningMergeSummary? = nil,
     canonicalUpdateResults: [LearningCanonicalUpdateResult] = [],
     detailsUpdateError: TestLearningStoreError? = nil,
-    additionError: TestLearningStoreError? = nil
+    additionError: TestLearningStoreError? = nil,
+    reviewResultIntervalDays: Double = 3
   ) {
     storedSummary = summary
     storedItems = items
@@ -1777,6 +1800,7 @@ private final class TestLearningStore: LearningStoring {
     self.canonicalUpdateResults = canonicalUpdateResults
     self.detailsUpdateError = detailsUpdateError
     self.additionError = additionError
+    self.reviewResultIntervalDays = reviewResultIntervalDays
   }
 
   func summary(at date: Date) async throws -> LearningSummary {
@@ -1816,8 +1840,8 @@ private final class TestLearningStore: LearningStoring {
       itemID: itemID,
       rating: rating,
       reviewedAt: reviewedAt,
-      nextReviewAt: reviewedAt.addingTimeInterval(3 * 86_400),
-      intervalDays: 3
+      nextReviewAt: reviewedAt.addingTimeInterval(reviewResultIntervalDays * 86_400),
+      intervalDays: reviewResultIntervalDays
     )
   }
 

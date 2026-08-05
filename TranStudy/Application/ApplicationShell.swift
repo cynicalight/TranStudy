@@ -278,11 +278,14 @@ final class ApplicationShell {
     }
     let now = environment.clock.now
     do {
-      _ = try await environment.learningStore.recordReview(
+      let result = try await environment.learningStore.recordReview(
         itemID: currentReviewItem.id,
         rating: rating,
         reviewedAt: now
       )
+      if result.nextReviewAt <= now {
+        reviewQueue.append(currentReviewItem)
+      }
       selectedReviewRating = rating
       isReviewAnswerVisible = true
       learningSummary = try await environment.learningStore.summary(at: now)
