@@ -173,28 +173,49 @@ private struct ReviewSessionView: View {
         hasCompletedReviewFlip = true
       }
 
-      Group {
-        if !showsNextReviewButton {
-          HStack(spacing: 10) {
-            ForEach(ReviewRating.allCases, id: \.self) { rating in
-              Button {
-                Task {
-                  await shell.rateCurrentReview(rating)
-                }
-              } label: {
-                Text(LocalizedStringKey(rating.title))
-                  .font(.title3.weight(.semibold))
-                  .frame(maxWidth: .infinity, minHeight: 64)
+      VStack(spacing: 12) {
+        HStack(spacing: 10) {
+          ForEach(ReviewRating.allCases, id: \.self) { rating in
+            Button {
+              Task {
+                await shell.rateCurrentReview(rating)
               }
-              .buttonStyle(.bordered)
-              .controlSize(.large)
-              .tint(rating.tint)
-              .disabled(shell.isReviewRating || shell.selectedReviewRating != nil)
-              .keyboardShortcut(rating.shortcut, modifiers: [])
+            } label: {
+              Text(LocalizedStringKey(rating.title))
+                .font(.title3.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 64)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .tint(rating.tint)
+            .opacity(
+              shell.selectedReviewRating == nil || shell.selectedReviewRating == rating ? 1 : 0.4
+            )
+            .overlay(alignment: .topTrailing) {
+              if shell.selectedReviewRating == rating {
+                Image(systemName: "checkmark.circle.fill")
+                  .foregroundStyle(rating.tint)
+                  .font(.title3)
+                  .padding(8)
+              }
+            }
+            .disabled(shell.isReviewRating || shell.selectedReviewRating != nil)
+            .keyboardShortcut(rating.shortcut, modifiers: [])
           }
+        }
+
+        if let rating = shell.selectedReviewRating {
+          Label {
+            Text(shell.localizedFormat("已选择：%@", shell.localized(rating.title)))
+          } icon: {
+            Image(systemName: "checkmark.circle.fill")
+          }
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(rating.tint)
           .transition(.opacity.combined(with: .scale(scale: 0.98)))
-        } else {
+        }
+
+        if showsNextReviewButton {
           Button {
             shell.advanceToNextReview()
           } label: {
@@ -210,7 +231,7 @@ private struct ReviewSessionView: View {
       }
       .animation(
         .easeOut(duration: accessibilityReduceMotion ? 0.12 : 0.16),
-        value: showsNextReviewButton
+        value: shell.selectedReviewRating
       )
     }
   }
@@ -616,13 +637,13 @@ extension ReviewRating {
   fileprivate var shortcut: KeyEquivalent {
     switch self {
     case .forgot:
-      "1"
+      "h"
     case .hard:
-      "2"
+      "j"
     case .remembered:
-      "3"
+      "k"
     case .easy:
-      "4"
+      "l"
     }
   }
 }
