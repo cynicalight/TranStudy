@@ -82,6 +82,7 @@ private struct ReviewSessionView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
   @State private var hasCompletedReviewFlip = false
+  @State private var spellingAttempt = ""
 
   let shell: ApplicationShell
 
@@ -96,6 +97,8 @@ private struct ReviewSessionView: View {
 
         if let item = shell.currentReviewItem {
           reviewSession(item)
+        } else if let item = shell.currentSpellingItem {
+          spellingSession(item)
         } else if shell.hasMoreReviewBatches {
           completedBatchStatus
         } else {
@@ -184,6 +187,7 @@ private struct ReviewSessionView: View {
               .controlSize(.large)
               .tint(rating.tint)
               .disabled(shell.isReviewRating || shell.selectedReviewRating != nil)
+              .keyboardShortcut(rating.shortcut, modifiers: [])
             }
           }
           .transition(.opacity.combined(with: .scale(scale: 0.98)))
@@ -197,6 +201,7 @@ private struct ReviewSessionView: View {
           }
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
+          .keyboardShortcut(.return, modifiers: [])
           .transition(.opacity.combined(with: .scale(scale: 0.98)))
         }
       }
@@ -204,6 +209,85 @@ private struct ReviewSessionView: View {
         .easeOut(duration: accessibilityReduceMotion ? 0.12 : 0.16),
         value: showsNextReviewButton
       )
+    }
+  }
+
+  private func spellingSession(_ item: LearningItem) -> some View {
+    VStack(spacing: 16) {
+      VStack(alignment: .leading, spacing: 18) {
+        Label("拼写复习", systemImage: "speaker.wave.2.fill")
+          .font(.title3.weight(.semibold))
+
+        Text("听发音，根据释义拼写英文单词。")
+          .foregroundStyle(.secondary)
+
+        Text(item.contextualMeaning)
+          .font(.system(size: 42, weight: .semibold, design: .rounded))
+          .minimumScaleFactor(0.7)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: .infinity, minHeight: 150)
+
+        if let spellingReviewResult = shell.spellingReviewResult {
+          Label(
+            spellingReviewResult ? "拼写正确" : "拼写未通过，已按忘记处理并移至队尾",
+            systemImage: spellingReviewResult
+              ? "checkmark.circle.fill"
+              : "arrow.uturn.backward.circle.fill"
+          )
+          .foregroundStyle(spellingReviewResult ? .green : .orange)
+        }
+      }
+      .padding(28)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentSurface()
+      .task(id: item.id) {
+        shell.speak(item.canonicalForm)
+      }
+
+      HStack(spacing: 10) {
+        TextField("输入单词", text: $spellingAttempt)
+          .textFieldStyle(.roundedBorder)
+          .disabled(shell.spellingReviewResult != nil)
+          .onSubmit {
+            submitSpelling()
+          }
+
+        Button("检查") {
+          submitSpelling()
+        }
+        .buttonStyle(.bordered)
+        .disabled(
+          shell.isSpellingReviewSubmitting
+            || shell.spellingReviewResult != nil
+            || spellingAttempt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        )
+      }
+
+      if shell.spellingReviewResult != nil {
+        Button {
+          shell.advanceToNextSpellingReview()
+          spellingAttempt = ""
+        } label: {
+          Label(
+            shell.spellingReviewResult == true ? "下一个" : "继续拼写",
+            systemImage: "arrow.right"
+          )
+          .font(.title3.weight(.semibold))
+          .frame(maxWidth: .infinity, minHeight: 64)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .keyboardShortcut(.return, modifiers: [])
+      }
+    }
+    .onChange(of: item.id) {
+      spellingAttempt = ""
+    }
+  }
+
+  private func submitSpelling() {
+    Task {
+      await shell.submitCurrentSpelling(spellingAttempt)
     }
   }
 
@@ -426,6 +510,8 @@ private struct ReviewFlipCard<Front: View, Back: View>: View {
         .contentShape(.rect)
     }
     .buttonStyle(.plain)
+    .keyboardShortcut(.space, modifiers: [])
+    .disabled(isFlipped)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .allowsHitTesting(!isFlipped)
     .accessibilityHidden(isFlipped)
@@ -509,6 +595,19 @@ extension ReviewRating {
       .blue
     case .easy:
       .green
+    }
+  }
+
+  fileprivate var shortcut: KeyEquivalent {
+    switch self {
+    case .forgot:
+      "1"
+    case .hard:
+      "2"
+    case .remembered:
+      "3"
+    case .easy:
+      "4"
     }
   }
 }

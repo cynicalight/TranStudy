@@ -78,6 +78,9 @@ final class ApplicationShell {
   private(set) var isReviewAnswerVisible = false
   private(set) var isReviewRating = false
   private(set) var selectedReviewRating: ReviewRating?
+  private(set) var spellingQueue: [LearningItem] = []
+  private(set) var spellingReviewResult: Bool?
+  private(set) var isSpellingReviewSubmitting = false
   private(set) var reviewReminderConfiguration: ReviewReminderConfiguration
   private(set) var isLaunchAtLoginEnabled: Bool
   private(set) var automaticallyChecksForUpdates: Bool
@@ -115,6 +118,10 @@ final class ApplicationShell {
 
   var hasMoreReviewBatches: Bool {
     !remainingReviewBatches.isEmpty
+  }
+
+  var currentSpellingItem: LearningItem? {
+    spellingQueue.first
   }
 
   var isLongTextTranslationPresentation: Bool {
@@ -231,8 +238,10 @@ final class ApplicationShell {
       learningSummary = summary
       reviewQueue = batches.first ?? []
       remainingReviewBatches = Array(batches.dropFirst())
+      spellingQueue = queue.items.filter { $0.kind == .word }
       isReviewAnswerVisible = false
       selectedReviewRating = nil
+      spellingReviewResult = nil
       lastReviewRefreshDate = now
     } catch {
       // A later ticket will expose recoverable loading errors in the review UI.
@@ -307,6 +316,54 @@ final class ApplicationShell {
     reviewQueue.removeFirst()
     isReviewAnswerVisible = false
     selectedReviewRating = nil
+  }
+
+  func submitCurrentSpelling(_ attempt: String) async {
+    guard
+      let currentSpellingItem,
+      spellingReviewResult == nil,
+      !isSpellingReviewSubmitting
+    else {
+      return
+    }
+
+    let isCorrect = SpellingAnswer.matches(
+      attempt,
+      expected: currentSpellingItem.canonicalForm
+    )
+    guard !isCorrect else {
+      spellingReviewResult = true
+      return
+    }
+
+    isSpellingReviewSubmitting = true
+    defer {
+      isSpellingReviewSubmitting = false
+    }
+    let now = environment.clock.now
+    do {
+      _ = try await environment.learningStore.recordReview(
+        itemID: currentSpellingItem.id,
+        rating: .forgot,
+        reviewedAt: now
+      )
+      spellingReviewResult = false
+      learningSummary = try await environment.learningStore.summary(at: now)
+      lastReviewRefreshDate = now
+    } catch {
+      // Keep the current spelling card available when persistence fails.
+    }
+  }
+
+  func advanceToNextSpellingReview() {
+    guard let wasCorrect = spellingReviewResult, !spellingQueue.isEmpty else {
+      return
+    }
+    let item = spellingQueue.removeFirst()
+    if !wasCorrect {
+      spellingQueue.append(item)
+    }
+    spellingReviewResult = nil
   }
 
   func startNextReviewBatch() {

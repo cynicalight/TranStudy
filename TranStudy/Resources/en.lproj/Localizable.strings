@@ -44,6 +44,13 @@
 "记得" = "Remembered";
 "简单" = "Easy";
 "显示完整释义和例句" = "Show the full meaning and examples";
+"拼写复习" = "Spelling Review";
+"听发音，根据释义拼写英文单词。" = "Listen to the pronunciation and spell the English word from its meaning.";
+"输入单词" = "Type the word";
+"检查" = "Check";
+"拼写正确" = "Correct spelling";
+"拼写未通过，已按忘记处理并移至队尾" = "Spelling was incorrect, recorded as Forgot, and moved to the end of the queue.";
+"继续拼写" = "Continue Spelling";
 
 "设置 TranStudy" = "Set Up TranStudy";
 "划词权限" = "Selection Permission";
@@ -63,6 +70,7 @@
 "你现在可以进入主界面。未完成的项目会保留为轻量提示，不会反复强制弹出引导。" = "You can now enter the main app. Unfinished items remain as a lightweight reminder instead of repeatedly reopening setup.";
 "登录时启动 TranStudy" = "Launch TranStudy at Login";
 "开启后，TranStudy 会在登录时进入菜单栏，以便继续提供划词和到期提醒。此选项默认关闭。" = "When enabled, TranStudy starts in the menu bar at login so selection translation and due reminders remain available. This is off by default.";
+"复习时按 Space 翻卡；用 1、2、3、4 选择“忘记、困难、记得、简单”；完成评分后按 Return 进入下一张。" = "During review, press Space to flip a card. Use 1, 2, 3, and 4 for Forgot, Hard, Remembered, and Easy. After rating, press Return for the next card.";
 "上一步" = "Back";
 "稍后处理" = "Do This Later";
 "进入 TranStudy" = "Enter TranStudy";

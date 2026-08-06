@@ -896,6 +896,53 @@ struct ApplicationShellTests {
     #expect(shell.selectedReviewRating == nil)
   }
 
+  @Test("spelling starts after the normal review and records an incorrect answer as forgot")
+  func spellingReviewRecordsIncorrectAnswerAsForgot() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "resilient"
+    )
+    let learningStore = TestLearningStore(dueItems: [item])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    await shell.refreshTodayReview()
+    await shell.rateCurrentReview(.remembered)
+    shell.advanceToNextReview()
+
+    #expect(shell.currentReviewItem == nil)
+    #expect(shell.currentSpellingItem == item)
+
+    await shell.submitCurrentSpelling("resilience")
+
+    #expect(shell.spellingReviewResult == false)
+    #expect(
+      learningStore.reviewInvocations
+        == [
+          ReviewInvocation(
+            itemID: item.id,
+            rating: .remembered,
+            reviewedAt: Date(timeIntervalSince1970: 1_234)
+          ),
+          ReviewInvocation(
+            itemID: item.id,
+            rating: .forgot,
+            reviewedAt: Date(timeIntervalSince1970: 1_234)
+          ),
+        ])
+
+    shell.advanceToNextSpellingReview()
+
+    #expect(shell.currentSpellingItem == item)
+
+    await shell.submitCurrentSpelling("resilient")
+    #expect(shell.spellingReviewResult == true)
+
+    shell.advanceToNextSpellingReview()
+    #expect(shell.currentSpellingItem == nil)
+  }
+
   @Test("a card scheduled again today returns to the end of the current review batch")
   func sameDayReviewReturnsToCurrentBatch() async {
     let item = makeLearningItem(
