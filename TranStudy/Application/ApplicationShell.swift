@@ -274,8 +274,36 @@ final class ApplicationShell {
 
   func rateCurrentReview(_ rating: ReviewRating) async {
     guard
-      let currentReviewItem,
+      currentReviewItem != nil,
       selectedReviewRating == nil,
+      !isReviewRating
+    else {
+      return
+    }
+
+    selectedReviewRating = rating
+    isReviewAnswerVisible = true
+  }
+
+  func cancelCurrentReviewRating() {
+    guard selectedReviewRating != nil, !isReviewRating else {
+      return
+    }
+    selectedReviewRating = nil
+  }
+
+  func confirmCurrentReviewOrRemember() async {
+    if selectedReviewRating == nil {
+      await rateCurrentReview(.remembered)
+    }
+    await advanceToNextReview()
+  }
+
+  func advanceToNextReview() async {
+    guard
+      let currentReviewItem,
+      let selectedReviewRating,
+      !reviewQueue.isEmpty,
       !isReviewRating
     else {
       return
@@ -289,7 +317,7 @@ final class ApplicationShell {
     do {
       let result = try await environment.learningStore.recordReview(
         itemID: currentReviewItem.id,
-        rating: rating,
+        rating: selectedReviewRating,
         reviewedAt: now
       )
       if Calendar.autoupdatingCurrent.startOfDay(for: result.nextReviewAt)
@@ -297,25 +325,17 @@ final class ApplicationShell {
       {
         reviewQueue.append(currentReviewItem)
       }
-      selectedReviewRating = rating
-      isReviewAnswerVisible = true
       learningSummary = try await environment.learningStore.summary(at: now)
       lastReviewRefreshDate = now
       if learningSummary.dueCount == 0 {
         try? await environment.notifications.replaceScheduledReminder(with: nil)
       }
+      reviewQueue.removeFirst()
+      isReviewAnswerVisible = false
+      self.selectedReviewRating = nil
     } catch {
-      // Keep the current card rateable when persistence fails.
+      // Keep the selected rating available for another submission attempt.
     }
-  }
-
-  func advanceToNextReview() {
-    guard selectedReviewRating != nil, !reviewQueue.isEmpty else {
-      return
-    }
-    reviewQueue.removeFirst()
-    isReviewAnswerVisible = false
-    selectedReviewRating = nil
   }
 
   func submitCurrentSpelling(_ attempt: String) async {
@@ -998,6 +1018,29 @@ final class ApplicationShell {
 
   func restoreSelectedLibraryItems() async {
     await setSelectedLibraryItemsArchived(at: nil)
+  }
+
+  func addSelectedLibraryItemsToTodayReview() async {
+    guard libraryScope == .active else {
+      return
+    }
+    let selectedIDs = Array(selectedLearningItemIDs)
+    guard !selectedIDs.isEmpty else {
+      return
+    }
+
+    let now = environment.clock.now
+    do {
+      for itemID in selectedIDs {
+        try await environment.learningStore.setReviewPaused(itemID: itemID, isPaused: false)
+        try await environment.learningStore.setNextReviewDate(itemID: itemID, nextReviewAt: now)
+      }
+      cancelLibrarySelection()
+      await refreshTodayReview()
+      await refreshLibrary()
+    } catch {
+      // Keep the selection so the user can retry.
+    }
   }
 
   func stageLibraryItemDeletion(itemID: UUID) async -> Bool {

@@ -11,7 +11,8 @@
 "J：困难" = "J: Hard";
 "K：记得" = "K: Remembered";
 "L：简单" = "L: Easy";
-"Return：下一张" = "Return: Next card";
+"Esc：撤销选择" = "Esc: Undo selection";
+"Return：记得并进入下一张" = "Return: Remembered and next card";
 "翻译剪贴板" = "Translate Clipboard";
 "翻译剪贴板（%@）" = "Translate Clipboard (%@)";
 "翻译剪贴板快捷键" = "Translate clipboard shortcut";
@@ -77,7 +78,7 @@
 "你现在可以进入主界面。未完成的项目会保留为轻量提示，不会反复强制弹出引导。" = "You can now enter the main app. Unfinished items remain as a lightweight reminder instead of repeatedly reopening setup.";
 "登录时启动 TranStudy" = "Launch TranStudy at Login";
 "开启后，TranStudy 会在登录时进入菜单栏，以便继续提供划词和到期提醒。此选项默认关闭。" = "When enabled, TranStudy starts in the menu bar at login so selection translation and due reminders remain available. This is off by default.";
-"复习时按 Space 翻卡；用 H、J、K、L 选择“忘记、困难、记得、简单”；完成评分后按 Return 进入下一张。" = "During review, press Space to flip a card. Use H, J, K, and L for Forgot, Hard, Remembered, and Easy. After rating, press Return for the next card.";
+"复习时按 Space 翻卡；用 H、J、K、L 选择“忘记、困难、记得、简单”；按 Return 可直接“记得”并进入下一张，或确认已选评分。" = "During review, press Space to flip a card. Use H, J, K, and L for Forgot, Hard, Remembered, and Easy. Press Return to mark Remembered and continue, or to confirm a selected rating.";
 "上一步" = "Back";
 "稍后处理" = "Do This Later";
 "进入 TranStudy" = "Enter TranStudy";

@@ -174,6 +174,16 @@ struct LearningLibraryView: View {
           }
           .disabled(shell.displayedLearningItems.isEmpty)
 
+          if shell.libraryScope == .active {
+            Button("加入今日复习") {
+              Task {
+                await shell.addSelectedLibraryItemsToTodayReview()
+              }
+            }
+            .buttonStyle(.bordered)
+            .disabled(shell.selectedLearningItemIDs.isEmpty)
+          }
+
           Button {
             Task {
               if shell.libraryScope == .active {

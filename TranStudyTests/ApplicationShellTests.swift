@@ -569,6 +569,41 @@ struct ApplicationShellTests {
     #expect(shell.archivedLearningItems.isEmpty)
   }
 
+  @Test("selected active library items can be added to today's review")
+  func selectedLibraryItemsCanBeAddedToTodayReview() async {
+    let firstItem = makeLearningItem(
+      id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
+      canonicalForm: "run"
+    )
+    let secondItem = makeLearningItem(
+      id: UUID(uuidString: "A60B21B0-D9FC-4DBD-B818-A1819310E5E4")!,
+      canonicalForm: "pause"
+    )
+    let learningStore = TestLearningStore(items: [firstItem, secondItem])
+    let shell = ApplicationShell(environment: .test(learningStore: learningStore))
+    await shell.refreshLibrary()
+
+    shell.beginLibrarySelection()
+    shell.selectAllLibraryItems()
+    await shell.addSelectedLibraryItemsToTodayReview()
+
+    #expect(!shell.isLibrarySelecting)
+    #expect(shell.selectedLearningItemIDs.isEmpty)
+    #expect(
+      Set(learningStore.nextReviewDateInvocations.map(\.itemID))
+        == [firstItem.id, secondItem.id]
+    )
+    #expect(
+      learningStore.nextReviewDateInvocations.allSatisfy {
+        $0.nextReviewAt == Date(timeIntervalSince1970: 1_234)
+      }
+    )
+    #expect(
+      Set(learningStore.reviewPausedInvocations.map(\.itemID)) == [firstItem.id, secondItem.id]
+    )
+    #expect(learningStore.reviewPausedInvocations.allSatisfy { $0.isPaused == false })
+  }
+
   @Test("a pending library deletion can be undone before persistence")
   func pendingLibraryDeletionCanBeUndone() async {
     let (item, learningStore, shell) = await makeLibraryDeletionContext()
@@ -852,8 +887,8 @@ struct ApplicationShellTests {
     #expect(shell.pendingLibraryMerge == nil)
   }
 
-  @Test("rating a due card records the controlled time, reveals the answer, then advances")
-  func ratingDueCardRevealsAnswerThenAdvances() async throws {
+  @Test("a selected rating can be cancelled before it is recorded")
+  func selectedRatingCanBeCancelledBeforeRecording() async throws {
     let firstItem = makeLearningItem(
       id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
       canonicalForm: "run",
@@ -876,6 +911,19 @@ struct ApplicationShellTests {
 
     await shell.rateCurrentReview(.remembered)
 
+    #expect(learningStore.reviewInvocations.isEmpty)
+    #expect(shell.currentReviewItem == firstItem)
+    #expect(shell.isReviewAnswerVisible)
+    #expect(shell.selectedReviewRating == .remembered)
+
+    shell.cancelCurrentReviewRating()
+
+    #expect(learningStore.reviewInvocations.isEmpty)
+    #expect(shell.currentReviewItem == firstItem)
+    #expect(shell.selectedReviewRating == nil)
+
+    await shell.confirmCurrentReviewOrRemember()
+
     #expect(
       learningStore.reviewInvocations
         == [
@@ -885,11 +933,6 @@ struct ApplicationShellTests {
             reviewedAt: Date(timeIntervalSince1970: 1_234)
           )
         ])
-    #expect(shell.currentReviewItem == firstItem)
-    #expect(shell.isReviewAnswerVisible)
-    #expect(shell.selectedReviewRating == .remembered)
-
-    shell.advanceToNextReview()
 
     #expect(shell.currentReviewItem == secondItem)
     #expect(shell.isReviewAnswerVisible == false)
@@ -909,7 +952,7 @@ struct ApplicationShellTests {
 
     await shell.refreshTodayReview()
     await shell.rateCurrentReview(.remembered)
-    shell.advanceToNextReview()
+    await shell.advanceToNextReview()
 
     #expect(shell.currentReviewItem == nil)
     #expect(shell.currentSpellingItem == item)
@@ -958,7 +1001,7 @@ struct ApplicationShellTests {
 
     await shell.refreshTodayReview()
     await shell.rateCurrentReview(.forgot)
-    shell.advanceToNextReview()
+    await shell.advanceToNextReview()
 
     #expect(shell.currentReviewItem == item)
     #expect(shell.selectedReviewRating == nil)
@@ -979,7 +1022,7 @@ struct ApplicationShellTests {
 
     await shell.refreshTodayReview()
     await shell.rateCurrentReview(.forgot)
-    shell.advanceToNextReview()
+    await shell.advanceToNextReview()
 
     #expect(shell.currentReviewItem == item)
     #expect(shell.selectedReviewRating == nil)
@@ -1014,7 +1057,7 @@ struct ApplicationShellTests {
 
     while shell.currentReviewItem != nil {
       await shell.rateCurrentReview(.remembered)
-      shell.advanceToNextReview()
+      await shell.advanceToNextReview()
     }
 
     #expect(learningStore.reviewInvocations.count == 20)

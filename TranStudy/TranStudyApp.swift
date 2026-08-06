@@ -110,7 +110,9 @@ struct TranStudyApp: App {
             .disabled(true)
           Button(shell.localized("L：简单")) {}
             .disabled(true)
-          Button(shell.localized("Return：下一张")) {}
+          Button(shell.localized("Esc：撤销选择")) {}
+            .disabled(true)
+          Button(shell.localized("Return：记得并进入下一张")) {}
             .disabled(true)
         }
       }

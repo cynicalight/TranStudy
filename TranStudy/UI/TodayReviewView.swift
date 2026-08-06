@@ -83,6 +83,8 @@ private struct ReviewSessionView: View {
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
   @State private var hasCompletedReviewFlip = false
   @State private var spellingAttempt = ""
+  @State private var isSpellingShaking = false
+  @FocusState private var isSpellingAttemptFocused: Bool
 
   let shell: ApplicationShell
 
@@ -174,6 +176,18 @@ private struct ReviewSessionView: View {
       }
 
       VStack(spacing: 12) {
+        Button {
+          Task {
+            await shell.confirmCurrentReviewOrRemember()
+          }
+        } label: {
+          EmptyView()
+        }
+        .keyboardShortcut(.return, modifiers: [])
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .accessibilityHidden(true)
+
         HStack(spacing: 10) {
           ForEach(ReviewRating.allCases, id: \.self) { rating in
             Button {
@@ -213,11 +227,20 @@ private struct ReviewSessionView: View {
           .font(.callout.weight(.semibold))
           .foregroundStyle(rating.tint)
           .transition(.opacity.combined(with: .scale(scale: 0.98)))
+
+          Button("撤销选择") {
+            shell.cancelCurrentReviewRating()
+          }
+          .buttonStyle(.borderless)
+          .disabled(shell.isReviewRating)
+          .keyboardShortcut(.escape, modifiers: [])
         }
 
         if showsNextReviewButton {
           Button {
-            shell.advanceToNextReview()
+            Task {
+              await shell.advanceToNextReview()
+            }
           } label: {
             Label("下一个", systemImage: "arrow.right")
               .font(.title3.weight(.semibold))
@@ -225,7 +248,7 @@ private struct ReviewSessionView: View {
           }
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
-          .keyboardShortcut(.return, modifiers: [])
+          .disabled(shell.isReviewRating)
           .transition(.opacity.combined(with: .scale(scale: 0.98)))
         }
       }
@@ -237,81 +260,128 @@ private struct ReviewSessionView: View {
   }
 
   private func spellingSession(_ item: LearningItem) -> some View {
-    VStack(spacing: 16) {
-      VStack(alignment: .leading, spacing: 18) {
+    let expectedCharacters = Array(item.canonicalForm)
+    let enteredCharacters = Array(spellingAttempt)
+
+    return VStack(spacing: 16) {
+      VStack(alignment: .leading, spacing: 24) {
         Label("拼写复习", systemImage: "speaker.wave.2.fill")
           .font(.title3.weight(.semibold))
 
-        Text("听发音，根据释义拼写英文单词。")
+        Text("听发音，根据释义拼写英文单词。共 (expectedCharacters.count) 个字母。")
           .foregroundStyle(.secondary)
 
         Text(item.contextualMeaning)
           .font(.system(size: 42, weight: .semibold, design: .rounded))
           .minimumScaleFactor(0.7)
           .multilineTextAlignment(.center)
-          .frame(maxWidth: .infinity, minHeight: 150)
+          .frame(maxWidth: .infinity, minHeight: 128)
+
+        HStack(spacing: 10) {
+          ForEach(Array(expectedCharacters.enumerated()), id: \.offset) { index, _ in
+            ZStack(alignment: .bottom) {
+              if index < enteredCharacters.count {
+                Text(String(enteredCharacters[index]))
+                  .font(.system(.title2, design: .monospaced).weight(.semibold))
+                  .foregroundStyle(spellingSlotTint)
+                  .frame(height: 38)
+              } else {
+                Rectangle()
+                  .fill(spellingSlotTint)
+                  .frame(width: 24, height: 2)
+                  .padding(.bottom, 7)
+              }
+            }
+            .frame(width: 30, height: 42)
+          }
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+          guard shell.spellingReviewResult == nil else {
+            return
+          }
+          isSpellingAttemptFocused = true
+        }
+        .offset(x: isSpellingShaking ? -7 : 0)
+        .animation(
+          accessibilityReduceMotion
+            ? nil
+            : .default.repeatCount(4, autoreverses: true),
+          value: isSpellingShaking
+        )
 
         if let spellingReviewResult = shell.spellingReviewResult {
           Label(
-            spellingReviewResult ? "拼写正确" : "拼写未通过，已按忘记处理并移至队尾",
-            systemImage: spellingReviewResult
-              ? "checkmark.circle.fill"
-              : "arrow.uturn.backward.circle.fill"
+            spellingReviewResult ? "拼写正确" : "拼写错误，已移至队尾",
+            systemImage: spellingReviewResult ? "checkmark.circle.fill" : "xmark.circle.fill"
           )
-          .foregroundStyle(spellingReviewResult ? .green : .orange)
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(spellingReviewResult ? .green : .red)
+          .frame(maxWidth: .infinity)
         }
+
+        TextField("", text: $spellingAttempt)
+          .textFieldStyle(.plain)
+          .focused($isSpellingAttemptFocused)
+          .frame(width: 1, height: 1)
+          .opacity(0.01)
+          .disabled(shell.spellingReviewResult != nil)
+          .onSubmit {
+            submitSpelling(expectedLength: expectedCharacters.count)
+          }
       }
       .padding(28)
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentSurface()
       .task(id: item.id) {
+        spellingAttempt = ""
+        isSpellingAttemptFocused = true
         shell.speak(item.canonicalForm)
       }
-
-      HStack(spacing: 10) {
-        TextField("输入单词", text: $spellingAttempt)
-          .textFieldStyle(.roundedBorder)
-          .disabled(shell.spellingReviewResult != nil)
-          .onSubmit {
-            submitSpelling()
-          }
-
-        Button("检查") {
-          submitSpelling()
+      .task(id: shell.spellingReviewResult) {
+        guard let spellingReviewResult = shell.spellingReviewResult else {
+          return
         }
-        .buttonStyle(.bordered)
-        .disabled(
-          shell.isSpellingReviewSubmitting
-            || shell.spellingReviewResult != nil
-            || spellingAttempt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        )
-      }
 
-      if shell.spellingReviewResult != nil {
-        Button {
-          shell.advanceToNextSpellingReview()
-          spellingAttempt = ""
-        } label: {
-          Label(
-            shell.spellingReviewResult == true ? "下一个" : "继续拼写",
-            systemImage: "arrow.right"
-          )
-          .font(.title3.weight(.semibold))
-          .frame(maxWidth: .infinity, minHeight: 64)
+        if spellingReviewResult == false, !accessibilityReduceMotion {
+          isSpellingShaking = true
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .keyboardShortcut(.return, modifiers: [])
+        try? await Task.sleep(for: spellingReviewResult ? .milliseconds(650) : .milliseconds(450))
+        guard !Task.isCancelled else {
+          return
+        }
+        isSpellingShaking = false
+        spellingAttempt = ""
+        shell.advanceToNextSpellingReview()
+        isSpellingAttemptFocused = true
       }
-    }
-    .onChange(of: item.id) {
-      spellingAttempt = ""
+      .onChange(of: spellingAttempt) { _, attempt in
+        let limitedAttempt = String(attempt.prefix(expectedCharacters.count))
+        if spellingAttempt != limitedAttempt {
+          spellingAttempt = limitedAttempt
+        }
+      }
     }
   }
 
-  private func submitSpelling() {
+  private func submitSpelling(expectedLength: Int) {
+    guard spellingAttempt.count == expectedLength else {
+      return
+    }
     Task {
       await shell.submitCurrentSpelling(spellingAttempt)
+    }
+  }
+
+  private var spellingSlotTint: Color {
+    switch shell.spellingReviewResult {
+    case true:
+      .green
+    case false:
+      .red
+    case nil:
+      .primary
     }
   }
 

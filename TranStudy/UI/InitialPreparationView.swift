@@ -167,7 +167,7 @@ struct InitialPreparationView: View {
         .font(.caption)
         .foregroundStyle(.secondary)
 
-      Label("复习时按 Space 翻卡；用 H、J、K、L 选择“忘记、困难、记得、简单”；完成评分后按 Return 进入下一张。", systemImage: "keyboard")
+      Label("复习时按 Space 翻卡；用 H、J、K、L 选择“忘记、困难、记得、简单”；按 Return 可直接“记得”并进入下一张，或确认已选评分。", systemImage: "keyboard")
         .font(.callout)
         .foregroundStyle(.secondary)
 
