@@ -283,7 +283,9 @@ final class ApplicationShell {
         rating: rating,
         reviewedAt: now
       )
-      if result.nextReviewAt <= now {
+      if Calendar.autoupdatingCurrent.startOfDay(for: result.nextReviewAt)
+        <= Calendar.autoupdatingCurrent.startOfDay(for: now)
+      {
         reviewQueue.append(currentReviewItem)
       }
       selectedReviewRating = rating

@@ -917,6 +917,27 @@ struct ApplicationShellTests {
     #expect(shell.selectedReviewRating == nil)
   }
 
+  @Test("a card scheduled later today returns to the current review batch")
+  func laterSameDayReviewReturnsToCurrentBatch() async {
+    let item = makeLearningItem(
+      id: UUID(),
+      canonicalForm: "run",
+      nextReviewAt: Date(timeIntervalSince1970: -100)
+    )
+    let learningStore = TestLearningStore(
+      dueItems: [item],
+      reviewResultIntervalDays: 0.01
+    )
+    let shell = ApplicationShell(environment: .test(learningStore: learningStore))
+
+    await shell.refreshTodayReview()
+    await shell.rateCurrentReview(.forgot)
+    shell.advanceToNextReview()
+
+    #expect(shell.currentReviewItem == item)
+    #expect(shell.selectedReviewRating == nil)
+  }
+
   @Test("daily review advances through complete twenty-card batches")
   func dailyReviewUsesTwentyCardBatches() async {
     let dueItems = (0..<45).map { index in

@@ -6,6 +6,32 @@ import Testing
 
 @MainActor
 struct SwiftDataLearningStoreTests {
+  @Test("cards scheduled later today are available for review")
+  func cardsScheduledLaterTodayAreAvailableForReview() async throws {
+    let store = try makeInMemoryStore()
+    let reviewTime = Date(timeIntervalSince1970: 100_000)
+    let laterToday = reviewTime.addingTimeInterval(3_600)
+
+    try await store.add(
+      LearningAddition(
+        draft: TranslationDraft(
+          sourceText: "running",
+          canonicalForm: "run",
+          pronunciation: "/rʌn/",
+          partOfSpeech: "verb",
+          contextualMeaning: "跑步",
+          exampleSentence: "They run every day.",
+          sentenceTranslation: "他们每天跑步。"
+        ),
+        sourceApplicationName: "Safari",
+        createdAt: reviewTime.addingTimeInterval(-86_400),
+        nextReviewAt: laterToday
+      ))
+
+    #expect(try await store.summary(at: reviewTime).dueCount == 1)
+    #expect(try await store.dueItems(at: reviewTime).map(\.canonicalForm) == ["run"])
+  }
+
   @Test("archiving cards hides them from learning and restoring preserves schedule")
   func archivingAndRestoringCardsPreservesLearningState() async throws {
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)

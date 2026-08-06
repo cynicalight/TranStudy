@@ -53,7 +53,7 @@ final class SwiftDataLearningStore: LearningStoring {
     }
     let activeRecords = records.filter { $0.archivedAt == nil }
     let dueCount = activeRecords.count(where: {
-      !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= date
+      isDue(nextReviewAt: $0.nextReviewAt, isPaused: $0.isPaused, at: date)
     })
     let reviewDays = records.flatMap(\.reviewEvents).map {
       calendar.startOfDay(for: $0.reviewedAt)
@@ -72,7 +72,7 @@ final class SwiftDataLearningStore: LearningStoring {
   func dueItems(at date: Date) async throws -> [LearningItem] {
     try await items()
       .filter {
-        !$0.isPaused && ($0.nextReviewAt ?? .distantFuture) <= date
+        isDue(nextReviewAt: $0.nextReviewAt, isPaused: $0.isPaused, at: date)
       }
       .sorted { first, second in
         let firstReviewDate = first.nextReviewAt ?? .distantFuture
@@ -917,6 +917,13 @@ final class SwiftDataLearningStore: LearningStoring {
 
   private func effectiveLastEncounteredAt(for record: LearningRecord) -> Date {
     record.encounters.map(\.encounteredAt).max() ?? record.createdAt
+  }
+
+  private func isDue(nextReviewAt: Date?, isPaused: Bool, at date: Date) -> Bool {
+    guard !isPaused, let nextReviewAt else {
+      return false
+    }
+    return calendar.startOfDay(for: nextReviewAt) <= calendar.startOfDay(for: date)
   }
 
   private func streakDayCount(reviewDays: Set<Date>, today: Date) -> Int {
