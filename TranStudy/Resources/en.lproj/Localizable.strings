@@ -5,6 +5,13 @@
 "单词库" = "Library";
 "设置" = "Settings";
 "翻译" = "Translate";
+"复习快捷键" = "Review Shortcuts";
+"Space：翻卡；翻卡后朗读单词" = "Space: Flip card; speak the word after flipping";
+"1：忘记" = "1: Forgot";
+"2：困难" = "2: Hard";
+"3：记得" = "3: Remembered";
+"4：简单" = "4: Easy";
+"Return：下一张" = "Return: Next card";
 "翻译剪贴板" = "Translate Clipboard";
 "翻译剪贴板（%@）" = "Translate Clipboard (%@)";
 "翻译剪贴板快捷键" = "Translate clipboard shortcut";

@@ -143,7 +143,10 @@ private struct ReviewSessionView: View {
       ReviewFlipCard(
         isFlipped: shell.isReviewAnswerVisible,
         isBackFaceInteractive: hasCompletedReviewFlip,
-        onFlip: shell.revealCurrentReviewAnswer
+        onFlip: shell.revealCurrentReviewAnswer,
+        onSpeak: {
+          shell.speak(item.kind == .word ? item.canonicalForm : item.sourceText)
+        }
       ) {
         Text(item.kind == .sentence ? item.sourceText : item.canonicalForm)
           .font(.system(size: 48, weight: .semibold, design: .rounded))
@@ -456,6 +459,7 @@ private struct ReviewFlipCard<Front: View, Back: View>: View {
   let isFlipped: Bool
   let isBackFaceInteractive: Bool
   let onFlip: () -> Void
+  let onSpeak: () -> Void
   let front: Front
   let back: Back
 
@@ -463,12 +467,14 @@ private struct ReviewFlipCard<Front: View, Back: View>: View {
     isFlipped: Bool,
     isBackFaceInteractive: Bool,
     onFlip: @escaping () -> Void,
+    onSpeak: @escaping () -> Void,
     @ViewBuilder front: () -> Front,
     @ViewBuilder back: () -> Back
   ) {
     self.isFlipped = isFlipped
     self.isBackFaceInteractive = isBackFaceInteractive
     self.onFlip = onFlip
+    self.onSpeak = onSpeak
     self.front = front()
     self.back = back()
   }
@@ -526,6 +532,15 @@ private struct ReviewFlipCard<Front: View, Back: View>: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
       .allowsHitTesting(isBackFaceInteractive)
       .accessibilityHidden(!isBackFaceInteractive)
+      .background {
+        Button(action: onSpeak) {
+          EmptyView()
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut(.space, modifiers: [])
+        .disabled(!isFlipped)
+        .accessibilityHidden(true)
+      }
   }
 
   private var flipAnimation: Animation {

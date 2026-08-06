@@ -97,6 +97,23 @@ struct TranStudyApp: App {
           coordinator.presentClipboardTranslation()
         }
       }
+
+      CommandGroup(after: .help) {
+        Menu(shell.localized("复习快捷键")) {
+          Button(shell.localized("Space：翻卡；翻卡后朗读单词")) {}
+            .disabled(true)
+          Button(shell.localized("1：忘记")) {}
+            .disabled(true)
+          Button(shell.localized("2：困难")) {}
+            .disabled(true)
+          Button(shell.localized("3：记得")) {}
+            .disabled(true)
+          Button(shell.localized("4：简单")) {}
+            .disabled(true)
+          Button(shell.localized("Return：下一张")) {}
+            .disabled(true)
+        }
+      }
     }
 
     MenuBarExtra {
