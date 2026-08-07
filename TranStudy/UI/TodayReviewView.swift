@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct TodayReviewView: View {
@@ -283,24 +284,11 @@ private struct ReviewSessionView: View {
           .multilineTextAlignment(.center)
           .frame(maxWidth: .infinity, minHeight: 128)
 
-        HStack(spacing: 10) {
-          ForEach(Array(expectedCharacters.enumerated()), id: \.offset) { index, _ in
-            ZStack(alignment: .bottom) {
-              if index < enteredCharacters.count {
-                Text(String(enteredCharacters[index]))
-                  .font(.system(.title2, design: .monospaced).weight(.semibold))
-                  .foregroundStyle(spellingSlotTint)
-                  .frame(height: 38)
-              } else {
-                Rectangle()
-                  .fill(spellingSlotTint)
-                  .frame(width: 24, height: 2)
-                  .padding(.bottom, 7)
-              }
-            }
-            .frame(width: 30, height: 42)
-          }
-        }
+        SpellingAnswerSlots(
+          expectedCharacters: expectedCharacters,
+          enteredCharacters: enteredCharacters,
+          tint: spellingSlotTint
+        )
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
@@ -336,12 +324,21 @@ private struct ReviewSessionView: View {
           .onSubmit {
             submitSpelling(expectedLength: expectedCharacters.count)
           }
+          .onKeyPress(.space) {
+            shell.speak(item.canonicalForm)
+            return .handled
+          }
+          .onKeyPress(.return) {
+            submitSpelling(expectedLength: expectedCharacters.count)
+            return .handled
+          }
       }
       .padding(28)
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentSurface()
       .task(id: item.id) {
         spellingAttempt = ""
+        await Task.yield()
         isSpellingAttemptFocused = true
         shell.speak(item.canonicalForm)
       }
@@ -434,7 +431,10 @@ private struct ReviewSessionView: View {
 
         VStack(alignment: .leading, spacing: 7) {
           HStack {
-            Text(item.exampleSentence)
+            HighlightedExampleSentence(
+              sentence: item.exampleSentence,
+              vocabulary: item.canonicalForm
+            )
               .font(.body)
               .italic()
             SpeechButton(text: item.exampleSentence, speak: shell.speak)
@@ -459,7 +459,10 @@ private struct ReviewSessionView: View {
                     }
                   }
                   HStack {
-                    Text(encounter.exampleSentence)
+                    HighlightedExampleSentence(
+                      sentence: encounter.exampleSentence,
+                      vocabulary: item.canonicalForm
+                    )
                       .italic()
                     SpeechButton(
                       text: encounter.exampleSentence,
@@ -547,6 +550,125 @@ private struct ReviewSessionView: View {
 
   private var reviewStatusTint: Color {
     shell.learningSummary.dueCount == 0 ? .green : .orange
+  }
+}
+
+private struct HighlightedExampleSentence: View {
+  let sentence: String
+  let vocabulary: String
+
+  var body: some View {
+    Text(highlightedSentence)
+  }
+
+  private var highlightedSentence: AttributedString {
+    var attributedSentence = AttributedString(sentence)
+    let normalizedVocabulary = vocabulary.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalizedVocabulary.isEmpty else {
+      return attributedSentence
+    }
+
+    let pattern =
+      "(?<![\\p{L}\\p{N}])"
+      + NSRegularExpression.escapedPattern(for: normalizedVocabulary)
+      + "(?![\\p{L}\\p{N}])"
+    guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+      return attributedSentence
+    }
+
+    let sentenceRange = NSRange(sentence.startIndex..., in: sentence)
+    for match in expression.matches(in: sentence, range: sentenceRange) {
+      guard let range = Range(match.range, in: attributedSentence) else {
+        continue
+      }
+      attributedSentence[range].foregroundColor = .accentColor
+      attributedSentence[range].font = .body.bold()
+    }
+    return attributedSentence
+  }
+}
+
+private struct SpellingAnswerSlots: View {
+  let expectedCharacters: [Character]
+  let enteredCharacters: [Character]
+  let tint: Color
+
+  var body: some View {
+    HStack(spacing: 10) {
+      ForEach(Array(expectedCharacters.enumerated()), id: \.offset) { index, _ in
+        VStack(spacing: 3) {
+          if index < enteredCharacters.count {
+            Text(String(enteredCharacters[index]))
+              .font(.system(.title2, design: .monospaced).weight(.semibold))
+              .foregroundStyle(tint)
+          } else {
+            Text(" ")
+              .font(.system(.title2, design: .monospaced).weight(.semibold))
+              .hidden()
+          }
+          Rectangle()
+            .fill(tint)
+            .frame(width: 24, height: 2)
+        }
+        .frame(width: 30, height: 42, alignment: .bottom)
+      }
+    }
+  }
+}
+
+private struct SpellingReviewPreview: View {
+  @State private var attempt = "se"
+  @FocusState private var isAttemptFocused: Bool
+
+  private let expectedCharacters = Array("serendipity")
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 24) {
+      Label("拼写复习", systemImage: "speaker.wave.2.fill")
+        .font(.title3.weight(.semibold))
+
+      Text("听发音，根据释义拼写英文单词。共 \(expectedCharacters.count) 个字母。")
+        .foregroundStyle(.secondary)
+
+      Text("意外发现美好事物的幸运")
+        .font(.system(size: 42, weight: .semibold, design: .rounded))
+        .minimumScaleFactor(0.7)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, minHeight: 128)
+
+      SpellingAnswerSlots(
+        expectedCharacters: expectedCharacters,
+        enteredCharacters: Array(attempt),
+        tint: .primary
+      )
+      .frame(maxWidth: .infinity)
+      .contentShape(Rectangle())
+      .onTapGesture {
+        isAttemptFocused = true
+      }
+
+      TextField("", text: $attempt)
+        .textFieldStyle(.plain)
+        .focused($isAttemptFocused)
+        .frame(width: 1, height: 1)
+        .opacity(0.01)
+        .onChange(of: attempt) { _, newValue in
+          attempt = String(newValue.prefix(expectedCharacters.count))
+        }
+        .onKeyPress(.space) {
+          .handled
+        }
+        .onKeyPress(.return) {
+          .handled
+        }
+    }
+    .padding(28)
+    .frame(width: 640, alignment: .leading)
+    .contentSurface()
+    .task {
+      await Task.yield()
+      isAttemptFocused = true
+    }
   }
 }
 
@@ -782,5 +904,20 @@ private struct SummaryCard: View {
     )
     .padding()
     .frame(width: 260)
+  }
+
+  #Preview("例句生词高亮") {
+    HighlightedExampleSentence(
+      sentence: "Finding this quiet bookstore was pure serendipity.",
+      vocabulary: "serendipity"
+    )
+    .font(.title3)
+    .italic()
+    .padding()
+    .frame(width: 480)
+  }
+
+  #Preview("拼写测验") {
+    SpellingReviewPreview()
   }
 #endif
