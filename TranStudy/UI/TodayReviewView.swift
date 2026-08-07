@@ -589,23 +589,23 @@ private struct SpellingAnswerSlots: View {
   let tint: Color
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: 4) {
       ForEach(Array(expectedCharacters.enumerated()), id: \.offset) { index, _ in
         VStack(spacing: 3) {
           if index < enteredCharacters.count {
             Text(String(enteredCharacters[index]))
-              .font(.system(.title2, design: .monospaced).weight(.semibold))
+              .font(.system(.title, design: .monospaced).weight(.semibold))
               .foregroundStyle(tint)
           } else {
             Text(" ")
-              .font(.system(.title2, design: .monospaced).weight(.semibold))
+              .font(.system(.title, design: .monospaced).weight(.semibold))
               .hidden()
           }
           Rectangle()
             .fill(tint)
-            .frame(width: 24, height: 2)
+            .frame(width: 28, height: 2)
         }
-        .frame(width: 30, height: 42, alignment: .bottom)
+        .frame(width: 32, height: 47, alignment: .bottom)
       }
     }
   }

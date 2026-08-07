@@ -975,14 +975,14 @@ struct ApplicationShellTests {
           ),
         ])
 
-    shell.advanceToNextSpellingReview()
+    await shell.advanceToNextSpellingReview()
 
     #expect(shell.currentSpellingItem == item)
 
     await shell.submitCurrentSpelling("resilient")
     #expect(shell.spellingReviewResult == true)
 
-    shell.advanceToNextSpellingReview()
+    await shell.advanceToNextSpellingReview()
     #expect(shell.currentSpellingItem == nil)
   }
 
