@@ -98,7 +98,9 @@ private struct ReviewSessionView: View {
           systemImage: "rectangle.stack.fill"
         )
 
-        if let item = shell.currentReviewItem {
+        if shell.isImmediateSpellingReview, let item = shell.currentSpellingItem {
+          spellingSession(item)
+        } else if let item = shell.currentReviewItem {
           reviewSession(item)
         } else if let item = shell.currentSpellingItem {
           spellingSession(item)
@@ -149,9 +151,7 @@ private struct ReviewSessionView: View {
         onFlip: shell.revealCurrentReviewAnswer,
         onSpeak: {
           if shell.selectedReviewRating != nil {
-            Task {
-              await shell.advanceToNextReview()
-            }
+            shell.startCurrentReviewSpelling()
           } else {
             shell.speak(item.kind == .word ? item.canonicalForm : item.sourceText)
           }
@@ -245,11 +245,9 @@ private struct ReviewSessionView: View {
 
         if showsNextReviewButton {
           Button {
-            Task {
-              await shell.advanceToNextReview()
-            }
+            shell.startCurrentReviewSpelling()
           } label: {
-            Label("下一个", systemImage: "arrow.right")
+            Label("开始拼写", systemImage: "text.cursor")
               .font(.title3.weight(.semibold))
               .frame(maxWidth: .infinity, minHeight: 64)
           }
@@ -307,7 +305,9 @@ private struct ReviewSessionView: View {
 
         if let spellingReviewResult = shell.spellingReviewResult {
           Label(
-            spellingReviewResult ? "拼写正确" : "拼写错误，已移至队尾",
+            spellingReviewResult
+              ? "拼写正确"
+              : shell.isImmediateSpellingReview ? "拼写错误，已按忘记处理" : "拼写错误，已移至队尾",
             systemImage: spellingReviewResult ? "checkmark.circle.fill" : "xmark.circle.fill"
           )
           .font(.callout.weight(.semibold))
@@ -356,7 +356,7 @@ private struct ReviewSessionView: View {
         }
         isSpellingShaking = false
         spellingAttempt = ""
-        shell.advanceToNextSpellingReview()
+        await shell.advanceToNextSpellingReview()
         isSpellingAttemptFocused = true
       }
       .onChange(of: spellingAttempt) { _, attempt in
@@ -568,17 +568,12 @@ private struct HighlightedExampleSentence: View {
       return attributedSentence
     }
 
-    let pattern =
-      "(?<![\\p{L}\\p{N}])"
-      + NSRegularExpression.escapedPattern(for: normalizedVocabulary)
-      + "(?![\\p{L}\\p{N}])"
-    guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-      return attributedSentence
-    }
-
-    let sentenceRange = NSRange(sentence.startIndex..., in: sentence)
-    for match in expression.matches(in: sentence, range: sentenceRange) {
-      guard let range = Range(match.range, in: attributedSentence) else {
+    for matchRange in ExampleSentenceVocabularyMatcher.matchingRanges(
+      in: sentence,
+      vocabulary: normalizedVocabulary
+    ) {
+      let matchNSRange = NSRange(matchRange, in: sentence)
+      guard let range = Range(matchNSRange, in: attributedSentence) else {
         continue
       }
       attributedSentence[range].foregroundColor = .accentColor

@@ -78,6 +78,7 @@ final class ApplicationShell {
   private(set) var isReviewAnswerVisible = false
   private(set) var isReviewRating = false
   private(set) var selectedReviewRating: ReviewRating?
+  private(set) var immediateSpellingItem: LearningItem?
   private(set) var spellingQueue: [LearningItem] = []
   private(set) var spellingReviewResult: Bool?
   private(set) var isSpellingReviewSubmitting = false
@@ -121,7 +122,11 @@ final class ApplicationShell {
   }
 
   var currentSpellingItem: LearningItem? {
-    spellingQueue.first
+    immediateSpellingItem ?? spellingQueue.first
+  }
+
+  var isImmediateSpellingReview: Bool {
+    immediateSpellingItem != nil
   }
 
   var isLongTextTranslationPresentation: Bool {
@@ -241,6 +246,7 @@ final class ApplicationShell {
       spellingQueue = queue.items.filter { $0.kind == .word }
       isReviewAnswerVisible = false
       selectedReviewRating = nil
+      immediateSpellingItem = nil
       spellingReviewResult = nil
       lastReviewRefreshDate = now
     } catch {
@@ -292,17 +298,31 @@ final class ApplicationShell {
     selectedReviewRating = nil
   }
 
+  func startCurrentReviewSpelling() {
+    guard
+      let currentReviewItem,
+      selectedReviewRating != nil,
+      !isReviewRating
+    else {
+      return
+    }
+
+    immediateSpellingItem = currentReviewItem
+    spellingReviewResult = nil
+  }
+
   func confirmCurrentReviewOrRemember() async {
     if selectedReviewRating == nil {
       await rateCurrentReview(.remembered)
     }
-    await advanceToNextReview()
+    startCurrentReviewSpelling()
   }
 
-  func advanceToNextReview() async {
+  func advanceToNextReview(ratingOverride: ReviewRating? = nil) async {
+    let rating = ratingOverride ?? selectedReviewRating
     guard
       let currentReviewItem,
-      let selectedReviewRating,
+      let rating,
       !reviewQueue.isEmpty,
       !isReviewRating
     else {
@@ -317,7 +337,7 @@ final class ApplicationShell {
     do {
       let result = try await environment.learningStore.recordReview(
         itemID: currentReviewItem.id,
-        rating: selectedReviewRating,
+        rating: rating,
         reviewedAt: now
       )
       if Calendar.autoupdatingCurrent.startOfDay(for: result.nextReviewAt)
@@ -351,6 +371,10 @@ final class ApplicationShell {
       attempt,
       expected: currentSpellingItem.canonicalForm
     )
+    if isImmediateSpellingReview {
+      spellingReviewResult = isCorrect
+      return
+    }
     guard !isCorrect else {
       spellingReviewResult = true
       return
@@ -375,10 +399,24 @@ final class ApplicationShell {
     }
   }
 
-  func advanceToNextSpellingReview() {
-    guard let wasCorrect = spellingReviewResult, !spellingQueue.isEmpty else {
+  func advanceToNextSpellingReview() async {
+    guard let wasCorrect = spellingReviewResult else {
       return
     }
+
+    if immediateSpellingItem != nil, let selectedReviewRating {
+      await advanceToNextReview(
+        ratingOverride: wasCorrect ? selectedReviewRating : .forgot
+      )
+      immediateSpellingItem = nil
+      spellingReviewResult = nil
+      return
+    }
+
+    guard !spellingQueue.isEmpty else {
+      return
+    }
+
     let item = spellingQueue.removeFirst()
     if !wasCorrect {
       spellingQueue.append(item)
