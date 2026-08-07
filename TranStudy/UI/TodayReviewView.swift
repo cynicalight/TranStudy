@@ -147,7 +147,13 @@ private struct ReviewSessionView: View {
         isBackFaceInteractive: hasCompletedReviewFlip,
         onFlip: shell.revealCurrentReviewAnswer,
         onSpeak: {
-          shell.speak(item.kind == .word ? item.canonicalForm : item.sourceText)
+          if shell.selectedReviewRating != nil {
+            Task {
+              await shell.advanceToNextReview()
+            }
+          } else {
+            shell.speak(item.kind == .word ? item.canonicalForm : item.sourceText)
+          }
         }
       ) {
         Text(item.kind == .sentence ? item.sourceText : item.canonicalForm)

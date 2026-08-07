@@ -100,7 +100,7 @@ struct TranStudyApp: App {
 
       CommandGroup(after: .help) {
         Menu(shell.localized("复习快捷键")) {
-          Button(shell.localized("Space：翻卡；翻卡后朗读单词")) {}
+          Button(shell.localized("Space：翻卡；翻卡后朗读单词；评分后下一张")) {}
             .disabled(true)
           Button(shell.localized("H：忘记")) {}
             .disabled(true)
