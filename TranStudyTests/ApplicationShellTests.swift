@@ -939,7 +939,7 @@ struct ApplicationShellTests {
     #expect(shell.selectedReviewRating == nil)
   }
 
-  @Test("spelling starts after the normal review and records an incorrect answer as forgot")
+  @Test("spelling shows the answer before recording an incorrect attempt as forgot")
   func spellingReviewRecordsIncorrectAnswerAsForgot() async {
     let item = makeLearningItem(
       id: UUID(uuidString: "7A9589F8-62AE-4F8A-87B2-72775B331759")!,
@@ -967,12 +967,7 @@ struct ApplicationShellTests {
             itemID: item.id,
             rating: .remembered,
             reviewedAt: Date(timeIntervalSince1970: 1_234)
-          ),
-          ReviewInvocation(
-            itemID: item.id,
-            rating: .forgot,
-            reviewedAt: Date(timeIntervalSince1970: 1_234)
-          ),
+          )
         ])
 
     shell.retryCurrentSpelling()
@@ -980,8 +975,28 @@ struct ApplicationShellTests {
     #expect(shell.currentSpellingItem == item)
     #expect(shell.spellingReviewResult == nil)
 
+    await shell.submitCurrentSpelling("resiliant")
+    #expect(shell.spellingReviewResult == false)
+    #expect(learningStore.reviewInvocations.count == 1)
+
+    shell.retryCurrentSpelling()
+
     await shell.submitCurrentSpelling("resilient")
     #expect(shell.spellingReviewResult == true)
+    #expect(
+      learningStore.reviewInvocations
+        == [
+          ReviewInvocation(
+            itemID: item.id,
+            rating: .remembered,
+            reviewedAt: Date(timeIntervalSince1970: 1_234)
+          ),
+          ReviewInvocation(
+            itemID: item.id,
+            rating: .forgot,
+            reviewedAt: Date(timeIntervalSince1970: 1_234)
+          ),
+        ])
 
     await shell.advanceToNextSpellingReview()
     #expect(shell.currentSpellingItem == nil)

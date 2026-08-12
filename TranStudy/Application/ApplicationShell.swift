@@ -374,14 +374,13 @@ final class ApplicationShell {
       attempt,
       expected: currentSpellingItem.canonicalForm
     )
-    if isImmediateSpellingReview {
-      spellingReviewResult = isCorrect
-      if !isCorrect {
-        spellingHadIncorrectAttempt = true
-      }
+    guard isCorrect else {
+      spellingReviewResult = false
+      spellingHadIncorrectAttempt = true
       return
     }
-    guard !isCorrect else {
+
+    guard !isImmediateSpellingReview, spellingHadIncorrectAttempt else {
       spellingReviewResult = true
       return
     }
@@ -397,8 +396,7 @@ final class ApplicationShell {
         rating: .forgot,
         reviewedAt: now
       )
-      spellingReviewResult = false
-      spellingHadIncorrectAttempt = true
+      spellingReviewResult = true
       learningSummary = try await environment.learningStore.summary(at: now)
       lastReviewRefreshDate = now
     } catch {

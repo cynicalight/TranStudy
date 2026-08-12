@@ -309,9 +309,7 @@ private struct ReviewSessionView: View {
           Label(
             spellingReviewResult
               ? "拼写正确"
-              : shell.isImmediateSpellingReview
-                ? "拼写错误，已按忘记处理，请按回车重试"
-                : "拼写错误，请按回车重试",
+              : "拼写错误，请先查看正确单词卡",
             systemImage: spellingReviewResult ? "checkmark.circle.fill" : "xmark.circle.fill"
           )
           .font(.callout.weight(.semibold))
@@ -319,10 +317,29 @@ private struct ReviewSessionView: View {
           .frame(maxWidth: .infinity)
 
           if !spellingReviewResult {
-            Text("正确拼写：\(item.canonicalForm)")
-              .font(.title3.weight(.semibold))
-              .foregroundStyle(.orange)
-              .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 18) {
+              Label("正确单词卡", systemImage: "rectangle.fill.on.rectangle.fill")
+                .font(.headline)
+                .foregroundStyle(.orange)
+
+              reviewAnswer(item)
+
+              Button {
+                retrySpelling()
+              } label: {
+                Label("再次拼写", systemImage: "arrow.counterclockwise")
+                  .font(.headline)
+                  .frame(maxWidth: .infinity, minHeight: 48)
+              }
+              .buttonStyle(.borderedProminent)
+              .controlSize(.large)
+            }
+            .padding(22)
+            .background(.orange.opacity(0.08), in: .rect(cornerRadius: 16))
+            .overlay {
+              RoundedRectangle(cornerRadius: 16)
+                .stroke(.orange.opacity(0.25), lineWidth: 1)
+            }
           }
         }
 
@@ -385,11 +402,7 @@ private struct ReviewSessionView: View {
 
   private func handleSpellingReturn(expectedLength: Int) {
     if shell.spellingReviewResult == false {
-      isSpellingShaking = false
-      spellingAttempt = ""
-      submittedSpellingAttempt = nil
-      shell.retryCurrentSpelling()
-      isSpellingAttemptFocused = true
+      retrySpelling()
       return
     }
 
@@ -405,6 +418,14 @@ private struct ReviewSessionView: View {
     Task {
       await shell.submitCurrentSpelling(submittedAttempt)
     }
+  }
+
+  private func retrySpelling() {
+    isSpellingShaking = false
+    spellingAttempt = ""
+    submittedSpellingAttempt = nil
+    shell.retryCurrentSpelling()
+    isSpellingAttemptFocused = true
   }
 
   private var spellingSlotTint: Color {
