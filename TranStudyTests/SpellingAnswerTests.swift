@@ -7,6 +7,7 @@ struct SpellingAnswerTests {
   func matchesCaseAndWhitespaceDifferences() {
     #expect(SpellingAnswer.matches("  Resilient  ", expected: "resilient"))
     #expect(SpellingAnswer.matches("in   spite\nof", expected: "in spite of"))
+    #expect(SpellingAnswer.matches("inspiteof", expected: "in spite of"))
   }
 
   @Test("spelling rejects a different answer")

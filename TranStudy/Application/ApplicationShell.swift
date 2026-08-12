@@ -81,6 +81,7 @@ final class ApplicationShell {
   private(set) var immediateSpellingItem: LearningItem?
   private(set) var spellingQueue: [LearningItem] = []
   private(set) var spellingReviewResult: Bool?
+  private var spellingHadIncorrectAttempt = false
   private(set) var isSpellingReviewSubmitting = false
   private(set) var reviewReminderConfiguration: ReviewReminderConfiguration
   private(set) var isLaunchAtLoginEnabled: Bool
@@ -248,6 +249,7 @@ final class ApplicationShell {
       selectedReviewRating = nil
       immediateSpellingItem = nil
       spellingReviewResult = nil
+      spellingHadIncorrectAttempt = false
       lastReviewRefreshDate = now
     } catch {
       // A later ticket will expose recoverable loading errors in the review UI.
@@ -309,6 +311,7 @@ final class ApplicationShell {
 
     immediateSpellingItem = currentReviewItem
     spellingReviewResult = nil
+    spellingHadIncorrectAttempt = false
   }
 
   func confirmCurrentReviewOrRemember() async {
@@ -373,6 +376,9 @@ final class ApplicationShell {
     )
     if isImmediateSpellingReview {
       spellingReviewResult = isCorrect
+      if !isCorrect {
+        spellingHadIncorrectAttempt = true
+      }
       return
     }
     guard !isCorrect else {
@@ -392,11 +398,20 @@ final class ApplicationShell {
         reviewedAt: now
       )
       spellingReviewResult = false
+      spellingHadIncorrectAttempt = true
       learningSummary = try await environment.learningStore.summary(at: now)
       lastReviewRefreshDate = now
     } catch {
       // Keep the current spelling card available when persistence fails.
     }
+  }
+
+  func retryCurrentSpelling() {
+    guard spellingReviewResult == false, !isSpellingReviewSubmitting else {
+      return
+    }
+
+    spellingReviewResult = nil
   }
 
   func advanceToNextSpellingReview() async {
@@ -406,10 +421,11 @@ final class ApplicationShell {
 
     if immediateSpellingItem != nil, let selectedReviewRating {
       await advanceToNextReview(
-        ratingOverride: wasCorrect ? selectedReviewRating : .forgot
+        ratingOverride: wasCorrect && !spellingHadIncorrectAttempt ? selectedReviewRating : .forgot
       )
       immediateSpellingItem = nil
       spellingReviewResult = nil
+      spellingHadIncorrectAttempt = false
       return
     }
 
@@ -422,6 +438,7 @@ final class ApplicationShell {
       spellingQueue.append(item)
     }
     spellingReviewResult = nil
+    spellingHadIncorrectAttempt = false
   }
 
   func startNextReviewBatch() {

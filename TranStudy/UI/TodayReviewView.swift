@@ -84,6 +84,7 @@ private struct ReviewSessionView: View {
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
   @State private var hasCompletedReviewFlip = false
   @State private var spellingAttempt = ""
+  @State private var submittedSpellingAttempt: String?
   @State private var isSpellingShaking = false
   @FocusState private var isSpellingAttemptFocused: Bool
 
@@ -266,14 +267,15 @@ private struct ReviewSessionView: View {
 
   private func spellingSession(_ item: LearningItem) -> some View {
     let expectedCharacters = Array(item.canonicalForm)
-    let enteredCharacters = Array(spellingAttempt)
+    let expectedInputLength = SpellingAnswer.inputCharacters(in: item.canonicalForm).count
+    let enteredCharacters = Array(submittedSpellingAttempt ?? spellingAttempt)
 
     return VStack(spacing: 16) {
       VStack(alignment: .leading, spacing: 24) {
         Label("拼写复习", systemImage: "speaker.wave.2.fill")
           .font(.title3.weight(.semibold))
 
-        Text("听发音，根据释义拼写英文单词。共 (expectedCharacters.count) 个字母。")
+        Text("听发音，根据释义拼写英文单词。共 \(expectedInputLength) 个字母。")
           .foregroundStyle(.secondary)
 
         Text(item.contextualMeaning)
@@ -290,7 +292,7 @@ private struct ReviewSessionView: View {
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
-          guard shell.spellingReviewResult == nil else {
+          guard shell.spellingReviewResult != true else {
             return
           }
           isSpellingAttemptFocused = true
@@ -307,12 +309,21 @@ private struct ReviewSessionView: View {
           Label(
             spellingReviewResult
               ? "拼写正确"
-              : shell.isImmediateSpellingReview ? "拼写错误，已按忘记处理" : "拼写错误，已移至队尾",
+              : shell.isImmediateSpellingReview
+                ? "拼写错误，已按忘记处理，请按回车重试"
+                : "拼写错误，请按回车重试",
             systemImage: spellingReviewResult ? "checkmark.circle.fill" : "xmark.circle.fill"
           )
           .font(.callout.weight(.semibold))
           .foregroundStyle(spellingReviewResult ? .green : .red)
           .frame(maxWidth: .infinity)
+
+          if !spellingReviewResult {
+            Text("正确拼写：\(item.canonicalForm)")
+              .font(.title3.weight(.semibold))
+              .foregroundStyle(.orange)
+              .frame(maxWidth: .infinity)
+          }
         }
 
         TextField("", text: $spellingAttempt)
@@ -320,16 +331,16 @@ private struct ReviewSessionView: View {
           .focused($isSpellingAttemptFocused)
           .frame(width: 1, height: 1)
           .opacity(0.01)
-          .disabled(shell.spellingReviewResult != nil)
+          .disabled(shell.spellingReviewResult == true)
           .onSubmit {
-            submitSpelling(expectedLength: expectedCharacters.count)
+            handleSpellingReturn(expectedLength: expectedInputLength)
           }
           .onKeyPress(.space) {
             shell.speak(item.canonicalForm)
             return .handled
           }
           .onKeyPress(.return) {
-            submitSpelling(expectedLength: expectedCharacters.count)
+            handleSpellingReturn(expectedLength: expectedInputLength)
             return .handled
           }
       }
@@ -338,6 +349,7 @@ private struct ReviewSessionView: View {
       .contentSurface()
       .task(id: item.id) {
         spellingAttempt = ""
+        submittedSpellingAttempt = nil
         await Task.yield()
         isSpellingAttemptFocused = true
         shell.speak(item.canonicalForm)
@@ -347,10 +359,13 @@ private struct ReviewSessionView: View {
           return
         }
 
-        if spellingReviewResult == false, !accessibilityReduceMotion {
-          isSpellingShaking = true
+        if !spellingReviewResult {
+          if !accessibilityReduceMotion {
+            isSpellingShaking = true
+          }
+          return
         }
-        try? await Task.sleep(for: spellingReviewResult ? .milliseconds(650) : .milliseconds(450))
+        try? await Task.sleep(for: .milliseconds(650))
         guard !Task.isCancelled else {
           return
         }
@@ -360,7 +375,7 @@ private struct ReviewSessionView: View {
         isSpellingAttemptFocused = true
       }
       .onChange(of: spellingAttempt) { _, attempt in
-        let limitedAttempt = String(attempt.prefix(expectedCharacters.count))
+        let limitedAttempt = String(attempt.prefix(expectedInputLength))
         if spellingAttempt != limitedAttempt {
           spellingAttempt = limitedAttempt
         }
@@ -368,12 +383,27 @@ private struct ReviewSessionView: View {
     }
   }
 
+  private func handleSpellingReturn(expectedLength: Int) {
+    if shell.spellingReviewResult == false {
+      isSpellingShaking = false
+      spellingAttempt = ""
+      submittedSpellingAttempt = nil
+      shell.retryCurrentSpelling()
+      isSpellingAttemptFocused = true
+      return
+    }
+
+    submitSpelling(expectedLength: expectedLength)
+  }
+
   private func submitSpelling(expectedLength: Int) {
     guard spellingAttempt.count == expectedLength else {
       return
     }
+    let submittedAttempt = spellingAttempt
+    submittedSpellingAttempt = submittedAttempt
     Task {
-      await shell.submitCurrentSpelling(spellingAttempt)
+      await shell.submitCurrentSpelling(submittedAttempt)
     }
   }
 
@@ -590,39 +620,52 @@ private struct SpellingAnswerSlots: View {
 
   var body: some View {
     HStack(spacing: 4) {
-      ForEach(Array(expectedCharacters.enumerated()), id: \.offset) { index, _ in
-        VStack(spacing: 3) {
-          if index < enteredCharacters.count {
-            Text(String(enteredCharacters[index]))
-              .font(.system(.title, design: .monospaced).weight(.semibold))
-              .foregroundStyle(tint)
-          } else {
-            Text(" ")
-              .font(.system(.title, design: .monospaced).weight(.semibold))
-              .hidden()
+      ForEach(Array(expectedCharacters.enumerated()), id: \.offset) { index, expectedCharacter in
+        if expectedCharacter.isWhitespace {
+          Color.clear
+            .frame(width: 16, height: 47)
+        } else {
+          let enteredIndex = SpellingAnswer.inputCharacters(
+            in: String(expectedCharacters[..<index])
+          ).count
+
+          VStack(spacing: 3) {
+            if enteredIndex < enteredCharacters.count {
+              Text(String(enteredCharacters[enteredIndex]))
+                .font(.system(.title, design: .monospaced).weight(.semibold))
+                .foregroundStyle(tint)
+            } else {
+              Text(" ")
+                .font(.system(.title, design: .monospaced).weight(.semibold))
+                .hidden()
+            }
+            Rectangle()
+              .fill(tint)
+              .frame(width: 28, height: 2)
           }
-          Rectangle()
-            .fill(tint)
-            .frame(width: 28, height: 2)
+          .frame(width: 32, height: 47, alignment: .bottom)
         }
-        .frame(width: 32, height: 47, alignment: .bottom)
       }
     }
   }
 }
 
 private struct SpellingReviewPreview: View {
-  @State private var attempt = "se"
+  @State private var attempt = "insp"
   @FocusState private var isAttemptFocused: Bool
 
-  private let expectedCharacters = Array("serendipity")
+  private let expectedCharacters = Array("in spite of")
+
+  private var expectedInputLength: Int {
+    SpellingAnswer.inputCharacters(in: String(expectedCharacters)).count
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
       Label("拼写复习", systemImage: "speaker.wave.2.fill")
         .font(.title3.weight(.semibold))
 
-      Text("听发音，根据释义拼写英文单词。共 \(expectedCharacters.count) 个字母。")
+      Text("听发音，根据释义拼写英文单词。共 \(expectedInputLength) 个字母。")
         .foregroundStyle(.secondary)
 
       Text("意外发现美好事物的幸运")
@@ -648,7 +691,7 @@ private struct SpellingReviewPreview: View {
         .frame(width: 1, height: 1)
         .opacity(0.01)
         .onChange(of: attempt) { _, newValue in
-          attempt = String(newValue.prefix(expectedCharacters.count))
+          attempt = String(newValue.prefix(expectedInputLength))
         }
         .onKeyPress(.space) {
           .handled

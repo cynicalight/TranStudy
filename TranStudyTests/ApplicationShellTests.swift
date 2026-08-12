@@ -975,9 +975,10 @@ struct ApplicationShellTests {
           ),
         ])
 
-    await shell.advanceToNextSpellingReview()
+    shell.retryCurrentSpelling()
 
     #expect(shell.currentSpellingItem == item)
+    #expect(shell.spellingReviewResult == nil)
 
     await shell.submitCurrentSpelling("resilient")
     #expect(shell.spellingReviewResult == true)
