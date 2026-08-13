@@ -612,7 +612,9 @@ final class ApplicationShell {
     translationError = nil
     longTextTranslation = nil
     translationStatus = .loading
-    let startedAt = beginTranslationDiagnostics()
+    let diagnostics = beginTranslationDiagnostics(
+      requestKind: DiagnosticTranslationRequestKind(request.kind)
+    )
 
     do {
       let result = try await environment.translation.translate(request)
@@ -627,7 +629,10 @@ final class ApplicationShell {
       pendingLearningMerge = nil
       pendingLearningAddition = nil
       translationStatus = .ready
-      finishTranslationDiagnostics(stage: .translationSucceeded, startedAt: startedAt)
+      finishTranslationDiagnostics(
+        stage: .translationSucceeded,
+        context: diagnostics
+      )
       if languageAndSpeechPreferences.automaticallySpeaksTranslations {
         speak(result.sourceText)
       }
@@ -647,7 +652,7 @@ final class ApplicationShell {
       finishTranslationDiagnostics(
         stage: .translationFailed,
         error: error,
-        startedAt: startedAt
+        context: diagnostics
       )
       selectionDebugLog("translation failed: errorType=\(String(reflecting: type(of: error)))")
     }
@@ -709,7 +714,9 @@ final class ApplicationShell {
       return .timeout
     case .networkUnavailable, .serviceUnavailable:
       return .network
-    case .invalidResponse(let failure):
+    case .httpFailure(let failure, _):
+      return failure.diagnosticErrorType
+    case .invalidResponse(let failure, _, _, _):
       switch failure {
       case .malformedPayload:
         return .malformedResponse
@@ -725,26 +732,75 @@ final class ApplicationShell {
     }
   }
 
-  private func beginTranslationDiagnostics() -> Date {
-    let startedAt = Date()
-    environment.diagnostics.record(
-      stage: .translationStarted,
-      sourceApplicationIdentifier: translationSourceApplicationIdentifier
+  private struct TranslationDiagnosticContext {
+    let startedAt: Date
+    let provider: String
+    let model: String
+    let requestKind: DiagnosticTranslationRequestKind
+  }
+
+  private func beginTranslationDiagnostics(
+    requestKind: DiagnosticTranslationRequestKind
+  ) -> TranslationDiagnosticContext {
+    let context = TranslationDiagnosticContext(
+      startedAt: Date(),
+      provider: translationProviderConfiguration.provider.rawValue,
+      model: diagnosticTranslationModel,
+      requestKind: requestKind
     )
-    return startedAt
+    environment.diagnostics.recordTranslation(
+      stage: .translationStarted,
+      sourceApplicationIdentifier: translationSourceApplicationIdentifier,
+      errorType: nil,
+      durationMilliseconds: nil,
+      details: diagnosticTranslationDetails(context: context)
+    )
+    return context
   }
 
   private func finishTranslationDiagnostics(
     stage: DiagnosticStage,
     error: Error? = nil,
-    startedAt: Date
+    context: TranslationDiagnosticContext
   ) {
-    environment.diagnostics.record(
+    let translationError = error as? TranslationError
+    environment.diagnostics.recordTranslation(
       stage: stage,
       sourceApplicationIdentifier: translationSourceApplicationIdentifier,
       errorType: error.map(diagnosticErrorType(for:)),
-      durationMilliseconds: Int(Date().timeIntervalSince(startedAt) * 1_000)
+      durationMilliseconds: Int(Date().timeIntervalSince(context.startedAt) * 1_000),
+      details: diagnosticTranslationDetails(
+        context: context,
+        failureReason: translationError?.diagnosticFailureReason,
+        missingResponseFields: translationError?.diagnosticMissingResponseFields,
+        httpStatusCode: translationError?.httpStatusCode
+      )
     )
+  }
+
+  private func diagnosticTranslationDetails(
+    context: TranslationDiagnosticContext,
+    failureReason: DiagnosticTranslationFailureReason? = nil,
+    missingResponseFields: [String]? = nil,
+    httpStatusCode: Int? = nil
+  ) -> DiagnosticTranslationDetails {
+    DiagnosticTranslationDetails(
+      provider: context.provider,
+      model: context.model,
+      requestKind: context.requestKind,
+      failureReason: failureReason,
+      missingResponseFields: missingResponseFields,
+      httpStatusCode: httpStatusCode
+    )
+  }
+
+  private var diagnosticTranslationModel: String {
+    switch translationProviderConfiguration.provider {
+    case .deepSeek:
+      translationProviderConfiguration.deepSeekModel.rawValue
+    case .openAICompatible:
+      translationProviderConfiguration.customModel
+    }
   }
 
   private func translateLongText(_ sourceText: String) async {
@@ -756,7 +812,7 @@ final class ApplicationShell {
     longTextTranslation = nil
     translationError = nil
     translationStatus = .loading
-    let startedAt = beginTranslationDiagnostics()
+    let diagnostics = beginTranslationDiagnostics(requestKind: .longText)
 
     do {
       let result = try await environment.translation.translateLongText(
@@ -771,7 +827,10 @@ final class ApplicationShell {
       activeTranslationID = nil
       longTextTranslation = result
       translationStatus = .ready
-      finishTranslationDiagnostics(stage: .translationSucceeded, startedAt: startedAt)
+      finishTranslationDiagnostics(
+        stage: .translationSucceeded,
+        context: diagnostics
+      )
       selectionDebugLog(
         "long text translation succeeded: sourceLength=\(sourceText.count) translatedLength=\(result.translatedText.count)"
       )
@@ -790,7 +849,7 @@ final class ApplicationShell {
       finishTranslationDiagnostics(
         stage: .translationFailed,
         error: error,
-        startedAt: startedAt
+        context: diagnostics
       )
       selectionDebugLog(
         "long text translation failed: errorType=\(String(reflecting: type(of: error)))"

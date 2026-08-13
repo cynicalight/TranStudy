@@ -239,6 +239,104 @@ struct ApplicationShellTests {
     #expect(shell.translationStatus == .failed)
   }
 
+  @Test("exported diagnostics explain a translation validation failure")
+  func exportedDiagnosticsExplainTranslationFailure() async throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: "ApplicationShellTests-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let diagnostics = FileDiagnosticLogStore(
+      fileURL: directory.appending(path: "diagnostics.json")
+    )
+    let configuration = TranslationProviderConfiguration(
+      provider: .openAICompatible,
+      deepSeekModel: .flash,
+      customBaseURL: "https://example.com/v1",
+      customModel: "gpt-5-mini"
+    )
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "secret selected text"),
+        translation: DiagnosticFailureTranslationProvider(),
+        providerConfigurationStore: TestTranslationProviderConfigurationStore(
+          configuration: configuration
+        ),
+        diagnostics: diagnostics
+      )
+    )
+
+    await shell.translateClipboard()
+
+    let archive = try JSONDecoder.tranStudy.decode(
+      DiagnosticArchive.self,
+      from: shell.makeDiagnosticExport()
+    )
+    let failure = try #require(
+      archive.events.last(where: { $0.stage == .translationFailed })
+    )
+    #expect(failure.provider == "openAICompatible")
+    #expect(failure.model == "gpt-5-mini")
+    #expect(failure.requestKind == .wordOrPhrase)
+    #expect(failure.errorType == .invalidEnglishResponse)
+    #expect(failure.failureReason == .responseSourceTextMismatch)
+    #expect(failure.httpStatusCode == 200)
+
+    let json = try #require(String(data: shell.makeDiagnosticExport(), encoding: .utf8))
+    #expect(!json.contains("secret selected text"))
+  }
+
+  @Test("translation diagnostics keep the provider configuration used by the request")
+  func translationDiagnosticsKeepRequestConfiguration() async throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: "ApplicationShellTests-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let diagnostics = FileDiagnosticLogStore(
+      fileURL: directory.appending(path: "diagnostics.json")
+    )
+    let translator = ControlledTranslationProvider()
+    let shell = ApplicationShell(
+      environment: .test(
+        clipboard: TestClipboardReader(text: "ran"),
+        translation: translator,
+        providerConfigurationStore: TestTranslationProviderConfigurationStore(
+          configuration: TranslationProviderConfiguration(
+            provider: .openAICompatible,
+            deepSeekModel: .flash,
+            customBaseURL: "https://example.com/v1",
+            customModel: "request-model"
+          )
+        ),
+        diagnostics: diagnostics
+      )
+    )
+    let task = Task {
+      await shell.translateClipboard()
+    }
+    await Task.yield()
+    #expect(translator.hasPendingRequest)
+
+    shell.updateCustomProvider(
+      baseURL: "https://example.com/v1",
+      model: "new-settings-model"
+    )
+    translator.fail(with: .authenticationFailed)
+    await task.value
+
+    let archive = try JSONDecoder.tranStudy.decode(
+      DiagnosticArchive.self,
+      from: shell.makeDiagnosticExport()
+    )
+    let failure = try #require(
+      archive.events.last(where: { $0.stage == .translationFailed })
+    )
+    #expect(failure.provider == "openAICompatible")
+    #expect(failure.model == "request-model")
+    #expect(failure.failureReason == .authenticationFailed)
+  }
+
   @Test("selection pause and application exclusions persist immediately")
   func selectionPrivacySettingsPersistImmediately() {
     let configurationStore = TestSelectionConfigurationStore()
@@ -1832,6 +1930,17 @@ private final class TestTranslationProvider: TranslationProviding {
 }
 
 @MainActor
+private final class DiagnosticFailureTranslationProvider: TranslationProviding {
+  func translate(_ request: TranslationRequest) async throws -> TranslationResult {
+    throw TranslationError.invalidResponse(
+      .invalidEnglishContent,
+      diagnosticReason: .responseSourceTextMismatch,
+      httpStatusCode: 200
+    )
+  }
+}
+
+@MainActor
 private final class TestLongTextTranslationProvider: TranslationProviding {
   private(set) var lastLongTextSource: String?
   private(set) var lastRequest: TranslationRequest?
@@ -1877,6 +1986,11 @@ private final class ControlledTranslationProvider: TranslationProviding {
 
   func complete(with result: TranslationResult) {
     continuation?.resume(returning: result)
+    continuation = nil
+  }
+
+  func fail(with error: TranslationError) {
+    continuation?.resume(throwing: error)
     continuation = nil
   }
 }

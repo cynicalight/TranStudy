@@ -21,23 +21,63 @@ final class FileDiagnosticLogStore: DiagnosticLogging {
     errorType: DiagnosticErrorType?,
     durationMilliseconds: Int?
   ) {
-    let version =
-      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-      ?? "unknown"
+    append(
+      stage: stage,
+      sourceApplicationIdentifier: sourceApplicationIdentifier,
+      errorType: errorType,
+      durationMilliseconds: durationMilliseconds,
+      details: nil
+    )
+  }
+
+  func recordTranslation(
+    stage: DiagnosticStage,
+    sourceApplicationIdentifier: String?,
+    errorType: DiagnosticErrorType?,
+    durationMilliseconds: Int?,
+    details: DiagnosticTranslationDetails
+  ) {
+    append(
+      stage: stage,
+      sourceApplicationIdentifier: sourceApplicationIdentifier,
+      errorType: errorType,
+      durationMilliseconds: durationMilliseconds,
+      details: details
+    )
+  }
+
+  private func append(
+    stage: DiagnosticStage,
+    sourceApplicationIdentifier: String?,
+    errorType: DiagnosticErrorType?,
+    durationMilliseconds: Int?,
+    details: DiagnosticTranslationDetails?
+  ) {
     events.append(
       DiagnosticEvent(
-        appVersion: version,
+        appVersion: Self.appVersion,
         systemVersion: ProcessInfo.processInfo.operatingSystemVersionString,
         sourceApplicationIdentifier: sourceApplicationIdentifier,
         stage: stage,
         errorType: errorType,
-        durationMilliseconds: durationMilliseconds
+        durationMilliseconds: durationMilliseconds,
+        provider: details?.provider,
+        model: details?.model,
+        requestKind: details?.requestKind,
+        failureReason: details?.failureReason,
+        missingResponseFields: details?.missingResponseFields,
+        httpStatusCode: details?.httpStatusCode
       )
     )
     if events.count > maximumEventCount {
       events.removeFirst(events.count - maximumEventCount)
     }
     persist()
+  }
+
+  private static var appVersion: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+      ?? "unknown"
   }
 
   func exportArchive(exportedAt: Date) -> DiagnosticArchive {

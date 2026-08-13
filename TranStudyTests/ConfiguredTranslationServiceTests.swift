@@ -223,14 +223,44 @@ struct ConfiguredTranslationServiceTests {
 
   @Test("HTTP failures expose an actionable translation error")
   func HTTPFailuresExposeActionableTranslationErrors() async throws {
-    let cases: [(statusCode: Int, response: String, expected: TranslationError)] = [
-      (400, "bad request", .invalidRequest),
-      (401, "unauthorized", .authenticationFailed),
-      (402, "insufficient balance", .quotaExceeded),
-      (413, "payload too large", .inputTooLong),
-      (429, "rate limit exceeded", .rateLimited),
-      (429, "insufficient_quota", .quotaExceeded),
-      (503, "service unavailable", .serviceUnavailable),
+    let cases: [(
+      statusCode: Int,
+      response: String,
+      expected: TranslationError,
+      reason: DiagnosticTranslationFailureReason
+    )] = [
+      (400, "bad request", .httpFailure(.invalidRequest, statusCode: 400), .requestRejected),
+      (
+        401,
+        "unauthorized",
+        .httpFailure(.authenticationFailed, statusCode: 401),
+        .authenticationFailed
+      ),
+      (
+        402,
+        "insufficient balance",
+        .httpFailure(.quotaExceeded, statusCode: 402),
+        .quotaExceeded
+      ),
+      (
+        413,
+        "payload too large",
+        .httpFailure(.inputTooLong, statusCode: 413),
+        .inputExceedsTranslationLimit
+      ),
+      (429, "rate limit exceeded", .httpFailure(.rateLimited, statusCode: 429), .rateLimited),
+      (
+        429,
+        "insufficient_quota",
+        .httpFailure(.quotaExceeded, statusCode: 429),
+        .quotaExceeded
+      ),
+      (
+        503,
+        "service unavailable",
+        .httpFailure(.serviceUnavailable, statusCode: 503),
+        .serviceUnavailable
+      ),
     ]
 
     for testCase in cases {
@@ -248,6 +278,8 @@ struct ConfiguredTranslationServiceTests {
         Issue.record("Expected HTTP \(testCase.statusCode) to fail")
       } catch let error as TranslationError {
         #expect(error == testCase.expected)
+        #expect(error.diagnosticFailureReason == testCase.reason)
+        #expect(error.httpStatusCode == testCase.statusCode)
       }
     }
   }

@@ -12,7 +12,10 @@ final class URLSessionHTTPClient: HTTPDataLoading {
     let (data, response) = try await session.data(for: request)
 
     guard let httpResponse = response as? HTTPURLResponse else {
-      throw TranslationError.invalidResponse(.malformedPayload)
+      throw TranslationError.invalidResponse(
+        .malformedPayload,
+        diagnosticReason: .invalidHTTPResponse
+      )
     }
 
     return (data, httpResponse)

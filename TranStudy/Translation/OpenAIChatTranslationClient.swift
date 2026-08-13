@@ -28,7 +28,7 @@ final class OpenAIChatTranslationClient {
 
   func translate(_ request: TranslationRequest) async throws -> TranslationResult {
     let userContent = request.promptContent
-    let content = try await completionContent(
+    let completion = try await completionContent(
       systemPrompt: Self.systemPrompt(for: request.chineseWritingSystem),
       userContent: userContent,
       exampleMessages: Self.wordOrPhraseExampleMessages(
@@ -38,22 +38,21 @@ final class OpenAIChatTranslationClient {
       timeoutInterval: 30
     )
     guard
-      let contentData = Self.jsonData(from: content),
+      let contentData = Self.jsonData(from: completion.content),
       let payload = try? JSONDecoder().decode(OpenAITranslationPayload.self, from: contentData)
     else {
       throw Self.invalidWordResponse(
         .malformedPayload,
-        check: "jsonDecoding",
-        content: content,
-        request: request
+        reason: .responseJSONCouldNotBeDecoded,
+        httpStatusCode: completion.httpStatusCode
       )
     }
     guard payload.inputKind != nil else {
       throw Self.invalidWordResponse(
         .missingRequiredContent,
-        check: "missingInputKind",
-        content: content,
-        request: request
+        reason: .responseInputKindMissing,
+        missingResponseFields: ["input_kind"],
+        httpStatusCode: completion.httpStatusCode
       )
     }
     guard
@@ -66,18 +65,16 @@ final class OpenAIChatTranslationClient {
     else {
       throw Self.invalidWordResponse(
         .missingRequiredContent,
-        check: "missingFields=\(Self.missingFieldNames(in: payload).joined(separator: ","))",
-        content: content,
-        request: request
+        reason: .responseRequiredFieldsMissing,
+        missingResponseFields: Self.missingFieldNames(in: payload),
+        httpStatusCode: completion.httpStatusCode
       )
     }
     guard Self.areRecoverablyEquivalent(sourceText, request.sourceText) else {
       throw Self.invalidWordResponse(
         .invalidEnglishContent,
-        check:
-          "sourceTextMismatch expected=\(String(reflecting: request.sourceText)) actual=\(String(reflecting: sourceText))",
-        content: content,
-        request: request
+        reason: .responseSourceTextMismatch,
+        httpStatusCode: completion.httpStatusCode
       )
     }
 
@@ -105,10 +102,10 @@ final class OpenAIChatTranslationClient {
     else {
       throw Self.invalidWordResponse(
         .invalidEnglishContent,
-        check:
-          "invalidEnglishFields canonical_form=\(String(reflecting: canonicalForm)) example_sentence=\(String(reflecting: exampleSentence))",
-        content: content,
-        request: request
+        reason: Self.containsLatinLetter(canonicalForm) && !Self.containsHanCharacter(canonicalForm)
+          ? .responseExampleSentenceIsNotEnglish
+          : .responseCanonicalFormIsNotEnglish,
+        httpStatusCode: completion.httpStatusCode
       )
     }
     guard
@@ -117,10 +114,10 @@ final class OpenAIChatTranslationClient {
     else {
       throw Self.invalidWordResponse(
         .invalidChineseContent,
-        check:
-          "invalidChineseFields contextual_meaning=\(String(reflecting: contextualMeaning)) sentence_translation=\(String(reflecting: exampleAndTranslation.sentenceTranslation))",
-        content: content,
-        request: request
+        reason: Self.containsHanCharacter(contextualMeaning)
+          ? .responseSentenceTranslationIsNotChinese
+          : .responseMeaningIsNotChinese,
+        httpStatusCode: completion.httpStatusCode
       )
     }
     if let selectionWordContext = request.selectionWordContext {
@@ -137,9 +134,8 @@ final class OpenAIChatTranslationClient {
       else {
         throw Self.invalidWordResponse(
           .invalidEnglishContent,
-          check: "exampleSentenceDoesNotMatchSelectionContext",
-          content: content,
-          request: request
+          reason: .exampleSentenceDoesNotMatchSelectionContext,
+          httpStatusCode: completion.httpStatusCode
         )
       }
     }
@@ -167,35 +163,64 @@ final class OpenAIChatTranslationClient {
     _ sourceText: String,
     chineseWritingSystem: ChineseWritingSystem
   ) async throws -> LongTextTranslationResult {
-    let content = try await completionContent(
+    let completion = try await completionContent(
       systemPrompt: Self.longTextSystemPrompt(for: chineseWritingSystem),
       userContent: sourceText,
       maxTokens: 6_000,
       timeoutInterval: 60
     )
     guard
-      let contentData = Self.jsonData(from: content),
+      let contentData = Self.jsonData(from: completion.content),
       let payload = try? JSONDecoder().decode(OpenAILongTextPayload.self, from: contentData)
     else {
-      throw TranslationError.invalidResponse(.malformedPayload)
+      throw TranslationError.invalidResponse(
+        .malformedPayload,
+        diagnosticReason: .responseJSONCouldNotBeDecoded,
+        httpStatusCode: completion.httpStatusCode
+      )
     }
     guard let inputKind = payload.inputKind else {
-      throw TranslationError.invalidResponse(.missingRequiredContent)
+      throw TranslationError.invalidResponse(
+        .missingRequiredContent,
+        diagnosticReason: .responseInputKindMissing,
+        missingResponseFields: ["input_kind"],
+        httpStatusCode: completion.httpStatusCode
+      )
     }
     guard inputKind == .longText else {
-      throw TranslationError.invalidResponse(.unexpectedInputKind)
+      throw TranslationError.invalidResponse(
+        .unexpectedInputKind,
+        diagnosticReason: .responseInputKindUnexpected,
+        httpStatusCode: completion.httpStatusCode
+      )
     }
     guard
       let payloadSourceText = Self.nonempty(payload.sourceText),
       let translation = Self.nonempty(payload.translation)
     else {
-      throw TranslationError.invalidResponse(.missingRequiredContent)
+      throw TranslationError.invalidResponse(
+        .missingRequiredContent,
+        diagnosticReason: .responseRequiredFieldsMissing,
+        missingResponseFields: [
+          ("source_text", payload.sourceText),
+          ("translation", payload.translation),
+        ].compactMap { Self.nonempty($0.1) == nil ? $0.0 : nil },
+        httpStatusCode: completion.httpStatusCode
+      )
     }
     guard payloadSourceText == sourceText else {
-      throw TranslationError.invalidResponse(.invalidEnglishContent)
+      throw TranslationError.invalidResponse(
+        .invalidEnglishContent,
+        diagnosticReason: .longTextSourceTextMismatch,
+        httpStatusCode: completion.httpStatusCode
+      )
     }
     guard Self.containsHanCharacter(translation) else {
-      throw TranslationError.invalidResponse(.invalidChineseContent)
+      throw TranslationError.invalidResponse(
+        .invalidChineseContent,
+        diagnosticReason: .longTextTranslationIsNotChinese,
+        httpStatusCode: completion.httpStatusCode
+      )
     }
 
     return LongTextTranslationResult(
@@ -210,7 +235,7 @@ final class OpenAIChatTranslationClient {
     exampleMessages: [OpenAIMessage] = [],
     maxTokens: Int,
     timeoutInterval: TimeInterval
-  ) async throws -> String {
+  ) async throws -> CompletionContent {
     guard
       let apiKey = try apiKeyStore.loadAPIKey(for: provider)?
         .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -244,9 +269,13 @@ final class OpenAIChatTranslationClient {
       let content = completion.choices.first?.message.content,
       !content.isEmpty
     else {
-      throw TranslationError.invalidResponse(.malformedPayload)
+      throw TranslationError.invalidResponse(
+        .malformedPayload,
+        diagnosticReason: .responseJSONCouldNotBeDecoded,
+        httpStatusCode: response.statusCode
+      )
     }
-    return content
+    return CompletionContent(content: content, httpStatusCode: response.statusCode)
   }
 
   private static func jsonData(from content: String) -> Data? {
@@ -279,21 +308,24 @@ final class OpenAIChatTranslationClient {
   ) -> TranslationError {
     switch response.statusCode {
     case 400, 404, 405, 422:
-      .invalidRequest
+      .httpFailure(.invalidRequest, statusCode: response.statusCode)
     case 401, 403:
-      .authenticationFailed
+      .httpFailure(.authenticationFailed, statusCode: response.statusCode)
     case 402:
-      .quotaExceeded
+      .httpFailure(.quotaExceeded, statusCode: response.statusCode)
     case 408, 504:
-      .timedOut
+      .httpFailure(.timedOut, statusCode: response.statusCode)
     case 413:
-      .inputTooLong
+      .httpFailure(.inputTooLong, statusCode: response.statusCode)
     case 429:
-      responseIndicatesExhaustedQuota(responseData) ? .quotaExceeded : .rateLimited
+      .httpFailure(
+        responseIndicatesExhaustedQuota(responseData) ? .quotaExceeded : .rateLimited,
+        statusCode: response.statusCode
+      )
     case 500..<600:
-      .serviceUnavailable
+      .httpFailure(.serviceUnavailable, statusCode: response.statusCode)
     default:
-      .serviceUnavailable
+      .httpFailure(.serviceUnavailable, statusCode: response.statusCode)
     }
   }
 
@@ -398,19 +430,6 @@ final class OpenAIChatTranslationClient {
     ]
   }
 
-  private static func missingFieldNames(in payload: OpenAITranslationPayload) -> [String] {
-    [
-      ("source_text", payload.sourceText),
-      ("canonical_form", payload.canonicalForm),
-      ("part_of_speech", payload.partOfSpeech),
-      ("contextual_meaning", payload.contextualMeaning),
-      ("example_sentence", payload.exampleSentence),
-      ("sentence_translation", payload.sentenceTranslation),
-    ].compactMap { fieldName, value in
-      nonempty(value) == nil ? fieldName : nil
-    }
-  }
-
   private static func translationContextDebugLog(
     _ label: String,
     content: @autoclosure () -> String
@@ -436,13 +455,31 @@ final class OpenAIChatTranslationClient {
     )
   #endif
 
+  private static func missingFieldNames(in payload: OpenAITranslationPayload) -> [String] {
+    [
+      ("source_text", payload.sourceText),
+      ("canonical_form", payload.canonicalForm),
+      ("part_of_speech", payload.partOfSpeech),
+      ("contextual_meaning", payload.contextualMeaning),
+      ("example_sentence", payload.exampleSentence),
+      ("sentence_translation", payload.sentenceTranslation),
+    ].compactMap { fieldName, value in
+      nonempty(value) == nil ? fieldName : nil
+    }
+  }
+
   private static func invalidWordResponse(
     _ failure: TranslationResponseValidationFailure,
-    check _: String,
-    content _: String,
-    request _: TranslationRequest
+    reason: DiagnosticTranslationFailureReason,
+    missingResponseFields: [String]? = nil,
+    httpStatusCode: Int
   ) -> TranslationError {
-    return .invalidResponse(failure)
+    return .invalidResponse(
+      failure,
+      diagnosticReason: reason,
+      missingResponseFields: missingResponseFields,
+      httpStatusCode: httpStatusCode
+    )
   }
 
   private static func systemPrompt(for writingSystem: ChineseWritingSystem) -> String {
@@ -489,6 +526,11 @@ final class OpenAIChatTranslationClient {
     omit content, add commentary, or include markdown outside the JSON object.
     """
   }
+}
+
+private struct CompletionContent {
+  let content: String
+  let httpStatusCode: Int
 }
 
 struct OpenAIChatRequest: Encodable {

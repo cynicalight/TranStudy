@@ -164,7 +164,7 @@ struct OpenAICompatibleTranslationProviderTests {
     #expect(correctedContextResult.exampleSentence == "She ran home.")
     #expect(correctedContextResult.sentenceTranslation == "她跑回了家。")
 
-    await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+    do {
       try await provider.translate(
         TranslationRequest(
           sourceText: "ran",
@@ -176,6 +176,16 @@ struct OpenAICompatibleTranslationProviderTests {
             followingText: " away."
           )
         ))
+      Issue.record("Expected mismatched selection context to fail")
+    } catch let error as TranslationError {
+      #expect(
+        error
+          == .invalidResponse(
+            .invalidEnglishContent,
+            diagnosticReason: .exampleSentenceDoesNotMatchSelectionContext,
+            httpStatusCode: 200
+          )
+      )
     }
   }
 
@@ -213,7 +223,7 @@ struct OpenAICompatibleTranslationProviderTests {
     let provider = OpenAICompatibleTranslationProvider(
       configuration: configuration,
       apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
-      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
+      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 206)
     )
 
     let result = try await provider.translate(TranslationRequest(sourceText: "cliche"))
@@ -222,7 +232,11 @@ struct OpenAICompatibleTranslationProviderTests {
     #expect(result.canonicalForm == "cliché")
 
     await #expect(
-      throws: TranslationError.invalidResponse(.invalidEnglishContent)
+      throws: TranslationError.invalidResponse(
+        .invalidEnglishContent,
+        diagnosticReason: .responseSourceTextMismatch,
+        httpStatusCode: 206
+      )
     ) {
       try await provider.translate(TranslationRequest(sourceText: "different text"))
     }
@@ -434,7 +448,12 @@ struct OpenAICompatibleTranslationProviderTests {
     )
 
     await #expect(
-      throws: TranslationError.invalidResponse(.missingRequiredContent)
+      throws: TranslationError.invalidResponse(
+        .missingRequiredContent,
+        diagnosticReason: .responseRequiredFieldsMissing,
+        missingResponseFields: ["contextual_meaning"],
+        httpStatusCode: 200
+      )
     ) {
       try await provider.translate(TranslationRequest(sourceText: "cliche"))
     }
