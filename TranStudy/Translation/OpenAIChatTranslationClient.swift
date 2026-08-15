@@ -220,17 +220,32 @@ final class OpenAIChatTranslationClient {
         selectionWordContext.selectedText
       )
       let normalizedExampleSentence = Self.normalizedEnglishIdentity(exampleSentence)
+      let contextContainsExample = normalizedContext.contains(normalizedExampleSentence)
+      let exampleContainsSelection = normalizedExampleSentence.contains(normalizedSelectedText)
       guard
-        normalizedContext.contains(normalizedExampleSentence),
-        normalizedExampleSentence.contains(normalizedSelectedText)
+        contextContainsExample,
+        exampleContainsSelection
       else {
+        #if DEBUG
+          let debugDetails = Self.selectionContextValidationDebugLines(
+            selectionWordContext: selectionWordContext,
+            normalizedContext: normalizedContext,
+            normalizedSelectedText: normalizedSelectedText,
+            normalizedExampleSentence: normalizedExampleSentence,
+            contextContainsExample: contextContainsExample,
+            exampleContainsSelection: exampleContainsSelection
+          )
+        #else
+          let debugDetails: [String] = []
+        #endif
         throw Self.invalidWordResponse(
           .invalidEnglishContent,
           reason: .exampleSentenceDoesNotMatchSelectionContext,
           httpStatusCode: completion.httpStatusCode,
           check: "exampleSentenceDoesNotMatchSelectionContext",
           content: completion.content,
-          request: request
+          request: request,
+          debugDetails: debugDetails
         )
       }
     }
@@ -597,6 +612,87 @@ final class OpenAIChatTranslationClient {
     )
 
     static var issue18DebugLogger = Issue18DebugFileLogger()
+
+    private static func selectionContextValidationDebugLines(
+      selectionWordContext: SelectionWordContext,
+      normalizedContext: String,
+      normalizedSelectedText: String,
+      normalizedExampleSentence: String,
+      contextContainsExample: Bool,
+      exampleContainsSelection: Bool
+    ) -> [String] {
+      [
+        "[DEBUG-issue18] selection.preceding_text="
+          + String(reflecting: selectionWordContext.precedingText),
+        "[DEBUG-issue18] selection.selected_text="
+          + String(reflecting: selectionWordContext.selectedText),
+        "[DEBUG-issue18] selection.following_text="
+          + String(reflecting: selectionWordContext.followingText),
+        "[DEBUG-issue18] selection.combined_text="
+          + String(reflecting: selectionWordContext.combinedText),
+        "[DEBUG-issue18] validation.normalized_context="
+          + String(reflecting: normalizedContext),
+        "[DEBUG-issue18] validation.normalized_selected_text="
+          + String(reflecting: normalizedSelectedText),
+        "[DEBUG-issue18] validation.normalized_example_sentence="
+          + String(reflecting: normalizedExampleSentence),
+        "[DEBUG-issue18] validation.context_contains_example=\(contextContainsExample)",
+        "[DEBUG-issue18] validation.example_contains_selection=\(exampleContainsSelection)",
+        "[DEBUG-issue18] validation.normalized_prefix_first_difference="
+          + normalizedPrefixFirstDifference(
+            context: normalizedContext,
+            example: normalizedExampleSentence
+          ),
+      ]
+    }
+
+    private static func normalizedPrefixFirstDifference(
+      context: String,
+      example: String
+    ) -> String {
+      let contextCharacters = Array(context)
+      let exampleCharacters = Array(example)
+      let sharedCount = min(contextCharacters.count, exampleCharacters.count)
+
+      for characterIndex in 0..<sharedCount
+      where contextCharacters[characterIndex] != exampleCharacters[characterIndex] {
+        return [
+          "character_index=\(characterIndex)",
+          "context=\(String(reflecting: String(contextCharacters[characterIndex])))",
+          "context_unicode=\(unicodeDescription(contextCharacters[characterIndex]))",
+          "example=\(String(reflecting: String(exampleCharacters[characterIndex])))",
+          "example_unicode=\(unicodeDescription(exampleCharacters[characterIndex]))",
+        ].joined(separator: " ")
+      }
+
+      guard contextCharacters.count != exampleCharacters.count else {
+        return "none"
+      }
+      if contextCharacters.count == sharedCount {
+        let exampleCharacter = exampleCharacters[sharedCount]
+        return [
+          "character_index=\(sharedCount)",
+          "context=<end>",
+          "context_unicode=none",
+          "example=\(String(reflecting: String(exampleCharacter)))",
+          "example_unicode=\(unicodeDescription(exampleCharacter))",
+        ].joined(separator: " ")
+      }
+      let contextCharacter = contextCharacters[sharedCount]
+      return [
+        "character_index=\(sharedCount)",
+        "context=\(String(reflecting: String(contextCharacter)))",
+        "context_unicode=\(unicodeDescription(contextCharacter))",
+        "example=<end>",
+        "example_unicode=none",
+      ].joined(separator: " ")
+    }
+
+    private static func unicodeDescription(_ character: Character) -> String {
+      character.unicodeScalars
+        .map { String(format: "U+%04X", $0.value) }
+        .joined(separator: "+")
+    }
   #endif
 
   private static func missingFieldNames(in payload: OpenAITranslationPayload) -> [String] {

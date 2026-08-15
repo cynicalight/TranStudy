@@ -160,6 +160,84 @@ struct DeepSeekTranslationProviderTests {
   }
 
   #if DEBUG
+    @Test("selection context mismatch writes comparison details to the debug text log")
+    func selectionContextMismatchWritesDebugComparisonDetails() async throws {
+      let responseContent = try JSONSerialization.data(
+        withJSONObject: [
+          "input_kind": "word_or_phrase",
+          "source_text": "where",
+          "canonical_form": "where",
+          "pronunciation": "/wɛr/",
+          "part_of_speech": "conjunction",
+          "contextual_meaning": "在那里",
+          "example_sentence": "Before \"where\" after.",
+          "sentence_translation": "之前、在那里、之后。",
+        ],
+        options: [.sortedKeys]
+      )
+      let responseContentText = try #require(
+        String(data: responseContent, encoding: .utf8)
+      )
+      let responseBody = try JSONSerialization.data(
+        withJSONObject: [
+          "choices": [
+            [
+              "message": ["content": responseContentText]
+            ]
+          ]
+        ]
+      )
+      let provider = DeepSeekTranslationProvider(
+        apiKeyStore: TestAPIKeyStore(apiKey: "test-api-key"),
+        httpClient: TestHTTPClient(data: responseBody, statusCode: 200),
+        model: .flash
+      )
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      let originalDebugLogger = OpenAIChatTranslationClient.issue18DebugLogger
+      OpenAIChatTranslationClient.issue18DebugLogger = Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 1_048_576
+      )
+      defer {
+        OpenAIChatTranslationClient.issue18DebugLogger = originalDebugLogger
+        try? FileManager.default.removeItem(at: temporaryDirectory)
+      }
+
+      await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+        try await provider.translate(
+          TranslationRequest(
+            sourceText: "where",
+            context: "Before “where” after.",
+            kind: .contextualSelection,
+            targetSentence: "Before “where” after.",
+            selectionWordContext: SelectionWordContext(
+              precedingText: "Before “",
+              selectedText: "where",
+              followingText: "” after."
+            )
+          )
+        )
+      }
+
+      let debugOutput = try String(contentsOf: logFileURL, encoding: .utf8)
+      #expect(debugOutput.contains("selection.preceding_text=\"Before “\""))
+      #expect(debugOutput.contains("selection.selected_text=\"where\""))
+      #expect(debugOutput.contains("selection.following_text=\"” after.\""))
+      #expect(debugOutput.contains("selection.combined_text=\"Before “where” after.\""))
+      #expect(debugOutput.contains("validation.normalized_context=\"before “where” after.\""))
+      #expect(debugOutput.contains("validation.normalized_example_sentence=\"before \\\"where\\\" after.\""))
+      #expect(debugOutput.contains("validation.context_contains_example=false"))
+      #expect(debugOutput.contains("validation.example_contains_selection=true"))
+      #expect(
+        debugOutput.contains(
+          "validation.normalized_prefix_first_difference=character_index=7 "
+            + "context=\"“\" context_unicode=U+201C example=\"\\\"\" example_unicode=U+0022"
+        )
+      )
+    }
+
     @Test("invalid DeepSeek word response writes debug details to a text log")
     func invalidWordResponseWritesDebugTextLog() async throws {
       let responseContent = try JSONSerialization.data(
