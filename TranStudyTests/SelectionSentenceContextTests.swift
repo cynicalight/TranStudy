@@ -24,7 +24,7 @@ struct SelectionSentenceContextTests {
 
     #expect(capture.sentenceContext == sentenceContext)
     #expect(capture.wordContext == nil)
-    #expect(capture.sourceWordWindowText == sentenceContext.targetSentence)
+    #expect(capture.diagnosticContextText == sentenceContext.targetSentence)
   }
 
   @Test("selection-only word capture without a sentence is unavailable")

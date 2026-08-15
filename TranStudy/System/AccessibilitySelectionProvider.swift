@@ -37,7 +37,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       self.wordContext = wordContext
     }
 
-    var sourceWordWindowText: String {
+    var diagnosticContextText: String {
       wordContext?.combinedText ?? sentenceContext?.targetSentence ?? ""
     }
   }
@@ -118,7 +118,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     Self.translationContextDebugLog("selected_text", content: selectedText)
     Self.translationContextDebugLog(
       "source_paragraph_text",
-      content: contextCapture.sourceWordWindowText
+      content: contextCapture.diagnosticContextText
     )
     selectionDebugLog(
       "snapshot context captured: targetLength=\(context?.targetSentence.count ?? 0) previous=\(context?.previousSentence != nil) next=\(context?.nextSentence != nil) beforeWordContextLength=\(contextCapture.wordContext?.precedingText.count ?? 0) afterWordContextLength=\(contextCapture.wordContext?.followingText.count ?? 0)"
