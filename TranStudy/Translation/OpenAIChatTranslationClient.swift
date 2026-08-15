@@ -516,6 +516,8 @@ final class OpenAIChatTranslationClient {
       subsystem: Bundle.main.bundleIdentifier ?? "com.cynicalight.TranStudy",
       category: "TranslationContext"
     )
+
+    static var issue18DebugOutput: (String) -> Void = { print($0) }
   #endif
 
   private static func missingFieldNames(in payload: OpenAITranslationPayload) -> [String] {

@@ -158,6 +158,59 @@ struct DeepSeekTranslationProviderTests {
       )
     }
   }
+
+  #if DEBUG
+    @Test("invalid DeepSeek word response emits debug details")
+    func invalidWordResponseEmitsDebugDetails() async throws {
+      let responseContent = try JSONSerialization.data(
+        withJSONObject: [
+          "input_kind": "word_or_phrase",
+          "source_text": "ran",
+          "canonical_form": "跑",
+          "pronunciation": "/ræn/",
+          "part_of_speech": "verb",
+          "contextual_meaning": "奔跑",
+          "example_sentence": "She ran home.",
+          "sentence_translation": "她跑回了家。",
+        ],
+        options: [.sortedKeys]
+      )
+      let responseContentText = try #require(
+        String(data: responseContent, encoding: .utf8)
+      )
+      let responseBody = try JSONSerialization.data(
+        withJSONObject: [
+          "choices": [
+            [
+              "message": ["content": responseContentText]
+            ]
+          ]
+        ]
+      )
+      let provider = DeepSeekTranslationProvider(
+        apiKeyStore: TestAPIKeyStore(apiKey: "test-api-key"),
+        httpClient: TestHTTPClient(data: responseBody, statusCode: 200),
+        model: .flash
+      )
+      var debugLines: [String] = []
+      let originalDebugOutput = OpenAIChatTranslationClient.issue18DebugOutput
+      OpenAIChatTranslationClient.issue18DebugOutput = { debugLines.append($0) }
+      defer {
+        OpenAIChatTranslationClient.issue18DebugOutput = originalDebugOutput
+      }
+
+      await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+        try await provider.translate(TranslationRequest(sourceText: "ran"))
+      }
+
+      let debugOutput = debugLines.joined(separator: "\n")
+      #expect(debugOutput.contains("[DEBUG-issue18] validation failed"))
+      #expect(debugOutput.contains("failure=invalidEnglishContent"))
+      #expect(debugOutput.contains("check=invalidEnglishFields"))
+      #expect(debugOutput.contains("request.source_text=\"ran\""))
+      #expect(debugOutput.contains(responseContentText))
+    }
+  #endif
 }
 
 @MainActor
