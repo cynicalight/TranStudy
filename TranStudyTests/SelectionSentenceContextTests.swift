@@ -4,6 +4,34 @@ import Testing
 @testable import TranStudy
 
 struct SelectionSentenceContextTests {
+  @Test("selection-only word context is not a surrounding word window")
+  func selectionOnlyWordContextIsNotUsable() {
+    let context = SelectionWordContext(
+      precedingText: " \n",
+      selectedText: "where",
+      followingText: "\t"
+    )
+
+    #expect(!context.hasSurroundingContent)
+  }
+
+  @Test("one populated side keeps a boundary word context usable")
+  func onePopulatedSideKeepsWordContextUsable() {
+    let documentStart = SelectionWordContext(
+      precedingText: "",
+      selectedText: "First",
+      followingText: " word after"
+    )
+    let documentEnd = SelectionWordContext(
+      precedingText: "word before ",
+      selectedText: "last",
+      followingText: ""
+    )
+
+    #expect(documentStart.hasSurroundingContent)
+    #expect(documentEnd.hasSurroundingContent)
+  }
+
   @Test("word context keeps exactly fifty words on each side of the selection")
   func wordContextKeepsFiftyWordsOnEachSide() throws {
     let precedingWords = (1...60).map { "before\($0)" }
