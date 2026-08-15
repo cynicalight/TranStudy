@@ -328,6 +328,87 @@ struct OpenAICompatibleTranslationProviderTests {
     #expect(result.canonicalForm == "run")
   }
 
+  @Test("malformed JSON response is retried once with the original response attached")
+  func malformedJSONResponseIsRetriedOnce() async throws {
+    let repairedContent = try JSONSerialization.data(
+      withJSONObject: [
+        "input_kind": "word_or_phrase",
+        "source_text": "ran",
+        "canonical_form": "run",
+        "pronunciation": "/ræn/",
+        "part_of_speech": "verb",
+        "contextual_meaning": "奔跑",
+        "example_sentence": "She ran home.",
+        "sentence_translation": "她跑回了家。",
+      ]
+    )
+    let initialResponse = try completionResponse(content: "{ this is not valid JSON")
+    let repairedResponse = try completionResponse(
+      content: try #require(String(data: repairedContent, encoding: .utf8))
+    )
+    let httpClient = SequencedCustomProviderTestHTTPClient(
+      responses: [
+        (data: initialResponse, statusCode: 200),
+        (data: repairedResponse, statusCode: 200),
+      ]
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: httpClient
+    )
+
+    let result = try await provider.translate(TranslationRequest(sourceText: "ran"))
+
+    #expect(result.canonicalForm == "run")
+    #expect(httpClient.requests.count == 2)
+    let retryBodyData = try #require(httpClient.requests.last?.httpBody)
+    let retryBody = try #require(
+      JSONSerialization.jsonObject(with: retryBodyData) as? [String: Any]
+    )
+    let retryMessages = try #require(retryBody["messages"] as? [[String: String]])
+    let retryContent = try #require(retryMessages.last?["content"])
+    #expect(retryContent.contains("\"original_request\":\"ran\""))
+    #expect(retryContent.contains("\"malformed_response\":\"{ this is not valid JSON\""))
+  }
+
+  @Test("a second malformed JSON response is not retried again")
+  func secondMalformedJSONResponseIsNotRetriedAgain() async throws {
+    let malformedResponse = try completionResponse(content: "not JSON")
+    let httpClient = SequencedCustomProviderTestHTTPClient(
+      responses: [
+        (data: malformedResponse, statusCode: 200),
+        (data: malformedResponse, statusCode: 200),
+      ]
+    )
+    let provider = OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: httpClient
+    )
+
+    await #expect(
+      throws: TranslationError.invalidResponse(
+        .malformedPayload,
+        diagnosticReason: .responseJSONCouldNotBeDecoded,
+        httpStatusCode: 200
+      )
+    ) {
+      try await provider.translate(TranslationRequest(sourceText: "ran"))
+    }
+    #expect(httpClient.requests.count == 2)
+  }
+
   @Test("cliche response without pronunciation is accepted")
   func clicheResponseWithoutPronunciationIsAccepted() async throws {
     let responseContent = try JSONSerialization.data(
@@ -482,6 +563,16 @@ struct OpenAICompatibleTranslationProviderTests {
   }
 }
 
+private func completionResponse(content: String) throws -> Data {
+  try JSONSerialization.data(
+    withJSONObject: [
+      "choices": [
+        ["message": ["content": content]]
+      ]
+    ]
+  )
+}
+
 @MainActor
 private final class CustomProviderTestHTTPClient: HTTPDataLoading {
   private let data: Data
@@ -503,6 +594,37 @@ private final class CustomProviderTestHTTPClient: HTTPDataLoading {
         headerFields: nil
       ))
     return (data, response)
+  }
+}
+
+@MainActor
+private final class SequencedCustomProviderTestHTTPClient: HTTPDataLoading {
+  struct Response {
+    let data: Data
+    let statusCode: Int
+  }
+
+  private let responses: [Response]
+  private var responseIndex = 0
+  private(set) var requests: [URLRequest] = []
+
+  init(responses: [(data: Data, statusCode: Int)]) {
+    self.responses = responses.map { Response(data: $0.data, statusCode: $0.statusCode) }
+  }
+
+  func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    requests.append(request)
+    precondition(responseIndex < responses.count, "Unexpected extra HTTP request")
+    let responseData = responses[responseIndex]
+    responseIndex += 1
+    let response = try #require(
+      HTTPURLResponse(
+        url: request.url ?? URL(string: "https://example.com")!,
+        statusCode: responseData.statusCode,
+        httpVersion: nil,
+        headerFields: nil
+      ))
+    return (responseData.data, response)
   }
 }
 

@@ -236,7 +236,7 @@
 "翻译请求超时。请检查网络后重试。" = "The translation request timed out. Check your network and try again.";
 "无法连接到翻译服务。请检查网络、代理或服务地址。" = "Could not connect to the translation service. Check your network, proxy, or service URL.";
 "翻译服务返回的内容格式不符合预期。请重试；若持续发生，请更换模型或导出诊断日志。" = "The translation service returned an unexpected response format. Try again; if it continues, change the model or export diagnostics.";
-"翻译服务返回的数据无法解析。请重试。" = "The translation service returned data that could not be parsed. Try again.";
+"翻译服务返回的 JSON 无法解析。请重试。" = "The translation service returned JSON that could not be parsed. Try again.";
 "翻译服务返回了错误的内容类型。请重试。" = "The translation service returned the wrong content type. Try again.";
 "翻译服务返回的学习内容不完整。请重试。" = "The translation service returned incomplete learning content. Try again.";
 "翻译服务返回的英文词条或例句无效。请重试。" = "The translation service returned an invalid English entry or example. Try again.";

@@ -247,7 +247,7 @@ enum TranslationResponseValidationFailure: Equatable, Sendable {
   var userFacingMessageKey: String {
     switch self {
     case .malformedPayload:
-      "翻译服务返回的数据无法解析。请重试。"
+      "翻译服务返回的 JSON 无法解析。请重试。"
     case .unexpectedInputKind:
       "翻译服务返回了错误的内容类型。请重试。"
     case .missingRequiredContent:
