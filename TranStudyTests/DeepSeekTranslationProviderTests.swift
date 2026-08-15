@@ -160,8 +160,8 @@ struct DeepSeekTranslationProviderTests {
   }
 
   #if DEBUG
-    @Test("invalid DeepSeek word response emits debug details")
-    func invalidWordResponseEmitsDebugDetails() async throws {
+    @Test("invalid DeepSeek word response writes debug details to a text log")
+    func invalidWordResponseWritesDebugTextLog() async throws {
       let responseContent = try JSONSerialization.data(
         withJSONObject: [
           "input_kind": "word_or_phrase",
@@ -192,23 +192,81 @@ struct DeepSeekTranslationProviderTests {
         httpClient: TestHTTPClient(data: responseBody, statusCode: 200),
         model: .flash
       )
-      var debugLines: [String] = []
-      let originalDebugOutput = OpenAIChatTranslationClient.issue18DebugOutput
-      OpenAIChatTranslationClient.issue18DebugOutput = { debugLines.append($0) }
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      let originalDebugLogger = OpenAIChatTranslationClient.issue18DebugLogger
+      OpenAIChatTranslationClient.issue18DebugLogger = Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 1_048_576
+      )
       defer {
-        OpenAIChatTranslationClient.issue18DebugOutput = originalDebugOutput
+        OpenAIChatTranslationClient.issue18DebugLogger = originalDebugLogger
+        try? FileManager.default.removeItem(at: temporaryDirectory)
       }
 
       await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
         try await provider.translate(TranslationRequest(sourceText: "ran"))
       }
 
-      let debugOutput = debugLines.joined(separator: "\n")
+      let debugOutput = try String(contentsOf: logFileURL, encoding: .utf8)
+      #expect(debugOutput.contains("[DEBUG-issue18] timestamp="))
       #expect(debugOutput.contains("[DEBUG-issue18] validation failed"))
       #expect(debugOutput.contains("failure=invalidEnglishContent"))
       #expect(debugOutput.contains("check=invalidEnglishFields"))
       #expect(debugOutput.contains("request.source_text=\"ran\""))
       #expect(debugOutput.contains(responseContentText))
+    }
+
+    @Test("Issue 18 debug text log replaces content before exceeding its size limit")
+    func issue18DebugTextLogStaysWithinSizeLimit() throws {
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+      try FileManager.default.createDirectory(
+        at: temporaryDirectory,
+        withIntermediateDirectories: true
+      )
+      try Data(repeating: 0x78, count: 64).write(to: logFileURL)
+
+      Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 64
+      ).append("[DEBUG-issue18] newest record")
+
+      let logData = try Data(contentsOf: logFileURL)
+      let logText = try #require(String(data: logData, encoding: .utf8))
+      #expect(logData.count <= 64)
+      #expect(logText == "[DEBUG-issue18] newest record\n")
+    }
+
+    @Test("Issue 18 debug text log is private after writing")
+    func issue18DebugTextLogUsesPrivatePermissions() throws {
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+      try FileManager.default.createDirectory(
+        at: temporaryDirectory,
+        withIntermediateDirectories: true
+      )
+      try Data().write(to: logFileURL)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o644],
+        ofItemAtPath: logFileURL.path
+      )
+
+      Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 1_048_576
+      ).append("[DEBUG-issue18] private record")
+
+      let attributes = try FileManager.default.attributesOfItem(
+        atPath: logFileURL.path
+      )
+      let permissions = try #require(attributes[.posixPermissions] as? NSNumber)
+      #expect(permissions.intValue & 0o777 == 0o600)
     }
   #endif
 }

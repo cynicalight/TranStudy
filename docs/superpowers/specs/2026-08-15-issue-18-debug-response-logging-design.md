@@ -8,7 +8,8 @@ validation check and model content needed for root-cause analysis.
 
 ## Scope
 
-- Change only `OpenAIChatTranslationClient.invalidWordResponse`.
+- Trigger response-file logging only from
+  `OpenAIChatTranslationClient.invalidWordResponse`.
 - Retain the existing `[DEBUG-issue18]`-style unique prefix on every line.
 - Log the validation failure, internal validation check, requested source text,
   optional target sentence, and `choices[0].message.content`.
@@ -19,20 +20,26 @@ validation check and model content needed for root-cause analysis.
 ## Data Flow
 
 When a decoded word response fails validation, each existing guard calls
-`invalidWordResponse`. A Debug build writes the bounded debugging record to the
-process console and then returns the same `TranslationError` as before. A
-Release build compiles out the logging and only returns the error.
+`invalidWordResponse`. A Debug build appends the bounded debugging record to
+`~/Library/Logs/TranStudy/issue-18-debug.log` and then returns the same
+`TranslationError` as before. The file is created with `0600` permissions and
+is replaced with the newest record before an append would grow it beyond 1 MB.
+File-system failures are ignored so diagnostics cannot change translation
+behavior. A Release build compiles out the logging and only returns the error.
 
 ## Verification
 
 - A focused test exercises an invalid English response and confirms the same
   public error classification remains intact.
-- The Debug build compiles with the restored parameter bindings and logging.
+- A focused test confirms the Debug log contains a timestamp, the failing
+  validation check, request context, and raw model response.
+- Tests confirm the file is private (`0600`) and bounded to 1 MB.
 - The Release build compiles without relying on Debug-only values.
 - Existing provider tests continue to pass.
 
 ## Cleanup
 
 After Issue #18 has been reproduced and the root cause is captured, remove all
-lines tagged `[DEBUG-issue18]` so selected text and model content do not remain
-in routine development logs.
+lines tagged `[DEBUG-issue18]` and remove
+`~/Library/Logs/TranStudy/issue-18-debug.log` so selected text and model content
+do not remain on the development machine.
