@@ -208,6 +208,46 @@ struct ApplicationShellTests {
     #expect(shell.translationDraft?.exampleSentence == "She ran home.")
   }
 
+  @Test("missing word window sends sentence context without strict word validation input")
+  func missingWordWindowUsesSentenceContext() async throws {
+    let translator = TestTranslationProvider(
+      result: TranslationResult(
+        sourceText: "where",
+        canonicalForm: "where",
+        pronunciation: "/wɛr/",
+        partOfSpeech: "adverb",
+        contextualMeaning: "在那里",
+        exampleSentence: "You can use it where you work.",
+        sentenceTranslation: "你可以在工作的地方使用它。"
+      ))
+    let shell = ApplicationShell(environment: .test(translation: translator))
+    let snapshot = SelectionSnapshot(
+      selectedText: "where",
+      targetSentence: "You can use it where you work.",
+      previousSentence: "The service is portable.",
+      nextSentence: "It also supports messages.",
+      wordContext: nil,
+      screenPosition: CGPoint(x: 640, y: 420),
+      sourceApplicationName: "Zen Browser"
+    )
+
+    await shell.translateSelection(snapshot)
+
+    #expect(
+      translator.lastRequest
+        == TranslationRequest(
+          sourceText: "where",
+          context: [
+            "Previous sentence:\nThe service is portable.",
+            "Target sentence:\nYou can use it where you work.",
+            "Next sentence:\nIt also supports messages.",
+          ].joined(separator: "\n\n"),
+          kind: .contextualSelection,
+          targetSentence: "You can use it where you work.",
+          selectionWordContext: nil
+        ))
+  }
+
   @Test("a selection without sentence context never starts translation")
   func selectionWithoutSentenceContextNeverStartsTranslation() async {
     let translator = TestTranslationProvider(

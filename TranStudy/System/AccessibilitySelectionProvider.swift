@@ -21,12 +21,24 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     let rangeIdentity: String
   }
 
-  private struct SelectionContextCapture {
+  struct SelectionContextCapture {
     let sentenceContext: SelectionSentenceContext?
-    let wordContext: SelectionWordContext
+    let wordContext: SelectionWordContext?
+
+    init?(
+      sentenceContext: SelectionSentenceContext?,
+      wordContext candidate: SelectionWordContext?
+    ) {
+      let wordContext = candidate?.hasSurroundingContent == true ? candidate : nil
+      guard sentenceContext != nil || wordContext != nil else {
+        return nil
+      }
+      self.sentenceContext = sentenceContext
+      self.wordContext = wordContext
+    }
 
     var sourceWordWindowText: String {
-      wordContext.combinedText
+      wordContext?.combinedText ?? sentenceContext?.targetSentence ?? ""
     }
   }
 
@@ -109,7 +121,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       content: contextCapture.sourceWordWindowText
     )
     selectionDebugLog(
-      "snapshot context captured: targetLength=\(context?.targetSentence.count ?? 0) previous=\(context?.previousSentence != nil) next=\(context?.nextSentence != nil) beforeWordContextLength=\(contextCapture.wordContext.precedingText.count) afterWordContextLength=\(contextCapture.wordContext.followingText.count)"
+      "snapshot context captured: targetLength=\(context?.targetSentence.count ?? 0) previous=\(context?.previousSentence != nil) next=\(context?.nextSentence != nil) beforeWordContextLength=\(contextCapture.wordContext?.precedingText.count ?? 0) afterWordContextLength=\(contextCapture.wordContext?.followingText.count ?? 0)"
     )
     return SelectionSnapshot(
       selectedText: selectedText,
@@ -387,15 +399,10 @@ final class AccessibilitySelectionProvider: SelectionProviding {
       selectionDebugLog("selection context failed: document text unavailable")
       return nil
     }
-    guard
-      let wordContext = SelectionWordContext.extract(
-        from: documentText,
-        selectedRange: selectedRange
-      )
-    else {
-      selectionDebugLog("selection context failed: 50-word window extraction returned nil")
-      return nil
-    }
+    let wordContext = SelectionWordContext.extract(
+      from: documentText,
+      selectedRange: selectedRange
+    )
     let sentenceContext = SelectionSentenceContext.extract(
       from: documentText,
       selectedRange: selectedRange
@@ -418,10 +425,7 @@ final class AccessibilitySelectionProvider: SelectionProviding {
     else {
       return nil
     }
-    guard let wordContext = webWordContext(selectedRange: selectedRange, in: element) else {
-      selectionDebugLog("selection context failed: AX 50-word window unavailable")
-      return nil
-    }
+    let wordContext = webWordContext(selectedRange: selectedRange, in: element)
 
     if let sentenceContext = webParagraphSentenceContext(
       selectedRange: selectedRange,

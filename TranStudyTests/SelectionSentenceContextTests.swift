@@ -4,6 +4,44 @@ import Testing
 @testable import TranStudy
 
 struct SelectionSentenceContextTests {
+  @Test("selection-only word capture preserves the sentence fallback")
+  @MainActor
+  func selectionOnlyWordCapturePreservesSentenceFallback() throws {
+    let sentenceContext = SelectionSentenceContext(
+      targetSentence: "You can use it where you work.",
+      previousSentence: nil,
+      nextSentence: nil
+    )
+    let capture = try #require(
+      AccessibilitySelectionProvider.SelectionContextCapture(
+        sentenceContext: sentenceContext,
+        wordContext: SelectionWordContext(
+          precedingText: "",
+          selectedText: "where",
+          followingText: ""
+        )
+      ))
+
+    #expect(capture.sentenceContext == sentenceContext)
+    #expect(capture.wordContext == nil)
+    #expect(capture.sourceWordWindowText == sentenceContext.targetSentence)
+  }
+
+  @Test("selection-only word capture without a sentence is unavailable")
+  @MainActor
+  func selectionOnlyWordCaptureWithoutSentenceIsUnavailable() {
+    let capture = AccessibilitySelectionProvider.SelectionContextCapture(
+      sentenceContext: nil,
+      wordContext: SelectionWordContext(
+        precedingText: "",
+        selectedText: "where",
+        followingText: ""
+      )
+    )
+
+    #expect(capture == nil)
+  }
+
   @Test("selection-only word context is not a surrounding word window")
   func selectionOnlyWordContextIsNotUsable() {
     let context = SelectionWordContext(
