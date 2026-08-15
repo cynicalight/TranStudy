@@ -189,6 +189,74 @@ struct OpenAICompatibleTranslationProviderTests {
     }
   }
 
+  @Test("sentence fallback accepts matching hints and rejects an unrelated example")
+  func sentenceFallbackValidatesTargetHint() async throws {
+    let provider = try customProvider(
+      responseFields: [
+        "input_kind": "word_or_phrase",
+        "source_text": "ran",
+        "canonical_form": "run",
+        "pronunciation": "/ræn/",
+        "part_of_speech": "verb",
+        "contextual_meaning": "奔跑",
+        "example_sentence": "She ran home.",
+        "sentence_translation": "她跑回了家。",
+      ])
+
+    let exactResult = try await provider.translate(
+      TranslationRequest(
+        sourceText: "ran",
+        context: "Target sentence:\nShe ran home.",
+        kind: .contextualSelection,
+        targetSentence: "She ran home."
+      ))
+    #expect(exactResult.exampleSentence == "She ran home.")
+
+    let completedHintResult = try await provider.translate(
+      TranslationRequest(
+        sourceText: "ran",
+        context: "Target sentence:\nran",
+        kind: .contextualSelection,
+        targetSentence: "ran"
+      ))
+    #expect(completedHintResult.exampleSentence == "She ran home.")
+
+    await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+      try await provider.translate(
+        TranslationRequest(
+          sourceText: "ran",
+          context: "Target sentence:\nThey ran away.",
+          kind: .contextualSelection,
+          targetSentence: "They ran away."
+        ))
+    }
+  }
+
+  @Test("sentence fallback rejects an example that omits the selected text")
+  func sentenceFallbackRequiresSelectedText() async throws {
+    let provider = try customProvider(
+      responseFields: [
+        "input_kind": "word_or_phrase",
+        "source_text": "ran",
+        "canonical_form": "run",
+        "pronunciation": "/ræn/",
+        "part_of_speech": "verb",
+        "contextual_meaning": "奔跑",
+        "example_sentence": "She hurried home.",
+        "sentence_translation": "她匆忙回家了。",
+      ])
+
+    await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+      try await provider.translate(
+        TranslationRequest(
+          sourceText: "ran",
+          context: "Target sentence:\nShe hurried home.",
+          kind: .contextualSelection,
+          targetSentence: "She hurried home."
+        ))
+    }
+  }
+
   @Test("recoverable source spelling drift does not replace the requested text")
   func responseSourceSpellingDriftUsesRequestedText() async throws {
     let responseContent = try JSONSerialization.data(
@@ -560,6 +628,33 @@ struct OpenAICompatibleTranslationProviderTests {
     }
 
     #expect(httpClient.lastRequest == nil)
+  }
+
+  private func customProvider(
+    responseFields: [String: String]
+  ) throws -> OpenAICompatibleTranslationProvider {
+    let responseContent = try JSONSerialization.data(withJSONObject: responseFields)
+    let responseBody = try JSONSerialization.data(
+      withJSONObject: [
+        "choices": [
+          [
+            "message": [
+              "content": try #require(String(data: responseContent, encoding: .utf8))
+            ]
+          ]
+        ]
+      ]
+    )
+    return OpenAICompatibleTranslationProvider(
+      configuration: TranslationProviderConfiguration(
+        provider: .openAICompatible,
+        deepSeekModel: .flash,
+        customBaseURL: "https://example.com/v1",
+        customModel: "example-model"
+      ),
+      apiKeyStore: CustomProviderTestAPIKeyStore(apiKey: "custom-api-key"),
+      httpClient: CustomProviderTestHTTPClient(data: responseBody, statusCode: 200)
+    )
   }
 }
 

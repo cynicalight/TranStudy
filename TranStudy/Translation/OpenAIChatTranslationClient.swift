@@ -248,6 +248,24 @@ final class OpenAIChatTranslationClient {
           debugDetails: debugDetails
         )
       }
+    } else if request.kind == .contextualSelection,
+      let targetSentence = request.targetSentence
+    {
+      let normalizedTargetSentence = Self.normalizedEnglishIdentity(targetSentence)
+      let normalizedSelectedText = Self.normalizedEnglishIdentity(request.sourceText)
+      let normalizedExampleSentence = Self.normalizedEnglishIdentity(exampleSentence)
+      let exampleContainsSelection = normalizedExampleSentence.contains(normalizedSelectedText)
+      let exampleMatchesTargetHint =
+        normalizedExampleSentence.contains(normalizedTargetSentence)
+        || normalizedTargetSentence.contains(normalizedExampleSentence)
+      guard exampleContainsSelection, exampleMatchesTargetHint else {
+        throw Self.invalidWordResponse(
+          .invalidEnglishContent,
+          check: "exampleSentenceDoesNotMatchSentenceFallback",
+          content: content,
+          request: request
+        )
+      }
     }
     #if DEBUG
       if request.kind == .contextualSelection {
