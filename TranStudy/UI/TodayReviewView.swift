@@ -245,17 +245,33 @@ private struct ReviewSessionView: View {
         }
 
         if showsNextReviewButton {
-          Button {
-            shell.startCurrentReviewSpelling()
-          } label: {
-            Label("开始拼写", systemImage: "text.cursor")
-              .font(.title3.weight(.semibold))
-              .frame(maxWidth: .infinity, minHeight: 64)
+          if item.kind == .word {
+            Button {
+              shell.startCurrentReviewSpelling()
+            } label: {
+              Label("开始拼写", systemImage: "text.cursor")
+                .font(.title3.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 64)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(shell.isReviewRating)
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+          } else {
+            Button {
+              Task {
+                await shell.advanceToNextReview()
+              }
+            } label: {
+              Label("完成评分", systemImage: "checkmark")
+                .font(.title3.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 64)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(shell.isReviewRating)
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
           }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.large)
-          .disabled(shell.isReviewRating)
-          .transition(.opacity.combined(with: .scale(scale: 0.98)))
         }
       }
       .animation(

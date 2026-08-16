@@ -1100,6 +1100,40 @@ struct ApplicationShellTests {
     #expect(shell.currentSpellingItem == nil)
   }
 
+  @Test("sentence reviews skip spelling and advance after rating")
+  func sentenceReviewSkipsSpelling() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "F750B412-277F-4C21-960B-9FB6870DBF90")!,
+      kind: .sentence,
+      canonicalForm: "She ran home."
+    )
+    let learningStore = TestLearningStore(dueItems: [item])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    await shell.refreshTodayReview()
+    await shell.rateCurrentReview(.remembered)
+    shell.startCurrentReviewSpelling()
+
+    #expect(shell.currentReviewItem == item)
+    #expect(shell.currentSpellingItem == nil)
+
+    await shell.confirmCurrentReviewOrRemember()
+
+    #expect(
+      learningStore.reviewInvocations
+        == [
+          ReviewInvocation(
+            itemID: item.id,
+            rating: .remembered,
+            reviewedAt: Date(timeIntervalSince1970: 1_234)
+          )
+        ])
+    #expect(shell.currentReviewItem == nil)
+    #expect(shell.currentSpellingItem == nil)
+  }
+
   @Test("a card scheduled again today returns to the end of the current review batch")
   func sameDayReviewReturnsToCurrentBatch() async {
     let item = makeLearningItem(
@@ -1396,11 +1430,13 @@ struct ApplicationShellTests {
 
   private func makeLearningItem(
     id: UUID,
+    kind: LearningContentKind = .word,
     canonicalForm: String,
     nextReviewAt: Date = Date(timeIntervalSince1970: 1_200)
   ) -> LearningItem {
     LearningItem(
       id: id,
+      kind: kind,
       sourceText: canonicalForm,
       canonicalForm: canonicalForm,
       pronunciation: "",

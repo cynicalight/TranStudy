@@ -303,6 +303,7 @@ final class ApplicationShell {
   func startCurrentReviewSpelling() {
     guard
       let currentReviewItem,
+      currentReviewItem.kind == .word,
       selectedReviewRating != nil,
       !isReviewRating
     else {
@@ -318,7 +319,11 @@ final class ApplicationShell {
     if selectedReviewRating == nil {
       await rateCurrentReview(.remembered)
     }
-    startCurrentReviewSpelling()
+    if currentReviewItem?.kind == .word {
+      startCurrentReviewSpelling()
+    } else {
+      await advanceToNextReview()
+    }
   }
 
   func advanceToNextReview(ratingOverride: ReviewRating? = nil) async {
