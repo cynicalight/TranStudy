@@ -255,14 +255,21 @@ final class OpenAIChatTranslationClient {
       let normalizedSelectedText = Self.normalizedEnglishIdentity(request.sourceText)
       let normalizedExampleSentence = Self.normalizedEnglishIdentity(exampleSentence)
       let exampleContainsSelection = normalizedExampleSentence.contains(normalizedSelectedText)
+      let exampleHasSurroundingContext = normalizedExampleSentence != normalizedSelectedText
       let exampleMatchesTargetHint =
         normalizedExampleSentence.contains(normalizedTargetSentence)
         || normalizedTargetSentence.contains(normalizedExampleSentence)
-      guard exampleContainsSelection, exampleMatchesTargetHint else {
+      guard
+        exampleContainsSelection,
+        exampleHasSurroundingContext,
+        exampleMatchesTargetHint
+      else {
         throw Self.invalidWordResponse(
           .invalidEnglishContent,
+          reason: .exampleSentenceDoesNotMatchSelectionContext,
+          httpStatusCode: completion.httpStatusCode,
           check: "exampleSentenceDoesNotMatchSentenceFallback",
-          content: content,
+          content: completion.content,
           request: request
         )
       }

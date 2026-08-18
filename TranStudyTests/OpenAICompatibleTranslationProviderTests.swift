@@ -165,7 +165,7 @@ struct OpenAICompatibleTranslationProviderTests {
     #expect(correctedContextResult.sentenceTranslation == "她跑回了家。")
 
     do {
-      try await provider.translate(
+      _ = try await provider.translate(
         TranslationRequest(
           sourceText: "ran",
           context: "They ran away.",
@@ -221,7 +221,13 @@ struct OpenAICompatibleTranslationProviderTests {
       ))
     #expect(completedHintResult.exampleSentence == "She ran home.")
 
-    await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+    await #expect(
+      throws: TranslationError.invalidResponse(
+        .invalidEnglishContent,
+        diagnosticReason: .exampleSentenceDoesNotMatchSelectionContext,
+        httpStatusCode: 200
+      )
+    ) {
       try await provider.translate(
         TranslationRequest(
           sourceText: "ran",
@@ -246,13 +252,50 @@ struct OpenAICompatibleTranslationProviderTests {
         "sentence_translation": "她匆忙回家了。",
       ])
 
-    await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+    await #expect(
+      throws: TranslationError.invalidResponse(
+        .invalidEnglishContent,
+        diagnosticReason: .exampleSentenceDoesNotMatchSelectionContext,
+        httpStatusCode: 200
+      )
+    ) {
       try await provider.translate(
         TranslationRequest(
           sourceText: "ran",
           context: "Target sentence:\nShe hurried home.",
           kind: .contextualSelection,
           targetSentence: "She hurried home."
+        ))
+    }
+  }
+
+  @Test("sentence fallback rejects an example containing only the selected text")
+  func sentenceFallbackRejectsSelectionOnlyExample() async throws {
+    let provider = try customProvider(
+      responseFields: [
+        "input_kind": "word_or_phrase",
+        "source_text": "ran",
+        "canonical_form": "run",
+        "pronunciation": "/ræn/",
+        "part_of_speech": "verb",
+        "contextual_meaning": "奔跑",
+        "example_sentence": "ran",
+        "sentence_translation": "跑了",
+      ])
+
+    await #expect(
+      throws: TranslationError.invalidResponse(
+        .invalidEnglishContent,
+        diagnosticReason: .exampleSentenceDoesNotMatchSelectionContext,
+        httpStatusCode: 200
+      )
+    ) {
+      try await provider.translate(
+        TranslationRequest(
+          sourceText: "ran",
+          context: "Target sentence:\nShe ran home.",
+          kind: .contextualSelection,
+          targetSentence: "She ran home."
         ))
     }
   }

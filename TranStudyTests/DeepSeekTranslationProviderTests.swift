@@ -205,7 +205,13 @@ struct DeepSeekTranslationProviderTests {
         try? FileManager.default.removeItem(at: temporaryDirectory)
       }
 
-      await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+      await #expect(
+        throws: TranslationError.invalidResponse(
+          .invalidEnglishContent,
+          diagnosticReason: .exampleSentenceDoesNotMatchSelectionContext,
+          httpStatusCode: 200
+        )
+      ) {
         try await provider.translate(
           TranslationRequest(
             sourceText: "where",
@@ -283,7 +289,13 @@ struct DeepSeekTranslationProviderTests {
         try? FileManager.default.removeItem(at: temporaryDirectory)
       }
 
-      await #expect(throws: TranslationError.invalidResponse(.invalidEnglishContent)) {
+      await #expect(
+        throws: TranslationError.invalidResponse(
+          .invalidEnglishContent,
+          diagnosticReason: .responseCanonicalFormIsNotEnglish,
+          httpStatusCode: 200
+        )
+      ) {
         try await provider.translate(TranslationRequest(sourceText: "ran"))
       }
 
