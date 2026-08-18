@@ -130,6 +130,11 @@ final class ApplicationShell {
     immediateSpellingItem != nil
   }
 
+  var requiresCurrentReviewSpelling: Bool {
+    currentReviewItem?.kind == .word && selectedReviewRating != nil
+      && selectedReviewRating != .easy
+  }
+
   var isLongTextTranslationPresentation: Bool {
     translationPresentationTitle == "翻译长文本"
   }
@@ -303,8 +308,7 @@ final class ApplicationShell {
   func startCurrentReviewSpelling() {
     guard
       let currentReviewItem,
-      currentReviewItem.kind == .word,
-      selectedReviewRating != nil,
+      requiresCurrentReviewSpelling,
       !isReviewRating
     else {
       return
@@ -319,7 +323,7 @@ final class ApplicationShell {
     if selectedReviewRating == nil {
       await rateCurrentReview(.remembered)
     }
-    if currentReviewItem?.kind == .word {
+    if requiresCurrentReviewSpelling {
       startCurrentReviewSpelling()
     } else {
       await advanceToNextReview()
@@ -348,6 +352,9 @@ final class ApplicationShell {
         rating: rating,
         reviewedAt: now
       )
+      if rating == .easy {
+        spellingQueue.removeAll { $0.id == currentReviewItem.id }
+      }
       if Calendar.autoupdatingCurrent.startOfDay(for: result.nextReviewAt)
         <= Calendar.autoupdatingCurrent.startOfDay(for: now)
       {

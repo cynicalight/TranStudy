@@ -151,7 +151,7 @@ private struct ReviewSessionView: View {
         isBackFaceInteractive: hasCompletedReviewFlip,
         onFlip: shell.revealCurrentReviewAnswer,
         onSpeak: {
-          if shell.selectedReviewRating != nil {
+          if shell.requiresCurrentReviewSpelling {
             shell.startCurrentReviewSpelling()
           } else {
             shell.speak(item.kind == .word ? item.canonicalForm : item.sourceText)
@@ -245,7 +245,7 @@ private struct ReviewSessionView: View {
         }
 
         if showsNextReviewButton {
-          if item.kind == .word {
+          if shell.requiresCurrentReviewSpelling {
             Button {
               shell.startCurrentReviewSpelling()
             } label: {

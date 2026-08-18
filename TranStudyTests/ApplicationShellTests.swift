@@ -1134,6 +1134,56 @@ struct ApplicationShellTests {
     #expect(shell.currentSpellingItem == nil)
   }
 
+  @Test("easy word reviews skip immediate and final spelling")
+  func easyWordReviewSkipsSpelling() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "7DB7433F-BB76-4DDE-9F32-5AA326443B74")!,
+      canonicalForm: "effortless"
+    )
+    let learningStore = TestLearningStore(dueItems: [item])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    await shell.refreshTodayReview()
+    await shell.rateCurrentReview(.easy)
+    await shell.confirmCurrentReviewOrRemember()
+
+    #expect(
+      learningStore.reviewInvocations
+        == [
+          ReviewInvocation(
+            itemID: item.id,
+            rating: .easy,
+            reviewedAt: Date(timeIntervalSince1970: 1_234)
+          )
+        ])
+    #expect(shell.currentReviewItem == nil)
+    #expect(shell.currentSpellingItem == nil)
+    #expect(shell.selectedReviewRating == nil)
+  }
+
+  @Test("remembered word reviews still require spelling")
+  func rememberedWordReviewRequiresSpelling() async {
+    let item = makeLearningItem(
+      id: UUID(uuidString: "14740F42-0F2C-4B48-A7CE-A00CE58454C5")!,
+      canonicalForm: "resilient"
+    )
+    let learningStore = TestLearningStore(dueItems: [item])
+    let shell = ApplicationShell(
+      environment: .test(learningStore: learningStore)
+    )
+
+    await shell.refreshTodayReview()
+    await shell.rateCurrentReview(.remembered)
+    await shell.confirmCurrentReviewOrRemember()
+
+    #expect(learningStore.reviewInvocations.isEmpty)
+    #expect(shell.currentReviewItem == item)
+    #expect(shell.currentSpellingItem == item)
+    #expect(shell.selectedReviewRating == .remembered)
+  }
+
   @Test("a card scheduled again today returns to the end of the current review batch")
   func sameDayReviewReturnsToCurrentBatch() async {
     let item = makeLearningItem(
