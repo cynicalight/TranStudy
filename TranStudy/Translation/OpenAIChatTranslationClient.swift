@@ -1,6 +1,61 @@
 import Foundation
 import OSLog
 
+#if DEBUG
+  struct Issue18DebugFileLogger {
+    static let defaultLogFileURL = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent("Library", isDirectory: true)
+      .appendingPathComponent("Logs", isDirectory: true)
+      .appendingPathComponent("TranStudy", isDirectory: true)
+      .appendingPathComponent("issue-18-debug.log")
+
+    let logFileURL: URL
+    let maximumByteCount: Int
+
+    init(
+      logFileURL: URL = Self.defaultLogFileURL,
+      maximumByteCount: Int = 1_048_576
+    ) {
+      self.logFileURL = logFileURL
+      self.maximumByteCount = maximumByteCount
+    }
+
+    func append(_ record: String) {
+      do {
+        guard maximumByteCount > 0 else { return }
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+          at: logFileURL.deletingLastPathComponent(),
+          withIntermediateDirectories: true,
+          attributes: [.posixPermissions: 0o700]
+        )
+        let data = Data((record + "\n").utf8)
+        let boundedData = data.count <= maximumByteCount
+          ? data
+          : Data(data.suffix(maximumByteCount))
+        let existingByteCount = try? logFileURL.resourceValues(
+          forKeys: [.fileSizeKey]
+        ).fileSize
+        let shouldReplace = (existingByteCount ?? 0) + data.count > maximumByteCount
+        if fileManager.fileExists(atPath: logFileURL.path), !shouldReplace {
+          let fileHandle = try FileHandle(forWritingTo: logFileURL)
+          defer { try? fileHandle.close() }
+          try fileHandle.seekToEnd()
+          try fileHandle.write(contentsOf: data)
+        } else {
+          try boundedData.write(to: logFileURL, options: .atomic)
+        }
+        try fileManager.setAttributes(
+          [.posixPermissions: 0o600],
+          ofItemAtPath: logFileURL.path
+        )
+      } catch {
+        // Debug diagnostics must never change translation behavior.
+      }
+    }
+  }
+#endif
+
 @MainActor
 final class OpenAIChatTranslationClient {
   private let provider: TranslationProviderKind
@@ -60,7 +115,10 @@ final class OpenAIChatTranslationClient {
       throw Self.invalidWordResponse(
         .malformedPayload,
         reason: .responseJSONCouldNotBeDecoded,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        check: "jsonDecoding",
+        content: completion.content,
+        request: request
       )
     }
     guard payload.inputKind != nil else {
@@ -68,7 +126,10 @@ final class OpenAIChatTranslationClient {
         .missingRequiredContent,
         reason: .responseInputKindMissing,
         missingResponseFields: ["input_kind"],
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        check: "missingInputKind",
+        content: completion.content,
+        request: request
       )
     }
     guard
@@ -83,14 +144,21 @@ final class OpenAIChatTranslationClient {
         .missingRequiredContent,
         reason: .responseRequiredFieldsMissing,
         missingResponseFields: Self.missingFieldNames(in: payload),
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        check: "missingFields=\(Self.missingFieldNames(in: payload).joined(separator: ","))",
+        content: completion.content,
+        request: request
       )
     }
     guard Self.areRecoverablyEquivalent(sourceText, request.sourceText) else {
       throw Self.invalidWordResponse(
         .invalidEnglishContent,
         reason: .responseSourceTextMismatch,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        check:
+          "sourceTextMismatch expected=\(String(reflecting: request.sourceText)) actual=\(String(reflecting: sourceText))",
+        content: completion.content,
+        request: request
       )
     }
 
@@ -121,7 +189,11 @@ final class OpenAIChatTranslationClient {
         reason: Self.containsLatinLetter(canonicalForm) && !Self.containsHanCharacter(canonicalForm)
           ? .responseExampleSentenceIsNotEnglish
           : .responseCanonicalFormIsNotEnglish,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        check:
+          "invalidEnglishFields canonical_form=\(String(reflecting: canonicalForm)) example_sentence=\(String(reflecting: exampleSentence))",
+        content: completion.content,
+        request: request
       )
     }
     guard
@@ -133,7 +205,11 @@ final class OpenAIChatTranslationClient {
         reason: Self.containsHanCharacter(contextualMeaning)
           ? .responseSentenceTranslationIsNotChinese
           : .responseMeaningIsNotChinese,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        check:
+          "invalidChineseFields contextual_meaning=\(String(reflecting: contextualMeaning)) sentence_translation=\(String(reflecting: exampleAndTranslation.sentenceTranslation))",
+        content: completion.content,
+        request: request
       )
     }
     if let selectionWordContext = request.selectionWordContext {
@@ -144,14 +220,57 @@ final class OpenAIChatTranslationClient {
         selectionWordContext.selectedText
       )
       let normalizedExampleSentence = Self.normalizedEnglishIdentity(exampleSentence)
+      let contextContainsExample = normalizedContext.contains(normalizedExampleSentence)
+      let exampleContainsSelection = normalizedExampleSentence.contains(normalizedSelectedText)
       guard
-        normalizedContext.contains(normalizedExampleSentence),
-        normalizedExampleSentence.contains(normalizedSelectedText)
+        contextContainsExample,
+        exampleContainsSelection
+      else {
+        #if DEBUG
+          let debugDetails = Self.selectionContextValidationDebugLines(
+            selectionWordContext: selectionWordContext,
+            normalizedContext: normalizedContext,
+            normalizedSelectedText: normalizedSelectedText,
+            normalizedExampleSentence: normalizedExampleSentence,
+            contextContainsExample: contextContainsExample,
+            exampleContainsSelection: exampleContainsSelection
+          )
+        #else
+          let debugDetails: [String] = []
+        #endif
+        throw Self.invalidWordResponse(
+          .invalidEnglishContent,
+          reason: .exampleSentenceDoesNotMatchSelectionContext,
+          httpStatusCode: completion.httpStatusCode,
+          check: "exampleSentenceDoesNotMatchSelectionContext",
+          content: completion.content,
+          request: request,
+          debugDetails: debugDetails
+        )
+      }
+    } else if request.kind == .contextualSelection,
+      let targetSentence = request.targetSentence
+    {
+      let normalizedTargetSentence = Self.normalizedEnglishIdentity(targetSentence)
+      let normalizedSelectedText = Self.normalizedEnglishIdentity(request.sourceText)
+      let normalizedExampleSentence = Self.normalizedEnglishIdentity(exampleSentence)
+      let exampleContainsSelection = normalizedExampleSentence.contains(normalizedSelectedText)
+      let exampleHasSurroundingContext = normalizedExampleSentence != normalizedSelectedText
+      let exampleMatchesTargetHint =
+        normalizedExampleSentence.contains(normalizedTargetSentence)
+        || normalizedTargetSentence.contains(normalizedExampleSentence)
+      guard
+        exampleContainsSelection,
+        exampleHasSurroundingContext,
+        exampleMatchesTargetHint
       else {
         throw Self.invalidWordResponse(
           .invalidEnglishContent,
           reason: .exampleSentenceDoesNotMatchSelectionContext,
-          httpStatusCode: completion.httpStatusCode
+          httpStatusCode: completion.httpStatusCode,
+          check: "exampleSentenceDoesNotMatchSentenceFallback",
+          content: completion.content,
+          request: request
         )
       }
     }
@@ -516,6 +635,89 @@ final class OpenAIChatTranslationClient {
       subsystem: Bundle.main.bundleIdentifier ?? "com.cynicalight.TranStudy",
       category: "TranslationContext"
     )
+
+    static var issue18DebugLogger = Issue18DebugFileLogger()
+
+    private static func selectionContextValidationDebugLines(
+      selectionWordContext: SelectionWordContext,
+      normalizedContext: String,
+      normalizedSelectedText: String,
+      normalizedExampleSentence: String,
+      contextContainsExample: Bool,
+      exampleContainsSelection: Bool
+    ) -> [String] {
+      [
+        "[DEBUG-issue18] selection.preceding_text="
+          + String(reflecting: selectionWordContext.precedingText),
+        "[DEBUG-issue18] selection.selected_text="
+          + String(reflecting: selectionWordContext.selectedText),
+        "[DEBUG-issue18] selection.following_text="
+          + String(reflecting: selectionWordContext.followingText),
+        "[DEBUG-issue18] selection.combined_text="
+          + String(reflecting: selectionWordContext.combinedText),
+        "[DEBUG-issue18] validation.normalized_context="
+          + String(reflecting: normalizedContext),
+        "[DEBUG-issue18] validation.normalized_selected_text="
+          + String(reflecting: normalizedSelectedText),
+        "[DEBUG-issue18] validation.normalized_example_sentence="
+          + String(reflecting: normalizedExampleSentence),
+        "[DEBUG-issue18] validation.context_contains_example=\(contextContainsExample)",
+        "[DEBUG-issue18] validation.example_contains_selection=\(exampleContainsSelection)",
+        "[DEBUG-issue18] validation.normalized_prefix_first_difference="
+          + normalizedPrefixFirstDifference(
+            context: normalizedContext,
+            example: normalizedExampleSentence
+          ),
+      ]
+    }
+
+    private static func normalizedPrefixFirstDifference(
+      context: String,
+      example: String
+    ) -> String {
+      let contextCharacters = Array(context)
+      let exampleCharacters = Array(example)
+      let sharedCount = min(contextCharacters.count, exampleCharacters.count)
+
+      for characterIndex in 0..<sharedCount
+      where contextCharacters[characterIndex] != exampleCharacters[characterIndex] {
+        return [
+          "character_index=\(characterIndex)",
+          "context=\(String(reflecting: String(contextCharacters[characterIndex])))",
+          "context_unicode=\(unicodeDescription(contextCharacters[characterIndex]))",
+          "example=\(String(reflecting: String(exampleCharacters[characterIndex])))",
+          "example_unicode=\(unicodeDescription(exampleCharacters[characterIndex]))",
+        ].joined(separator: " ")
+      }
+
+      guard contextCharacters.count != exampleCharacters.count else {
+        return "none"
+      }
+      if contextCharacters.count == sharedCount {
+        let exampleCharacter = exampleCharacters[sharedCount]
+        return [
+          "character_index=\(sharedCount)",
+          "context=<end>",
+          "context_unicode=none",
+          "example=\(String(reflecting: String(exampleCharacter)))",
+          "example_unicode=\(unicodeDescription(exampleCharacter))",
+        ].joined(separator: " ")
+      }
+      let contextCharacter = contextCharacters[sharedCount]
+      return [
+        "character_index=\(sharedCount)",
+        "context=\(String(reflecting: String(contextCharacter)))",
+        "context_unicode=\(unicodeDescription(contextCharacter))",
+        "example=<end>",
+        "example_unicode=none",
+      ].joined(separator: " ")
+    }
+
+    private static func unicodeDescription(_ character: Character) -> String {
+      character.unicodeScalars
+        .map { String(format: "U+%04X", $0.value) }
+        .joined(separator: "+")
+    }
   #endif
 
   private static func missingFieldNames(in payload: OpenAITranslationPayload) -> [String] {
@@ -535,8 +737,33 @@ final class OpenAIChatTranslationClient {
     _ failure: TranslationResponseValidationFailure,
     reason: DiagnosticTranslationFailureReason,
     missingResponseFields: [String]? = nil,
-    httpStatusCode: Int
+    httpStatusCode: Int,
+    check: String,
+    content: String,
+    request: TranslationRequest,
+    debugDetails: [String] = []
   ) -> TranslationError {
+    #if DEBUG
+      var debugLines = [
+        "[DEBUG-issue18] timestamp=\(Date().ISO8601Format())",
+        "[DEBUG-issue18] validation failed: failure=\(failure) check=\(check)",
+        "[DEBUG-issue18] request.source_text=\(String(reflecting: request.sourceText))",
+      ]
+      if let targetSentence = request.targetSentence {
+        debugLines.append(
+          "[DEBUG-issue18] request.target_sentence=\(String(reflecting: targetSentence))"
+        )
+      }
+      debugLines.append(contentsOf: debugDetails)
+      debugLines.append("[DEBUG-issue18] response.content.begin")
+      debugLines.append(
+        contentsOf: content.components(separatedBy: .newlines).map {
+          "[DEBUG-issue18] \($0)"
+        }
+      )
+      debugLines.append("[DEBUG-issue18] response.content.end")
+      issue18DebugLogger.append(debugLines.joined(separator: "\n"))
+    #endif
     return .invalidResponse(
       failure,
       diagnosticReason: reason,

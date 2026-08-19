@@ -11,6 +11,11 @@ struct SelectionWordContext: Codable, Equatable, Hashable, Sendable {
     precedingText + selectedText + followingText
   }
 
+  var hasSurroundingContent: Bool {
+    !precedingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || !followingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
   var promptText: String {
     [
       "Text before the selected occurrence (up to 50 words):\n\(precedingText)",

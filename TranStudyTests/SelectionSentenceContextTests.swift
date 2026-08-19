@@ -4,6 +4,72 @@ import Testing
 @testable import TranStudy
 
 struct SelectionSentenceContextTests {
+  @Test("selection-only word capture preserves the sentence fallback")
+  @MainActor
+  func selectionOnlyWordCapturePreservesSentenceFallback() throws {
+    let sentenceContext = SelectionSentenceContext(
+      targetSentence: "You can use it where you work.",
+      previousSentence: nil,
+      nextSentence: nil
+    )
+    let capture = try #require(
+      AccessibilitySelectionProvider.SelectionContextCapture(
+        sentenceContext: sentenceContext,
+        wordContext: SelectionWordContext(
+          precedingText: "",
+          selectedText: "where",
+          followingText: ""
+        )
+      ))
+
+    #expect(capture.sentenceContext == sentenceContext)
+    #expect(capture.wordContext == nil)
+    #expect(capture.diagnosticContextText == sentenceContext.targetSentence)
+  }
+
+  @Test("selection-only word capture without a sentence is unavailable")
+  @MainActor
+  func selectionOnlyWordCaptureWithoutSentenceIsUnavailable() {
+    let capture = AccessibilitySelectionProvider.SelectionContextCapture(
+      sentenceContext: nil,
+      wordContext: SelectionWordContext(
+        precedingText: "",
+        selectedText: "where",
+        followingText: ""
+      )
+    )
+
+    #expect(capture == nil)
+  }
+
+  @Test("selection-only word context is not a surrounding word window")
+  func selectionOnlyWordContextIsNotUsable() {
+    let context = SelectionWordContext(
+      precedingText: " \n",
+      selectedText: "where",
+      followingText: "\t"
+    )
+
+    #expect(!context.hasSurroundingContent)
+  }
+
+  @Test("one populated side keeps a boundary word context usable")
+  func onePopulatedSideKeepsWordContextUsable() {
+    let documentStart = SelectionWordContext(
+      precedingText: "",
+      selectedText: "First",
+      followingText: " word after"
+    )
+    let documentEnd = SelectionWordContext(
+      precedingText: "word before ",
+      selectedText: "last",
+      followingText: ""
+    )
+
+    #expect(documentStart.hasSurroundingContent)
+    #expect(documentEnd.hasSurroundingContent)
+  }
+
   @Test("word context keeps exactly fifty words on each side of the selection")
   func wordContextKeepsFiftyWordsOnEachSide() throws {
     let precedingWords = (1...60).map { "before\($0)" }

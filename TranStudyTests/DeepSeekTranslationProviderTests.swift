@@ -158,6 +158,207 @@ struct DeepSeekTranslationProviderTests {
       )
     }
   }
+
+  #if DEBUG
+    @Test("selection context mismatch writes comparison details to the debug text log")
+    func selectionContextMismatchWritesDebugComparisonDetails() async throws {
+      let responseContent = try JSONSerialization.data(
+        withJSONObject: [
+          "input_kind": "word_or_phrase",
+          "source_text": "where",
+          "canonical_form": "where",
+          "pronunciation": "/wɛr/",
+          "part_of_speech": "conjunction",
+          "contextual_meaning": "在那里",
+          "example_sentence": "Before \"where\" after.",
+          "sentence_translation": "之前、在那里、之后。",
+        ],
+        options: [.sortedKeys]
+      )
+      let responseContentText = try #require(
+        String(data: responseContent, encoding: .utf8)
+      )
+      let responseBody = try JSONSerialization.data(
+        withJSONObject: [
+          "choices": [
+            [
+              "message": ["content": responseContentText]
+            ]
+          ]
+        ]
+      )
+      let provider = DeepSeekTranslationProvider(
+        apiKeyStore: TestAPIKeyStore(apiKey: "test-api-key"),
+        httpClient: TestHTTPClient(data: responseBody, statusCode: 200),
+        model: .flash
+      )
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      let originalDebugLogger = OpenAIChatTranslationClient.issue18DebugLogger
+      OpenAIChatTranslationClient.issue18DebugLogger = Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 1_048_576
+      )
+      defer {
+        OpenAIChatTranslationClient.issue18DebugLogger = originalDebugLogger
+        try? FileManager.default.removeItem(at: temporaryDirectory)
+      }
+
+      await #expect(
+        throws: TranslationError.invalidResponse(
+          .invalidEnglishContent,
+          diagnosticReason: .exampleSentenceDoesNotMatchSelectionContext,
+          httpStatusCode: 200
+        )
+      ) {
+        try await provider.translate(
+          TranslationRequest(
+            sourceText: "where",
+            context: "Before “where” after.",
+            kind: .contextualSelection,
+            targetSentence: "Before “where” after.",
+            selectionWordContext: SelectionWordContext(
+              precedingText: "Before “",
+              selectedText: "where",
+              followingText: "” after."
+            )
+          )
+        )
+      }
+
+      let debugOutput = try String(contentsOf: logFileURL, encoding: .utf8)
+      #expect(debugOutput.contains("selection.preceding_text=\"Before “\""))
+      #expect(debugOutput.contains("selection.selected_text=\"where\""))
+      #expect(debugOutput.contains("selection.following_text=\"” after.\""))
+      #expect(debugOutput.contains("selection.combined_text=\"Before “where” after.\""))
+      #expect(debugOutput.contains("validation.normalized_context=\"before “where” after.\""))
+      #expect(debugOutput.contains("validation.normalized_example_sentence=\"before \\\"where\\\" after.\""))
+      #expect(debugOutput.contains("validation.context_contains_example=false"))
+      #expect(debugOutput.contains("validation.example_contains_selection=true"))
+      #expect(
+        debugOutput.contains(
+          "validation.normalized_prefix_first_difference=character_index=7 "
+            + "context=\"“\" context_unicode=U+201C example=\"\\\"\" example_unicode=U+0022"
+        )
+      )
+    }
+
+    @Test("invalid DeepSeek word response writes debug details to a text log")
+    func invalidWordResponseWritesDebugTextLog() async throws {
+      let responseContent = try JSONSerialization.data(
+        withJSONObject: [
+          "input_kind": "word_or_phrase",
+          "source_text": "ran",
+          "canonical_form": "跑",
+          "pronunciation": "/ræn/",
+          "part_of_speech": "verb",
+          "contextual_meaning": "奔跑",
+          "example_sentence": "She ran home.",
+          "sentence_translation": "她跑回了家。",
+        ],
+        options: [.sortedKeys]
+      )
+      let responseContentText = try #require(
+        String(data: responseContent, encoding: .utf8)
+      )
+      let responseBody = try JSONSerialization.data(
+        withJSONObject: [
+          "choices": [
+            [
+              "message": ["content": responseContentText]
+            ]
+          ]
+        ]
+      )
+      let provider = DeepSeekTranslationProvider(
+        apiKeyStore: TestAPIKeyStore(apiKey: "test-api-key"),
+        httpClient: TestHTTPClient(data: responseBody, statusCode: 200),
+        model: .flash
+      )
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      let originalDebugLogger = OpenAIChatTranslationClient.issue18DebugLogger
+      OpenAIChatTranslationClient.issue18DebugLogger = Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 1_048_576
+      )
+      defer {
+        OpenAIChatTranslationClient.issue18DebugLogger = originalDebugLogger
+        try? FileManager.default.removeItem(at: temporaryDirectory)
+      }
+
+      await #expect(
+        throws: TranslationError.invalidResponse(
+          .invalidEnglishContent,
+          diagnosticReason: .responseCanonicalFormIsNotEnglish,
+          httpStatusCode: 200
+        )
+      ) {
+        try await provider.translate(TranslationRequest(sourceText: "ran"))
+      }
+
+      let debugOutput = try String(contentsOf: logFileURL, encoding: .utf8)
+      #expect(debugOutput.contains("[DEBUG-issue18] timestamp="))
+      #expect(debugOutput.contains("[DEBUG-issue18] validation failed"))
+      #expect(debugOutput.contains("failure=invalidEnglishContent"))
+      #expect(debugOutput.contains("check=invalidEnglishFields"))
+      #expect(debugOutput.contains("request.source_text=\"ran\""))
+      #expect(debugOutput.contains(responseContentText))
+    }
+
+    @Test("Issue 18 debug text log replaces content before exceeding its size limit")
+    func issue18DebugTextLogStaysWithinSizeLimit() throws {
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+      try FileManager.default.createDirectory(
+        at: temporaryDirectory,
+        withIntermediateDirectories: true
+      )
+      try Data(repeating: 0x78, count: 64).write(to: logFileURL)
+
+      Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 64
+      ).append("[DEBUG-issue18] newest record")
+
+      let logData = try Data(contentsOf: logFileURL)
+      let logText = try #require(String(data: logData, encoding: .utf8))
+      #expect(logData.count <= 64)
+      #expect(logText == "[DEBUG-issue18] newest record\n")
+    }
+
+    @Test("Issue 18 debug text log is private after writing")
+    func issue18DebugTextLogUsesPrivatePermissions() throws {
+      let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      let logFileURL = temporaryDirectory.appendingPathComponent("issue-18-debug.log")
+      defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+      try FileManager.default.createDirectory(
+        at: temporaryDirectory,
+        withIntermediateDirectories: true
+      )
+      try Data().write(to: logFileURL)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o644],
+        ofItemAtPath: logFileURL.path
+      )
+
+      Issue18DebugFileLogger(
+        logFileURL: logFileURL,
+        maximumByteCount: 1_048_576
+      ).append("[DEBUG-issue18] private record")
+
+      let attributes = try FileManager.default.attributesOfItem(
+        atPath: logFileURL.path
+      )
+      let permissions = try #require(attributes[.posixPermissions] as? NSNumber)
+      #expect(permissions.intValue & 0o777 == 0o600)
+    }
+  #endif
 }
 
 @MainActor
