@@ -80,6 +80,7 @@ struct DiagnosticTranslationDetails: Sendable {
   let failureReason: DiagnosticTranslationFailureReason?
   let missingResponseFields: [String]?
   let httpStatusCode: Int?
+  let rawResponse: String?
 
   init(
     provider: String,
@@ -87,7 +88,8 @@ struct DiagnosticTranslationDetails: Sendable {
     requestKind: DiagnosticTranslationRequestKind,
     failureReason: DiagnosticTranslationFailureReason? = nil,
     missingResponseFields: [String]? = nil,
-    httpStatusCode: Int? = nil
+    httpStatusCode: Int? = nil,
+    rawResponse: String? = nil
   ) {
     self.provider = provider
     self.model = model
@@ -95,6 +97,7 @@ struct DiagnosticTranslationDetails: Sendable {
     self.failureReason = failureReason
     self.missingResponseFields = missingResponseFields
     self.httpStatusCode = httpStatusCode
+    self.rawResponse = rawResponse
   }
 }
 
@@ -111,10 +114,11 @@ struct DiagnosticEvent: Codable, Equatable, Sendable {
   let failureReason: DiagnosticTranslationFailureReason?
   let missingResponseFields: [String]?
   let httpStatusCode: Int?
+  let rawResponse: String?
 }
 
 struct DiagnosticArchive: Codable, Equatable, Sendable {
-  static let currentFormatVersion = 2
+  static let currentFormatVersion = 3
 
   let formatVersion: Int
   let exportedAt: Date

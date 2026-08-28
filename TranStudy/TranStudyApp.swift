@@ -60,7 +60,7 @@ struct TranStudyApp: App {
   }
 
   var body: some Scene {
-    WindowGroup("TranStudy", id: "main") {
+    Window("TranStudy", id: "main") {
       RootView(
         shell: shell,
         onTranslateClipboard: {

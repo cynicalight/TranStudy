@@ -285,6 +285,10 @@ private struct ReviewSessionView: View {
     let expectedCharacters = Array(item.canonicalForm)
     let expectedInputLength = SpellingAnswer.inputCharacters(in: item.canonicalForm).count
     let enteredCharacters = Array(submittedSpellingAttempt ?? spellingAttempt)
+    let sessionIdentity = SpellingSessionIdentity(
+      itemID: item.id,
+      isImmediate: shell.isImmediateSpellingReview
+    )
 
     return VStack(spacing: 16) {
       VStack(alignment: .leading, spacing: 24) {
@@ -380,10 +384,14 @@ private struct ReviewSessionView: View {
       .padding(28)
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentSurface()
-      .task(id: item.id) {
+      .task(id: sessionIdentity) {
+        isSpellingAttemptFocused = false
         spellingAttempt = ""
         submittedSpellingAttempt = nil
         await Task.yield()
+        guard !Task.isCancelled, shell.spellingReviewResult != true else {
+          return
+        }
         isSpellingAttemptFocused = true
         shell.speak(item.canonicalForm)
       }
@@ -402,10 +410,11 @@ private struct ReviewSessionView: View {
         guard !Task.isCancelled else {
           return
         }
+        isSpellingAttemptFocused = false
         isSpellingShaking = false
         spellingAttempt = ""
+        submittedSpellingAttempt = nil
         await shell.advanceToNextSpellingReview()
-        isSpellingAttemptFocused = true
       }
       .onChange(of: spellingAttempt) { _, attempt in
         let limitedAttempt = String(attempt.prefix(expectedInputLength))
@@ -745,6 +754,11 @@ private struct SpellingReviewPreview: View {
       isAttemptFocused = true
     }
   }
+}
+
+private struct SpellingSessionIdentity: Equatable {
+  let itemID: UUID
+  let isImmediate: Bool
 }
 
 private struct ReviewFlipCard<Front: View, Back: View>: View {

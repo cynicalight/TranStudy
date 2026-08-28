@@ -5,8 +5,8 @@ import Testing
 
 @MainActor
 struct DiagnosticLogStoreTests {
-  @Test("diagnostic archive contains only bounded metadata")
-  func diagnosticArchiveContainsOnlyMetadata() throws {
+  @Test("diagnostic archive contains only bounded metadata for non-response failures")
+  func diagnosticArchiveContainsOnlyBoundedMetadataForNonResponseFailures() throws {
     let directory = FileManager.default.temporaryDirectory
       .appending(path: "DiagnosticLogStoreTests-\(UUID().uuidString)")
     let fileURL = directory.appending(path: "diagnostics.json")
@@ -55,7 +55,8 @@ struct DiagnosticLogStoreTests {
         requestKind: .contextualSelection,
         failureReason: .exampleSentenceDoesNotMatchSelectionContext,
         missingResponseFields: nil,
-        httpStatusCode: 200
+        httpStatusCode: 200,
+        rawResponse: "{\"example_sentence\":\"raw model response\"}"
       )
     )
 
@@ -67,11 +68,12 @@ struct DiagnosticLogStoreTests {
     #expect(event.failureReason == .exampleSentenceDoesNotMatchSelectionContext)
     #expect(event.missingResponseFields == nil)
     #expect(event.httpStatusCode == 200)
+    #expect(event.rawResponse == "{\"example_sentence\":\"raw model response\"}")
 
     let data = try JSONEncoder.tranStudy.encode(archive)
     let json = try #require(String(data: data, encoding: .utf8))
     #expect(!json.contains("selected text"))
-    #expect(!json.contains("raw model response"))
+    #expect(json.contains("raw model response"))
     #expect(!json.contains("secret-key"))
   }
 }

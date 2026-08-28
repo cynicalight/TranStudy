@@ -66,7 +66,8 @@ final class FileDiagnosticLogStore: DiagnosticLogging {
         requestKind: details?.requestKind,
         failureReason: details?.failureReason,
         missingResponseFields: details?.missingResponseFields,
-        httpStatusCode: details?.httpStatusCode
+        httpStatusCode: details?.httpStatusCode,
+        rawResponse: details?.rawResponse
       )
     )
     if events.count > maximumEventCount {

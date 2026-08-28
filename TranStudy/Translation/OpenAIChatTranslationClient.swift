@@ -324,7 +324,8 @@ final class OpenAIChatTranslationClient {
       throw TranslationError.invalidResponse(
         .malformedPayload,
         diagnosticReason: .responseJSONCouldNotBeDecoded,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        rawResponse: completion.content
       )
     }
     guard let inputKind = payload.inputKind else {
@@ -332,14 +333,16 @@ final class OpenAIChatTranslationClient {
         .missingRequiredContent,
         diagnosticReason: .responseInputKindMissing,
         missingResponseFields: ["input_kind"],
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        rawResponse: completion.content
       )
     }
     guard inputKind == .longText else {
       throw TranslationError.invalidResponse(
         .unexpectedInputKind,
         diagnosticReason: .responseInputKindUnexpected,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        rawResponse: completion.content
       )
     }
     guard
@@ -353,21 +356,24 @@ final class OpenAIChatTranslationClient {
           ("source_text", payload.sourceText),
           ("translation", payload.translation),
         ].compactMap { Self.nonempty($0.1) == nil ? $0.0 : nil },
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        rawResponse: completion.content
       )
     }
     guard payloadSourceText == sourceText else {
       throw TranslationError.invalidResponse(
         .invalidEnglishContent,
         diagnosticReason: .longTextSourceTextMismatch,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        rawResponse: completion.content
       )
     }
     guard Self.containsHanCharacter(translation) else {
       throw TranslationError.invalidResponse(
         .invalidChineseContent,
         diagnosticReason: .longTextTranslationIsNotChinese,
-        httpStatusCode: completion.httpStatusCode
+        httpStatusCode: completion.httpStatusCode,
+        rawResponse: completion.content
       )
     }
 
@@ -420,7 +426,8 @@ final class OpenAIChatTranslationClient {
       throw TranslationError.invalidResponse(
         .malformedPayload,
         diagnosticReason: .responseJSONCouldNotBeDecoded,
-        httpStatusCode: response.statusCode
+        httpStatusCode: response.statusCode,
+        rawResponse: String(decoding: data, as: UTF8.self)
       )
     }
     return CompletionContent(content: content, httpStatusCode: response.statusCode)
@@ -768,7 +775,8 @@ final class OpenAIChatTranslationClient {
       failure,
       diagnosticReason: reason,
       missingResponseFields: missingResponseFields,
-      httpStatusCode: httpStatusCode
+      httpStatusCode: httpStatusCode,
+      rawResponse: content
     )
   }
 

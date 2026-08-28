@@ -10,10 +10,10 @@
 		"swift"
 	],
 	"argv": [
-		"/Users/apple/.local/share/nvim/mason/bin/xcode-build-server"
+		"/Users/bu44er/.local/share/nvim/mason/bin/xcode-build-server"
 	],
-	"workspace": "/Users/apple/Developer/TranStudy/TranStudy.xcodeproj/project.xcworkspace",
-	"build_root": "/Users/apple/Library/Developer/Xcode/DerivedData/TranStudy-dofojekapuedzzfbfkysvzfpevxa",
+	"workspace": "/Users/bu44er/Developer/Projects/TranStudy/TranStudy.xcodeproj/project.xcworkspace",
+	"build_root": "/Users/bu44er/Library/Developer/Xcode/DerivedData/TranStudy-dofojekapuedzzfbfkysvzfpevxa",
 	"scheme": "TranStudy",
 	"kind": "xcode"
 }

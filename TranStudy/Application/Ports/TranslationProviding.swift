@@ -88,7 +88,8 @@ enum TranslationError: Error, Equatable, Sendable {
     TranslationResponseValidationFailure = .malformedPayload,
     diagnosticReason: DiagnosticTranslationFailureReason? = nil,
     missingResponseFields: [String]? = nil,
-    httpStatusCode: Int? = nil
+    httpStatusCode: Int? = nil,
+    rawResponse: String? = nil
   )
   case invalidRequest
   case authenticationFailed
@@ -107,7 +108,7 @@ enum TranslationError: Error, Equatable, Sendable {
       "翻译请求超时。请检查网络后重试。"
     case .networkUnavailable:
       "无法连接到翻译服务。请检查网络、代理或服务地址。"
-    case .invalidResponse(let failure, _, _, _):
+    case .invalidResponse(let failure, _, _, _, _):
       failure.userFacingMessageKey
     case .invalidRequest:
       TranslationHTTPFailure.invalidRequest.userFacingMessageKey
@@ -134,7 +135,7 @@ enum TranslationError: Error, Equatable, Sendable {
       return .requestTimedOut
     case .networkUnavailable:
       return .networkUnavailable
-    case .invalidResponse(let failure, let reason, _, _):
+    case .invalidResponse(let failure, let reason, _, _, _):
       return reason ?? failure.defaultDiagnosticReason
     case .invalidRequest:
       return .requestRejected
@@ -152,7 +153,7 @@ enum TranslationError: Error, Equatable, Sendable {
   }
 
   var diagnosticMissingResponseFields: [String]? {
-    guard case .invalidResponse(_, _, let fields, _) = self else {
+    guard case .invalidResponse(_, _, let fields, _, _) = self else {
       return nil
     }
     return fields
@@ -160,12 +161,47 @@ enum TranslationError: Error, Equatable, Sendable {
 
   var httpStatusCode: Int? {
     switch self {
-    case .invalidResponse(_, _, _, let statusCode):
+    case .invalidResponse(_, _, _, let statusCode, _):
       return statusCode
     case .httpFailure(_, let statusCode):
       return statusCode
     default:
       return nil
+    }
+  }
+
+  var diagnosticRawResponse: String? {
+    guard case .invalidResponse(_, _, _, _, let rawResponse) = self else {
+      return nil
+    }
+    return rawResponse
+  }
+
+  static func == (lhs: TranslationError, rhs: TranslationError) -> Bool {
+    // Raw provider content is diagnostic context and does not change the error identity.
+    switch (lhs, rhs) {
+    case (.notConfigured, .notConfigured),
+      (.inputTooLong, .inputTooLong),
+      (.timedOut, .timedOut),
+      (.networkUnavailable, .networkUnavailable),
+      (.invalidRequest, .invalidRequest),
+      (.authenticationFailed, .authenticationFailed),
+      (.quotaExceeded, .quotaExceeded),
+      (.rateLimited, .rateLimited),
+      (.serviceUnavailable, .serviceUnavailable):
+      return true
+    case let (
+      .invalidResponse(lhsFailure, lhsReason, lhsFields, lhsStatusCode, _),
+      .invalidResponse(rhsFailure, rhsReason, rhsFields, rhsStatusCode, _)
+    ):
+      return lhsFailure == rhsFailure
+        && lhsReason == rhsReason
+        && lhsFields == rhsFields
+        && lhsStatusCode == rhsStatusCode
+    case let (.httpFailure(lhsFailure, lhsStatusCode), .httpFailure(rhsFailure, rhsStatusCode)):
+      return lhsFailure == rhsFailure && lhsStatusCode == rhsStatusCode
+    default:
+      return false
     }
   }
 }

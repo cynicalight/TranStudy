@@ -321,9 +321,11 @@ struct ApplicationShellTests {
     #expect(failure.errorType == .invalidEnglishResponse)
     #expect(failure.failureReason == .responseSourceTextMismatch)
     #expect(failure.httpStatusCode == 200)
+    #expect(failure.rawResponse == "{\"source_text\":\"model response\"}")
 
     let json = try #require(String(data: shell.makeDiagnosticExport(), encoding: .utf8))
     #expect(!json.contains("secret selected text"))
+    #expect(json.contains("model response"))
   }
 
   @Test("translation diagnostics keep the provider configuration used by the request")
@@ -2061,7 +2063,8 @@ private final class DiagnosticFailureTranslationProvider: TranslationProviding {
     throw TranslationError.invalidResponse(
       .invalidEnglishContent,
       diagnosticReason: .responseSourceTextMismatch,
-      httpStatusCode: 200
+      httpStatusCode: 200,
+      rawResponse: "{\"source_text\":\"model response\"}"
     )
   }
 }

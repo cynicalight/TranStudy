@@ -186,6 +186,7 @@ struct OpenAICompatibleTranslationProviderTests {
             httpStatusCode: 200
           )
       )
+      #expect(error.diagnosticRawResponse?.contains("She ran home.") == true)
     }
   }
 

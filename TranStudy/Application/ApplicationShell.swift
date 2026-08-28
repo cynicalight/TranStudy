@@ -728,7 +728,7 @@ final class ApplicationShell {
       return .network
     case .httpFailure(let failure, _):
       return failure.diagnosticErrorType
-    case .invalidResponse(let failure, _, _, _):
+    case .invalidResponse(let failure, _, _, _, _):
       switch failure {
       case .malformedPayload:
         return .malformedResponse
@@ -785,7 +785,8 @@ final class ApplicationShell {
         context: context,
         failureReason: translationError?.diagnosticFailureReason,
         missingResponseFields: translationError?.diagnosticMissingResponseFields,
-        httpStatusCode: translationError?.httpStatusCode
+        httpStatusCode: translationError?.httpStatusCode,
+        rawResponse: translationError?.diagnosticRawResponse
       )
     )
   }
@@ -794,7 +795,8 @@ final class ApplicationShell {
     context: TranslationDiagnosticContext,
     failureReason: DiagnosticTranslationFailureReason? = nil,
     missingResponseFields: [String]? = nil,
-    httpStatusCode: Int? = nil
+    httpStatusCode: Int? = nil,
+    rawResponse: String? = nil
   ) -> DiagnosticTranslationDetails {
     DiagnosticTranslationDetails(
       provider: context.provider,
@@ -802,7 +804,8 @@ final class ApplicationShell {
       requestKind: context.requestKind,
       failureReason: failureReason,
       missingResponseFields: missingResponseFields,
-      httpStatusCode: httpStatusCode
+      httpStatusCode: httpStatusCode,
+      rawResponse: rawResponse
     )
   }
 
