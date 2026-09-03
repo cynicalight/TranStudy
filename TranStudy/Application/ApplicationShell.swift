@@ -246,10 +246,11 @@ final class ApplicationShell {
         seed: DailyReviewQueueBuilder.seed(for: now)
       )
       let batches = queue.batches
+      let firstBatch = batches.first ?? []
       learningSummary = summary
-      reviewQueue = batches.first ?? []
+      reviewQueue = firstBatch
       remainingReviewBatches = Array(batches.dropFirst())
-      spellingQueue = queue.items.filter { $0.kind == .word }
+      spellingQueue = firstBatch.filter { $0.kind == .word }
       isReviewAnswerVisible = false
       selectedReviewRating = nil
       immediateSpellingItem = nil
@@ -452,10 +453,17 @@ final class ApplicationShell {
   }
 
   func startNextReviewBatch() {
-    guard reviewQueue.isEmpty, !remainingReviewBatches.isEmpty else {
+    guard
+      reviewQueue.isEmpty,
+      spellingQueue.isEmpty,
+      immediateSpellingItem == nil,
+      !remainingReviewBatches.isEmpty
+    else {
       return
     }
-    reviewQueue = remainingReviewBatches.removeFirst()
+    let nextBatch = remainingReviewBatches.removeFirst()
+    reviewQueue = nextBatch
+    spellingQueue = nextBatch.filter { $0.kind == .word }
     isReviewAnswerVisible = false
     selectedReviewRating = nil
   }
