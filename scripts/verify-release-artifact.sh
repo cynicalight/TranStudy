@@ -33,7 +33,7 @@ assert_plist_value CFBundleIdentifier "$RELEASE_SIGNING_BUNDLE_IDENTIFIER"
 assert_plist_value LSMinimumSystemVersion 14.0
 assert_plist_value SUFeedURL \
   https://github.com/cynicalight/TranStudy/releases/latest/download/appcast.xml
-assert_plist_value SUPublicEDKey e0FYHC/ETQiiTfpRq8QHxRleYusmX6weOrlLmY7Xpow=
+assert_plist_value SUPublicEDKey "$RELEASE_SPARKLE_PUBLIC_KEY"
 assert_plist_value SUEnableAutomaticChecks false
 assert_plist_value SUScheduledCheckInterval 604800
 assert_plist_value SUAutomaticallyUpdate false

@@ -1,14 +1,20 @@
 # Releasing TranStudy
 
-TranStudy is distributed as a macOS 14+ DMG through GitHub Releases. GitHub distribution does not require an Apple Developer Program membership. Releases use the fixed self-signed identity `TranStudy GitHub Release` and are not notarized by Apple. The bundle identifier remains `com.cynicalight.TranStudy`, and the release certificate SHA-1 fingerprint remains `D8877EB8F9C65B7D6D2EEA6E96A7C41C8AF2CB0A`. Sparkle 2.9.4 checks the HTTPS appcast at most once per week only when the user enables automatic checks. Automatic downloads and installations are disabled at the framework configuration level, so every update requires an explicit user decision.
+TranStudy is distributed as a macOS 14+ DMG through GitHub Releases. GitHub distribution does not require an Apple Developer Program membership. Releases use the fixed self-signed identity `TranStudy GitHub Release 2026` and are not notarized by Apple. The bundle identifier remains `com.cynicalight.TranStudy`, and the release certificate SHA-1 fingerprint remains `2F061B77046B598ABE6E1206F5A1C3EEB83E7256`. Sparkle 2.9.4 checks the HTTPS appcast at most once per week only when the user enables automatic checks. Automatic downloads and installations are disabled at the framework configuration level, so every update requires an explicit user decision.
 
 ## One-time preparation
 
-The Sparkle private EdDSA key is stored only in the login keychain; its public key is `e0FYHC/ETQiiTfpRq8QHxRleYusmX6weOrlLmY7Xpow=`. Back up the private key to protected offline storage with Sparkle’s `generate_keys -x` command, then remove the exported file from the working machine after confirming the backup.
+The Sparkle private EdDSA key is stored in the login keychain under account `transtudy-release-2026`; its public key is `tiawuVpbj3cB5C5KyqLyshS83QIvHTao6Rh9ECUKkAM=`. Back up the private key to protected offline storage with Sparkle’s `generate_keys --account transtudy-release-2026 -x` command, then remove the exported file from the working machine after confirming the backup.
 
 The private Sparkle key must never be committed, uploaded as a release asset, or stored on the web server that hosts GitHub Releases.
 
-The `TranStudy GitHub Release` private key lives in the developer's login keychain, with a password-protected `.p12` backup stored outside the repository. The public certificate is embedded in signed releases, and its fingerprint in `config/GitHubReleaseSigning.sh` is safe to commit. Users do not install or maintain the private key. The fixed public fingerprint prevents accidental releases with a different identity.
+The `TranStudy GitHub Release 2026` private key lives in the developer's login keychain. Create a password-protected `.p12` backup in Keychain Access and keep it in protected offline storage outside the repository. The replacement identity has not yet been backed up. The public certificate is embedded in signed releases, and its fingerprint in `config/GitHubReleaseSigning.sh` is safe to commit. Users do not install or maintain the private key. The fixed public fingerprint prevents accidental releases with a different identity. This self-signed certificate is trusted locally for code signing only; the signing preflight checks the code-signing policy. Signing uses the current default keychain explicitly, so an unrelated locked keychain does not interrupt the release. Set `RELEASE_SIGNING_KEYCHAIN` to an absolute keychain path when using a different keychain.
+
+## Signing-key replacement in v1.1.4
+
+Version 1.1.4 replaces both the app signing certificate and the Sparkle update-signing key. The previous keys remain in the old keychain, but are unavailable for this release. Versions 1.1.3 and earlier cannot authenticate the new signed feed or update. Users must download the v1.1.4 DMG from GitHub Releases, quit TranStudy, and replace the app in Applications manually. Learning data remains in its existing Application Support location. macOS may require users to grant Accessibility permission again after the signing identity changes.
+
+Keep signed-feed and update verification enabled. Manually installed v1.1.4 uses the replacement public key for subsequent updates; future releases must retain these replacement keys. Sparkle documents the constraints in its [signing-key rotation guidance](https://sparkle-project.org/documentation/#rotating-signing-keys).
 
 ## Build the DMG
 

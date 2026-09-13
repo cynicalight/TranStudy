@@ -4,6 +4,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
+source "$repo_root/config/GitHubReleaseSigning.sh"
 
 required_variable() {
   local name=$1
@@ -103,6 +104,7 @@ release_notes_path="$release_root/TranStudy-$VERSION.md"
 cp "$RELEASE_NOTES_FILE" "$release_notes_path"
 
 "$sparkle_tools/generate_appcast" \
+  --account "$RELEASE_SPARKLE_ACCOUNT" \
   --download-url-prefix \
   "https://github.com/cynicalight/TranStudy/releases/download/v$VERSION/" \
   --link https://github.com/cynicalight/TranStudy \

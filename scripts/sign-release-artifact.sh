@@ -28,8 +28,19 @@ if [[ "$actual_bundle_identifier" != "$RELEASE_SIGNING_BUNDLE_IDENTIFIER" ]]; th
   exit 65
 fi
 
+signing_keychain=${RELEASE_SIGNING_KEYCHAIN:-$(
+  security default-keychain -d user |
+    sed -E 's/^[[:space:]]*"(.*)"[[:space:]]*$/\1/'
+)}
+if [[ ! -f "$signing_keychain" ]]; then
+  echo "release signing keychain is unavailable: $signing_keychain" >&2
+  exit 69
+fi
+
 identity_pattern="$RELEASE_SIGNING_CERTIFICATE_SHA1 \"$RELEASE_SIGNING_IDENTITY_NAME\""
-if ! security find-identity -v -p basic | grep -F "$identity_pattern" >/dev/null; then
+if ! security find-identity -v -p codesigning "$signing_keychain" |
+  grep -F "$identity_pattern" >/dev/null
+then
   echo \
     "release signing identity is unavailable: $RELEASE_SIGNING_IDENTITY_NAME ($RELEASE_SIGNING_CERTIFICATE_SHA1)" \
     >&2
@@ -44,6 +55,7 @@ designated_requirement="designated => $identity_requirement"
 
 codesign \
   --force \
+  --keychain "$signing_keychain" \
   --options runtime \
   --entitlements "$repo_root/config/GitHubRelease.entitlements" \
   --generate-entitlement-der \

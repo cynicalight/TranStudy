@@ -33,7 +33,7 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/cynicalight/TranStudy/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>e0FYHC/ETQiiTfpRq8QHxRleYusmX6weOrlLmY7Xpow=</string>
+	<string>tiawuVpbj3cB5C5KyqLyshS83QIvHTao6Rh9ECUKkAM=</string>
 	<key>SURequireSignedFeed</key>
 	<true/>
 	<key>SUScheduledCheckInterval</key>

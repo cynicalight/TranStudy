@@ -33,7 +33,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         SUFeedURL: https://github.com/cynicalight/TranStudy/releases/latest/download/appcast.xml
-        SUPublicEDKey: "e0FYHC/ETQiiTfpRq8QHxRleYusmX6weOrlLmY7Xpow="
+        SUPublicEDKey: "tiawuVpbj3cB5C5KyqLyshS83QIvHTao6Rh9ECUKkAM="
         SUEnableAutomaticChecks: false
         SUScheduledCheckInterval: 604800
         SUAutomaticallyUpdate: false
