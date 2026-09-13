@@ -33,7 +33,7 @@ struct DeepSeekTranslationProviderTests {
       data: try JSONSerialization.data(
         withJSONObject: [
           "data": [
-            ["id": "deepseek-v4-flash"]
+            ["id": "deepseek-flash"]
           ]
         ]
       ),
@@ -106,7 +106,7 @@ struct DeepSeekTranslationProviderTests {
     let body = try #require(
       JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
     )
-    #expect(body["model"] as? String == "deepseek-v4-flash")
+    #expect(body["model"] as? String == "deepseek-flash")
     #expect((body["response_format"] as? [String: String])?["type"] == "json_object")
     #expect(
       result

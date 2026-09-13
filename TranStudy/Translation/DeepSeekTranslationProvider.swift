@@ -1,8 +1,24 @@
 import Foundation
 
 enum DeepSeekModel: String, CaseIterable, Codable, Identifiable, Sendable {
-  case flash = "deepseek-v4-flash"
+  case flash = "deepseek-flash"
   case pro = "deepseek-v4-pro"
+
+  init(from decoder: any Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let rawValue = try container.decode(String.self)
+    // Preserve configurations saved before the Flash model was renamed.
+    if rawValue == "deepseek-v4-flash" {
+      self = .flash
+    } else if let model = Self(rawValue: rawValue) {
+      self = model
+    } else {
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Unknown DeepSeek model: \(rawValue)"
+      )
+    }
+  }
 
   var id: Self {
     self
@@ -11,7 +27,7 @@ enum DeepSeekModel: String, CaseIterable, Codable, Identifiable, Sendable {
   var title: String {
     switch self {
     case .flash:
-      "DeepSeek V4 Flash"
+      "DeepSeek Flash"
     case .pro:
       "DeepSeek V4 Pro"
     }
